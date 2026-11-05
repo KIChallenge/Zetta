@@ -22,6 +22,7 @@ export default defineConfig({
     proxy: {
       '/auth/': api,
       '^/me$': api,
+      '^/chats(/|$)': api,
     },
   },
 })
