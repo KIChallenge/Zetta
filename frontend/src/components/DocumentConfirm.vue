@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { ConfirmPayload } from '../chats'
+import { t } from '../i18n'
 
 // Quotes found in the letter: the user confirms which are right. Only confirmed ones shape the plan.
 const props = defineProps<{ text: string; payload: ConfirmPayload; active: boolean }>()
@@ -21,16 +22,16 @@ function confirm() {
         <li v-for="i in payload.items" :key="i.recommendation">
           <label class="check">
             <input v-model="picked" type="checkbox" :value="i.recommendation" />
-            <span><b>{{ i.label }}</b><small>„{{ i.quote }}“</small></span>
+            <span><b>{{ t(i.label) }}</b><small>„{{ i.quote }}“</small></span>
           </label>
         </li>
       </ul>
-      <p class="hint">Befunde liest der Lotse nicht. Ihr Brief wird nicht gespeichert.</p>
-      <div class="actions"><button type="button" class="btn btn-primary" @click="confirm">Stimmt so, weiter</button></div>
+      <p class="hint">{{ t('Befunde liest der Lotse nicht. Ihr Brief wird nicht gespeichert.') }}</p>
+      <div class="actions"><button type="button" class="btn btn-primary" @click="confirm">{{ t('Stimmt so, weiter') }}</button></div>
     </template>
     <!-- Answered: the quotes are in the plan, here only what the letter contained. -->
     <ul v-else-if="payload.items.length" class="found">
-      <li v-for="i in payload.items" :key="i.recommendation">{{ i.label }}</li>
+      <li v-for="i in payload.items" :key="i.recommendation">{{ t(i.label) }}</li>
     </ul>
   </section>
 </template>

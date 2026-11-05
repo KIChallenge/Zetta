@@ -8,8 +8,9 @@ import {
   type PlanPayload,
   type QuestionPayload, type StepUpdate,
 } from '../chats'
+import { k, locale, setLocale, t, takeRegistering } from '../i18n'
 import { toHtml } from '../markdown'
-import { getProfile, type Profile } from '../profile'
+import { getProfile, saveProfile, type Profile } from '../profile'
 import DocumentConfirm from './DocumentConfirm.vue'
 import FactChips from './FactChips.vue'
 import NoticeCard from './NoticeCard.vue'
@@ -31,8 +32,8 @@ const emit = defineEmits<{ expired: []; deleted: [] }>()
 
 const LIST = 'gespraeche'
 const SETTINGS = 'einstellungen'
-const STATE = { sending: 'Wird gesendet …', delivered: 'Zugestellt', failed: 'Nicht zugestellt' }
-const NO_REPLY = 'Die Antwort konnte gerade nicht erstellt werden.'
+const STATE = { sending: k('Wird gesendet …'), delivered: k('Zugestellt'), failed: k('Nicht zugestellt') }
+const NO_REPLY = k('Die Antwort konnte gerade nicht erstellt werden.')
 
 const hash = ref(location.hash.slice(1))
 const activeId = computed(() => (hash.value && hash.value !== LIST && hash.value !== SETTINGS ? decodeURIComponent(hash.value) : null))
@@ -69,7 +70,7 @@ let pendingFocus = ''
 // Every API error goes through here, so an expired session always ends at the login screen.
 function fail(e: unknown, invalid?: string) {
   if (e instanceof ApiError && e.status === 401) emit('expired')
-  return say(e, invalid)
+  return t(say(e, invalid))
 }
 
 const focus = (id: string) => nextTick(() => document.getElementById(id)?.focus())
@@ -124,7 +125,12 @@ async function loadList() {
 }
 loadList()
 getProfile()
-  .then((p) => (profile.value = p))
+  .then(async (p) => {
+    // A new account gets the language picked on the login screen; after that the profile decides.
+    if (takeRegistering() && p.answer_language !== locale.value) p = await saveProfile({ ...p, answer_language: locale.value as Profile['answer_language'] })
+    profile.value = p
+    setLocale(p.answer_language)
+  })
   .catch((e) => {
     fail(e)
     profileFailed.value = true
@@ -132,6 +138,7 @@ getProfile()
 
 function profileSaved(p: Profile) {
   profile.value = p
+  setLocale(p.answer_language)
   profileFailed.value = false
 }
 
@@ -158,7 +165,7 @@ watch(activeId, async (id, _, onCleanup) => {
   } catch (e) {
     if (stale) return
     const msg = fail(e)
-    if (msg !== NOT_FOUND) loadErr.value = msg
+    if (msg !== t(NOT_FOUND)) loadErr.value = msg
     else {
       notice.value = msg
       go('', 'view-h', true)
@@ -173,7 +180,7 @@ watch(activeId, async (id, _, onCleanup) => {
 function submit() {
   if (run.value) return // one reply at a time
   const text = draft.value.trim()
-  draftErr.value = text ? '' : 'Bitte schreiben Sie zuerst Ihre Nachricht.'
+  draftErr.value = text ? '' : t('Bitte schreiben Sie zuerst Ihre Nachricht.')
   if (!text) return focus('q')
   notice.value = ''
   if (!activeId.value) return start(text)
@@ -224,7 +231,7 @@ function answerMany(key: string, chips: Chip[]) {
 }
 function confirmLetter(values: string[], labels: string[]) {
   if (run.value || !activeId.value) return
-  const label = labels.length ? 'Stimmt so' : 'Keine davon stimmt'
+  const label = labels.length ? k('Stimmt so') : k('Keine davon stimmt')
   deliver(activeId.value, label, { fact_key: 'documented_recommendations', value: values.length ? values : 'unknown' })
 }
 
@@ -242,7 +249,7 @@ async function upload(e: Event) {
   try {
     // From the start view the letter is the first message: open a new chat for it, as start() does for text.
     if (!id) {
-      const c = await createChat('Entlassungsbrief')
+      const c = await createChat(t('Entlassungsbrief'))
       put(c)
       messages.value = []
       facts.value = []
@@ -256,9 +263,9 @@ async function upload(e: Event) {
   } catch (err) {
     const status = err instanceof ApiError ? err.status : 0
     draftErr.value =
-      status === 415 ? 'Bitte laden Sie eine PDF-Datei hoch.'
-      : status === 413 ? 'Die Datei ist zu groß (höchstens 10 MB).'
-      : status === 422 ? 'In dieser PDF ist kein Text lesbar. Fotos und Scans gehen noch nicht.'
+      status === 415 ? t('Bitte laden Sie eine PDF-Datei hoch.')
+      : status === 413 ? t('Die Datei ist zu groß (höchstens 10 MB).')
+      : status === 422 ? t('In dieser PDF ist kein Text lesbar. Fotos und Scans gehen noch nicht.')
       : fail(err)
   }
   uploading.value = false
@@ -298,7 +305,7 @@ async function retry(id: string, m: Bubble) {
       } else if (e.event === 'done') {
         Object.assign(r, e.data, { pending: false })
         done = true
-        setStatus(id, plan.value?.status ?? (e.data.kind === 'question' ? 'Frage offen' : null))
+        setStatus(id, plan.value?.status ?? (e.data.kind === 'question' ? k('Frage offen') : null))
       } else {
         throw new Error(e.data.detail)
       }
@@ -306,12 +313,12 @@ async function retry(id: string, m: Bubble) {
     await sendMessage(id, m.text, ctrl.signal, onEvent, m.kind === 'answer' ? (m.payload as AnswerPayload) : undefined)
     // A stream that ends without "done" lost its connection.
     if (!done) throw new ApiError(0, UNREACHABLE)
-    announce.value = r.kind === 'question' ? `Frage: ${r.text}` : 'Antwort fertig'
+    announce.value = r.kind === 'question' ? t('Frage: {text}', { text: t(r.text) }) : t('Antwort fertig')
   } catch (e) {
     // Left the chat: the server keeps what it saved. Otherwise nothing was saved, so it can be sent again.
     if (!ctrl.signal.aborted) {
       m.state = 'failed'
-      m.error = e instanceof ApiError ? fail(e, 'Die Nachricht darf höchstens 4000 Zeichen lang sein.') : NO_REPLY
+      m.error = e instanceof ApiError ? fail(e, k('Die Nachricht darf höchstens 4000 Zeichen lang sein.')) : t(NO_REPLY)
     }
   } finally {
     if (r.pending) drop(r)
@@ -352,7 +359,7 @@ async function openRename(c: Chat) {
 async function saveRename() {
   const c = target.value!
   const title = newTitle.value.trim()
-  dlgErr.value = title ? '' : 'Bitte geben Sie einen Namen ein.'
+  dlgErr.value = title ? '' : t('Bitte geben Sie einen Namen ein.')
   if (!title) return focus('rn-input')
   try {
     put(await renameChat(c.id, title))
@@ -360,7 +367,7 @@ async function saveRename() {
     optsOpen.value = null
     focus(`more-${c.id}`)
   } catch (e) {
-    dlgErr.value = fail(e, 'Der Name darf höchstens 100 Zeichen lang sein.')
+    dlgErr.value = fail(e, k('Der Name darf höchstens 100 Zeichen lang sein.'))
   }
 }
 
@@ -389,22 +396,22 @@ async function confirmDelete() {
   <div class="shell" :data-pane="hash === LIST ? 'list' : 'main'">
     <nav class="side" aria-labelledby="side-h">
       <button id="new-btn" type="button" class="btn btn-primary btn-block" @click="go('', 'q')">
-        <svg class="i" aria-hidden="true"><use href="#i-plus" /></svg>Neues Anliegen
+        <svg class="i" aria-hidden="true"><use href="#i-plus" /></svg>{{ t('Neues Anliegen') }}
       </button>
       <div class="side-h-row">
-        <h2 id="side-h" class="caps" tabindex="-1">Ihre Gespräche</h2>
+        <h2 id="side-h" class="caps" tabindex="-1">{{ t('Ihre Gespräche') }}</h2>
         <span v-if="chats.length" class="muted">{{ chats.length }}</span>
       </div>
       <template v-if="listErr">
         <p class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ listErr }}</span></p>
-        <button type="button" class="btn btn-secondary" @click="loadList">Nochmal laden</button>
+        <button type="button" class="btn btn-secondary" @click="loadList">{{ t('Nochmal laden') }}</button>
       </template>
       <ul v-else class="chats">
         <li v-for="c in chats" :key="c.id" class="ci" :class="{ on: String(c.id) === activeId }">
           <a class="ci-link" :href="`#${c.id}`" :aria-current="String(c.id) === activeId ? 'page' : undefined">
             <span class="ci-title">{{ c.title }}</span>
-            <span v-if="c.status" class="pill ci-status" :data-tone="c.status === 'Erledigt' ? 'ready' : c.status.startsWith('Wartet') ? 'wait' : 'turn'">{{ c.status }}</span>
-            <span class="ci-when"><span class="sr">Zuletzt geändert: </span>{{ when(c.updated_at) }}</span>
+            <span v-if="c.status" class="pill ci-status" :data-tone="c.status === 'Erledigt' ? 'ready' : c.status.startsWith('Wartet') ? 'wait' : 'turn'">{{ t(c.status) }}</span>
+            <span class="ci-when"><span class="sr">{{ t('Zuletzt geändert:') }} </span>{{ when(c.updated_at) }}</span>
           </a>
           <button
             :id="`more-${c.id}`"
@@ -412,21 +419,21 @@ async function confirmDelete() {
             class="ci-more"
             :aria-expanded="optsOpen === String(c.id)"
             :aria-controls="`opt-${c.id}`"
-            title="Umbenennen oder löschen"
+            :title="t('Umbenennen oder löschen')"
             @click="toggle(String(c.id))"
           >
-            <svg class="i" aria-hidden="true"><use href="#i-more" /></svg><span class="sr">Optionen für „{{ c.title }}“</span>
+            <svg class="i" aria-hidden="true"><use href="#i-more" /></svg><span class="sr">{{ t('Optionen für „{title}“', { title: c.title }) }}</span>
           </button>
           <div :id="`opt-${c.id}`" class="ci-opts" :hidden="optsOpen !== String(c.id)">
             <button type="button" class="btn btn-quiet" @click="openRename(c)">
-              <svg class="i" aria-hidden="true"><use href="#i-pencil" /></svg>Umbenennen
+              <svg class="i" aria-hidden="true"><use href="#i-pencil" /></svg>{{ t('Umbenennen') }}
             </button>
             <button type="button" class="btn btn-quiet danger" @click="openDelete(c)">
-              <svg class="i" aria-hidden="true"><use href="#i-trash" /></svg>Löschen
+              <svg class="i" aria-hidden="true"><use href="#i-trash" /></svg>{{ t('Löschen') }}
             </button>
           </div>
         </li>
-        <li v-if="listLoaded && !chats.length" class="empty">Noch keine Gespräche. Ihr erstes Anliegen erscheint dann hier.</li>
+        <li v-if="listLoaded && !chats.length" class="empty">{{ t('Noch keine Gespräche. Ihr erstes Anliegen erscheint dann hier.') }}</li>
       </ul>
     </nav>
 
@@ -434,67 +441,67 @@ async function confirmDelete() {
     <section v-else class="pane" :class="activeId ? 'is-chat' : 'is-home'" aria-labelledby="view-h">
       <div v-if="activeId" ref="scroller" class="view">
         <button v-if="plan" type="button" class="plan-pin" @click="toPlan">
-          <svg class="i" aria-hidden="true"><use href="#i-route" /></svg><span>Ihr Plan · {{ plan.status }}</span><span class="pin-go">Zum Plan</span>
+          <svg class="i" aria-hidden="true"><use href="#i-route" /></svg><span>{{ t('Ihr Plan') }} · {{ t(plan.status) }}</span><span class="pin-go">{{ t('Zum Plan') }}</span>
         </button>
-        <h1 id="view-h" class="chat-h" tabindex="-1">{{ active?.title ?? 'Gespräch' }}</h1>
+        <h1 id="view-h" class="chat-h" tabindex="-1">{{ active?.title ?? t('Gespräch') }}</h1>
         <ProfileCard class="chat-known" compact :profile="profile" :failed="profileFailed" />
-        <p v-if="loading" class="muted">Nachrichten werden geladen …</p>
+        <p v-if="loading" class="muted">{{ t('Nachrichten werden geladen …') }}</p>
         <p v-else-if="loadErr" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ loadErr }}</span></p>
-        <p v-else-if="!messages.length" class="muted">Noch keine Nachrichten in diesem Gespräch.</p>
-        <ol v-else class="msgs" aria-label="Nachrichten">
+        <p v-else-if="!messages.length" class="muted">{{ t('Noch keine Nachrichten in diesem Gespräch.') }}</p>
+        <ol v-else class="msgs" :aria-label="t('Nachrichten')">
           <li v-for="m in messages" :id="`m-${m.key ?? m.id}`" :key="m.key ?? m.id" class="msg" :class="[m.role, m.kind]">
             <FactChips v-if="m === anchor && facts.length && (m.kind === 'plan' || m.kind === 'card')" class="msg-facts" :facts="facts" :disabled="!!run" @answer="editFact" />
             <p v-if="m.pending" class="typing" role="status">
-              Der Lotse sucht die passenden Stellen<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              {{ t('Der Lotse sucht die passenden Stellen') }}<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
             </p>
             <QuestionCard
               v-else-if="m.kind === 'question'"
-              :text="m.text"
-              :why="q(m).why"
+              :text="t(m.text)"
+              :why="t(q(m).why)"
               :chips="q(m).chips"
               :active="m === lastMsg && !run"
               :multi="!!q(m).multi"
               @answer="(chip) => answer(q(m).fact_key, chip)"
               @many="(chips) => answerMany(q(m).fact_key, chips)"
             />
-            <NoticeCard v-else-if="m.kind === 'card'" :card="card(m)" :text="m.text" />
+            <NoticeCard v-else-if="m.kind === 'card'" :card="card(m)" :text="t(m.text)" />
             <DocumentConfirm
               v-else-if="m.kind === 'confirm'"
-              :text="m.text"
+              :text="t(m.text)"
               :payload="m.payload as ConfirmPayload"
               :active="m === lastMsg && !run"
               @confirm="confirmLetter"
             />
             <div v-else-if="m.kind === 'plan'" class="plan-msg">
-              <div class="bubble"><p>{{ m.text }}</p></div>
+              <div class="bubble"><p>{{ t(m.text) }}</p></div>
               <PlanView v-if="isCurrent(m)" :plan="plan!" :error="planErr" @update="patchStep" @upload="fileInput?.click()" />
-              <p v-else class="muted">Dieser Plan wurde später angepasst. Der aktuelle Plan steht weiter unten.</p>
+              <p v-else class="muted">{{ t('Dieser Plan wurde später angepasst. Der aktuelle Plan steht weiter unten.') }}</p>
             </div>
             <div v-else class="bubble" :class="m.state">
               <div v-if="m.role === 'assistant'" class="md" v-html="m.html"></div>
               <p v-else-if="m.kind === 'document'" class="text"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg> {{ m.text }}</p>
-              <p v-else class="text">{{ m.text }}</p>
+              <p v-else class="text">{{ m.kind === 'answer' ? t(m.text) : m.text }}</p>
               <p class="meta">
                 <time :datetime="m.created_at">{{ when(m.created_at) }}</time>
-                <span v-if="m.state" class="state" aria-live="polite">{{ STATE[m.state] }}</span>
+                <span v-if="m.state" class="state" aria-live="polite">{{ t(STATE[m.state]) }}</span>
               </p>
               <template v-if="m.state === 'failed'">
                 <p class="err">{{ m.error }}</p>
-                <button type="button" class="btn btn-secondary" @click="retry(activeId!, m)">Nochmal versuchen</button>
+                <button type="button" class="btn btn-secondary" @click="retry(activeId!, m)">{{ t('Nochmal versuchen') }}</button>
               </template>
             </div>
           </li>
         </ol>
       </div>
       <div v-else class="home navy-band">
-        <h1 id="view-h" tabindex="-1">Guten Tag, {{ user.display_name }}.</h1>
-        <p class="lead">Beschreiben Sie Ihr Anliegen in eigenen Worten.</p>
+        <h1 id="view-h" tabindex="-1">{{ t('Guten Tag, {name}.', { name: user.display_name }) }}</h1>
+        <p class="lead">{{ t('Beschreiben Sie Ihr Anliegen in eigenen Worten.') }}</p>
         <p v-if="notice" class="notice" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ notice }}</span></p>
       </div>
 
       <p class="sr" aria-live="polite">{{ announce }}</p>
       <form class="composer" :class="{ 'navy-band': !activeId }" novalidate @submit.prevent="submit">
-        <label class="q-label" :class="{ sr: activeId }" for="q">{{ activeId ? 'Ihre Nachricht' : 'Worum geht es?' }}</label>
+        <label class="q-label" :class="{ sr: activeId }" for="q">{{ activeId ? t('Ihre Nachricht') : t('Worum geht es?') }}</label>
         <div class="cbox">
           <textarea
             id="q"
@@ -511,10 +518,10 @@ async function confirmDelete() {
           <div class="cbox-row">
             <input ref="fileInput" type="file" accept="application/pdf" class="sr" tabindex="-1" @change="upload" />
             <button type="button" class="btn btn-quiet" :aria-disabled="uploading || busy || !!run" @click="!uploading && !busy && !run && fileInput?.click()">
-              <svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ uploading ? 'Brief wird gelesen …' : 'Entlassungsbrief (PDF)' }}
+              <svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ uploading ? t('Brief wird gelesen …') : t('Entlassungsbrief (PDF)') }}
             </button>
             <button type="submit" class="btn btn-primary send" :aria-disabled="busy || !!run">
-              {{ busy || run ? 'Einen Moment …' : 'Senden' }}<svg class="i" aria-hidden="true"><use href="#i-arrow" /></svg>
+              {{ busy || run ? t('Einen Moment …') : t('Senden') }}<svg class="i" aria-hidden="true"><use href="#i-arrow" /></svg>
             </button>
           </div>
         </div>
@@ -526,14 +533,14 @@ async function confirmDelete() {
     <dialog ref="renameDlg" class="small" aria-labelledby="rn-h">
       <form novalidate @submit.prevent="saveRename">
         <div class="dlg-head">
-          <h2 id="rn-h">Gespräch umbenennen</h2>
-          <button type="button" class="btn btn-quiet icon-only" aria-label="Schließen" @click="renameDlg?.close()">
+          <h2 id="rn-h">{{ t('Gespräch umbenennen') }}</h2>
+          <button type="button" class="btn btn-quiet icon-only" :aria-label="t('Schließen')" @click="renameDlg?.close()">
             <svg class="i" aria-hidden="true"><use href="#i-x" /></svg>
           </button>
         </div>
         <div class="dlg-body">
           <div class="field">
-            <label class="field-l" for="rn-input">Neuer Name</label>
+            <label class="field-l" for="rn-input">{{ t('Neuer Name') }}</label>
             <input
               id="rn-input"
               ref="rnInput"
@@ -550,27 +557,27 @@ async function confirmDelete() {
           </div>
         </div>
         <div class="dlg-foot">
-          <button type="button" class="btn btn-secondary" @click="renameDlg?.close()">Abbrechen</button>
-          <button type="submit" class="btn btn-primary">Speichern</button>
+          <button type="button" class="btn btn-secondary" @click="renameDlg?.close()">{{ t('Abbrechen') }}</button>
+          <button type="submit" class="btn btn-primary">{{ t('Speichern') }}</button>
         </div>
       </form>
     </dialog>
 
     <dialog ref="deleteDlg" class="small" aria-labelledby="del-h" aria-describedby="del-d">
       <div class="dlg-head">
-        <h2 id="del-h">Gespräch löschen?</h2>
-        <button type="button" class="btn btn-quiet icon-only" aria-label="Schließen" @click="deleteDlg?.close()">
+        <h2 id="del-h">{{ t('Gespräch löschen?') }}</h2>
+        <button type="button" class="btn btn-quiet icon-only" :aria-label="t('Schließen')" @click="deleteDlg?.close()">
           <svg class="i" aria-hidden="true"><use href="#i-x" /></svg>
         </button>
       </div>
       <div class="dlg-body">
-        <p id="del-d">„<b>{{ target?.title }}</b>“ und alle Nachrichten darin werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.</p>
+        <p id="del-d">„<b>{{ target?.title }}</b>“ {{ t('und alle Nachrichten darin werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.') }}</p>
         <p v-if="dlgErr" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ dlgErr }}</span></p>
       </div>
       <div class="dlg-foot">
-        <button type="button" class="btn btn-secondary" autofocus @click="deleteDlg?.close()">Abbrechen</button>
+        <button type="button" class="btn btn-secondary" autofocus @click="deleteDlg?.close()">{{ t('Abbrechen') }}</button>
         <button type="button" class="btn btn-danger" @click="confirmDelete">
-          <svg class="i" aria-hidden="true"><use href="#i-trash" /></svg>Endgültig löschen
+          <svg class="i" aria-hidden="true"><use href="#i-trash" /></svg>{{ t('Endgültig löschen') }}
         </button>
       </div>
     </dialog>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { t } from '../i18n'
 import { facts, LANGS, LENGTHS, type Profile } from '../profile'
 
 // Rendered from the current profile (not stored in the chat), so it always shows what the next reply gets.
@@ -13,16 +14,16 @@ const known = computed(() => (props.profile ? facts(props.profile) : []))
     <component :is="compact ? 'summary' : 'h2'" class="known-h">
       <svg class="i" aria-hidden="true"><use href="#i-user" /></svg>
       <span>
-        {{ known.length ? 'Das weiß der Lotse über Sie' : failed ? 'Ihre Daten konnten gerade nicht geladen werden.' : 'Der Lotse weiß noch nichts über Sie.' }}<span v-if="compact && known[0]" class="muted">: {{ known[0][1] }}</span>
+        {{ known.length ? t('Das weiß der Lotse über Sie') : failed ? t('Ihre Daten konnten gerade nicht geladen werden.') : t('Der Lotse weiß noch nichts über Sie.') }}<span v-if="compact && known[0]" class="muted">: {{ known[0][1] }}</span>
       </span>
     </component>
     <dl v-if="known.length" class="kv">
-      <div v-for="[k, v] in known" :key="k"><dt>{{ k }}</dt><dd>{{ v }}</dd></div>
+      <div v-for="[k, v] in known" :key="k"><dt>{{ t(k) }}</dt><dd>{{ v }}</dd></div>
     </dl>
-    <p v-else-if="profile" class="muted">Mit Ihrem Namen und Ihrer Adresse kann er Anrufe und E-Mails für Sie vorbereiten.</p>
+    <p v-else-if="profile" class="muted">{{ t('Mit Ihrem Namen und Ihrer Adresse kann er Anrufe und E-Mails für Sie vorbereiten.') }}</p>
     <p class="known-foot">
-      <span v-if="profile" class="muted">Antwortet auf {{ LANGS[profile.answer_language] }}, {{ LENGTHS[profile.answer_length].toLowerCase() }}.</span>
-      <a href="#einstellungen">{{ known.length ? 'Ändern' : 'Daten hinterlegen' }}</a>
+      <span v-if="profile" class="muted">{{ t('Antwortet auf {language}, {length}.', { language: LANGS[profile.answer_language], length: t(LENGTHS[profile.answer_length]).toLowerCase() }) }}</span>
+      <a href="#einstellungen">{{ known.length ? t('Ändern') : t('Daten hinterlegen') }}</a>
     </p>
   </component>
 </template>

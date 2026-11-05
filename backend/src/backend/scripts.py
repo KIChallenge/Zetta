@@ -179,6 +179,19 @@ def render(script: dict, step: dict, profile: ProfileData, facts: dict) -> dict:
     return {**out, "have_ready": [h for h in have_ready if h["label"]]}
 
 
+def plain(step: dict, profile: ProfileData, facts: dict, corpus: Corpus) -> dict | None:
+    """The corpus script with its placeholders still in, for the frontend to show next to its translation."""
+    values = slot_values(profile, facts)
+    try:
+        script = fallback(step, corpus)
+    except StopIteration:  # an old plan whose step is no longer in the corpus: shown in German only
+        return None
+    return {
+        "template": script.get("call") or script["email"],
+        "slots": {s: {"value": values[s], "gap": gap(s, facts)[1:-1] if values[s] is None else ""} for s in step["slots"]},
+    }
+
+
 async def generate(llm, steps: list[dict], services: dict[str, str], detail: str, corpus: Corpus) -> dict[str, dict]:
     """One batched LLM call for all steps; rejected ones are retried once, then get the corpus fallback."""
     result: dict[str, dict] = {}

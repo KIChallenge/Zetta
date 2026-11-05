@@ -16,6 +16,10 @@ from backend.facts import FACTS, extraction_schema
 LANGUAGES = {
     "de": 'German (as used in Austria, addressing the user formally with "Sie")',
     "en": "English",
+    "fr": "French",
+    "cs": "Czech",
+    "sk": "Slovak",
+    "sl": "Slovenian",
     "tr": "Turkish",
     "bks": "Bosnian/Croatian/Serbian",
     "ro": "Romanian",
@@ -67,6 +71,29 @@ LETTER_PROMPT = (
     "an exact quote copied word for word from the letter (one sentence or list item). Ignore diagnoses, "
     "findings, lab values, medication, therapy plans and anything doctors decide among themselves: these are "
     "medical tasks and map to no value. If nothing matches, return an empty list.\nAllowed values: {values}"
+)
+TRANSLATE_PROMPT = (
+    "You translate the German texts of a guide to social insurance and care services in Vienna, Austria, into "
+    "{language}. Readers are people who may not know the Austrian system, often in a difficult situation: write "
+    "plainly and politely, addressing the reader formally. Many texts are short labels of buttons, chips and form "
+    "fields. A text may come with a `note` that says what it means in the app: follow it, but do not translate it.\n"
+    "Terms:\n"
+    "- \"Der Lotse\" is the name of this app. Keep \"Lotse\" as a name in every language, never translate it.\n"
+    "- Bewegt im Park is the name of a programme: keep it in German.\n"
+    "Translate these into {language} by their meaning, never leave the German word:\n"
+    "- Kasse: a public health insurance fund. Kassenvertrag: a contract with one.\n"
+    "- Wahlarzt, Wahlarztpraxis: a private doctor WITHOUT a contract with public health insurance. The patient pays "
+    "first and gets part of it back. Never use a word that suggests a contract, such as French \"conventionné\".\n"
+    "- Spital: hospital. Entlassung: discharge from hospital. Entlassungsbrief: discharge letter.\n"
+    "- rund um die Uhr: around the clock, in words. Never use a digit the German text does not have, such as 24/7.\n"
+    "Rules:\n"
+    "- Return one translation per text, with the same id.\n"
+    "- Keep placeholders such as {user.name} or {n} exactly as they are.\n"
+    "- Never add or change phone numbers, email addresses, web addresses, dates or other numbers.\n"
+    "- Keep names of institutions and abbreviations in German: ÖGK, PVA, FSW, e-card, Fonds Soziales Wien.\n"
+    "- For Austrian benefits and official terms, translate the meaning and add the German term in brackets once, so "
+    "the reader can use it on the phone, e.g. \"care allowance (Pflegegeld)\". Not in very short labels.\n"
+    "- Add nothing else: no advice, no medical statements."
 )
 DETAIL = {
     "short": "Keep it short: one sentence per point.",
@@ -124,15 +151,17 @@ def _format(name: str, schema: dict) -> dict:
 class Llm:
     def __init__(self) -> None:
         self.client = AsyncOpenAI(
-            base_url=settings.azure_openai_endpoint, api_key=settings.azure_openai_api_key
+            base_url=settings.llm_base_url,
+            api_key=settings.llm_api_key or "not-needed",  # the client refuses an empty key
         )
 
     async def _complete(self, system: str, user: str, response_format: dict | None = None) -> str:
         response = await self.client.chat.completions.create(
-            model=settings.azure_openai_model,
+            model=settings.llm_model,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             reasoning_effort="low",
             max_completion_tokens=4000,
+            extra_body=settings.llm_extra_body or None,
             **({"response_format": response_format} if response_format else {}),
         )
         return response.choices[0].message.content or ""
@@ -183,6 +212,35 @@ class Llm:
         values = "; ".join(f"{v}: {h}" for v, h in fact.hints.items())
         content = await self._complete(LETTER_PROMPT.replace("{values}", values), letter, _format("letter", schema))
         return json.loads(content)["items"]
+
+    async def translate(self, texts: list[str], language: str, notes: dict[str, str]) -> list[str]:
+        """For scripts/translate.py only, on public texts: the app itself never translates at runtime."""
+        schema = {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {"id": {"type": "integer"}, "text": {"type": "string"}},
+                        "required": ["id", "text"],
+                        "additionalProperties": False,
+                    },
+                }
+            },
+            "required": ["items"],
+            "additionalProperties": False,
+        }
+        content = await self._complete(
+            TRANSLATE_PROMPT.replace("{language}", language),
+            json.dumps(
+                [{"id": i, "text": t, **({"note": notes[t]} if t in notes else {})} for i, t in enumerate(texts)],
+                ensure_ascii=False,
+            ),
+            _format("translations", schema),
+        )
+        found = {item["id"]: item["text"] for item in json.loads(content)["items"]}
+        return [found.get(i, "") for i in range(len(texts))]
 
     async def title(self, text: str) -> str:
         return await self._complete(TITLE_PROMPT, text)

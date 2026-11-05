@@ -101,7 +101,7 @@ def test_profiles_are_per_user(client, anna, bob):
         ("full_name", "x" * 101),
         ("street", "x" * 101),
         ("city", "x" * 61),
-        ("answer_language", "fr"),
+        ("answer_language", "xx"),
         ("answer_length", "long"),
     ],
 )

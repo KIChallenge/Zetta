@@ -7,7 +7,7 @@ from pathlib import Path
 test_dir = tempfile.TemporaryDirectory()
 os.environ["DATABASE_URL"] = f"sqlite:///{Path(test_dir.name) / 'test.db'}"
 os.environ["JWT_SECRET"] = "test-secret-test-secret-test-secret-1234"
-os.environ["AZURE_OPENAI_API_KEY"] = "test-key"
+os.environ["LLM_API_KEY"] = "test-key"
 
 import pytest
 from fastapi.testclient import TestClient

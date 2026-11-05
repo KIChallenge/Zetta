@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CardPayload } from '../chats'
+import { hours, t } from '../i18n'
 
 // Fixed cards (boundary, out of scope, general): corpus text and corpus contacts only, no LLM text.
 // Name, number and "jetzt erreichbar" are shown; labels, hours, addresses and sources open under "Mehr".
@@ -9,7 +10,7 @@ defineProps<{ card: CardPayload; text: string }>()
 <template>
   <section class="notice-card" :data-card="card.card">
     <h2 class="nc-h">
-      <svg class="i" aria-hidden="true"><use :href="card.card === 'boundary' ? '#i-alert' : '#i-info'" /></svg>{{ card.title }}
+      <svg class="i" aria-hidden="true"><use :href="card.card === 'boundary' ? '#i-alert' : '#i-info'" /></svg>{{ t(card.title) }}
     </h2>
     <p>{{ text }}</p>
     <template v-if="card.contacts.length">
@@ -21,20 +22,20 @@ defineProps<{ card: CardPayload; text: string }>()
               <a class="nc-val" :href="ch.href">
                 <svg class="i" aria-hidden="true"><use :href="ch.type === 'phone' ? '#i-phone' : ch.type === 'email' ? '#i-mail' : '#i-ext'" /></svg>{{ ch.value }}
               </a>
-              <span v-if="ch.reachable?.text" class="avail" :data-open="ch.reachable.open">{{ ch.reachable.text }}</span>
+              <span v-if="ch.reachable?.text" class="avail" :data-open="ch.reachable.open">{{ t(ch.reachable.text) }}</span>
             </div>
           </template>
         </li>
       </ul>
       <details class="more">
-        <summary>Mehr</summary>
+        <summary>{{ t('Mehr') }}</summary>
         <div v-for="inst in card.contacts" :key="inst.name" class="nc-more">
           <p class="mini-h">{{ inst.name }}</p>
           <template v-for="ch in inst.channels" :key="ch.value">
             <p v-if="!ch.href">{{ ch.value }}</p>
-            <p v-if="ch.label || ch.hours" class="muted">{{ [ch.label, ch.hours].filter(Boolean).join(' · ') }}</p>
+            <p v-if="ch.label || ch.hours" class="muted">{{ [ch.label && t(ch.label), ch.hours && hours(ch.hours)].filter(Boolean).join(' · ') }}</p>
           </template>
-          <a class="src-link" :href="inst.source_url" target="_blank" rel="noopener noreferrer">Quelle</a>
+          <a class="src-link" :href="inst.source_url" target="_blank" rel="noopener noreferrer">{{ t('Quelle') }}</a>
         </div>
       </details>
     </template>

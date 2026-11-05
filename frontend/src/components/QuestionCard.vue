@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { Chip } from '../chats'
+import { t } from '../i18n'
 
 // One question at a time. Only the latest one has chips; answered ones stay as plain text in the history.
 defineProps<{ text: string; why: string; chips: Chip[]; active: boolean; multi?: boolean }>()
@@ -28,12 +29,12 @@ function pick(c: Chip, multi: boolean) {
           :aria-pressed="multi && !QUIET.includes(c.value) ? picked.includes(c) : undefined"
           @click="pick(c, !!multi)"
         >
-          {{ c.label }}
+          {{ t(c.label) }}
         </button>
       </div>
       <div v-if="multi" class="actions">
-        <button type="button" class="btn btn-primary" :aria-disabled="!picked.length" @click="picked.length && emit('many', picked)">Weiter</button>
-        <span class="hint">Mehrere möglich</span>
+        <button type="button" class="btn btn-primary" :aria-disabled="!picked.length" @click="picked.length && emit('many', picked)">{{ t('Weiter') }}</button>
+        <span class="hint">{{ t('Mehrere möglich') }}</span>
       </div>
     </template>
   </section>

@@ -1,3 +1,5 @@
+import { k } from './i18n'
+
 export interface User {
   id: string | number
   email: string
@@ -13,8 +15,8 @@ export class ApiError extends Error {
 }
 
 const KEY = 'access_token'
-export const UNREACHABLE = 'Der Server ist gerade nicht erreichbar. Bitte versuchen Sie es später noch einmal.'
-export const GENERIC = 'Das hat leider nicht geklappt. Bitte versuchen Sie es noch einmal.'
+export const UNREACHABLE = k('Der Server ist gerade nicht erreichbar. Bitte versuchen Sie es später noch einmal.')
+export const GENERIC = k('Das hat leider nicht geklappt. Bitte versuchen Sie es noch einmal.')
 
 // shortcut: JWT in localStorage is readable by any script on the page; move to an httpOnly cookie before production.
 export const getToken = () => localStorage.getItem(KEY)

@@ -309,7 +309,8 @@ Not allowed in output: "Aufgrund Ihrer Diagnose benötigen Sie ...". Allowed: "I
 
 ## 11. Personalization
 
-- Language and simple language: questions and service summaries are stored in German and simple German in the corpus. Other languages are translated by the LLM from those texts, never from scratch. Translated text is checked with the same regex rules as scripts (no new numbers, URLs, emails).
+- Language: German is the source in the corpus, the database and the API. The interface is available in English, French, Czech, Slovak and Slovenian: `scripts/translate.py` has the LLM translate every text ahead of time into `frontend/src/locales/`, and the frontend looks each one up. Nothing is translated at runtime. Translations are checked (no new numbers, URLs, emails; same placeholders) by the script and by `tests/test_translations.py`, which also fails when a text has no translation. Names of institutions and forms stay German, because users need them on the phone.
+- Scripts and emails stay German, because that is what the institution reads and hears. In another language the plan shows the corpus script with its translation below; an LLM script could differ from its translation.
 - Detail level: `short` shows title, why and actions only; `detailed` expands summaries and criteria.
 - Preferences such as `preferred_time` and `near_home` shape the plan (call windows in the morning, institutions in or near the district first).
 - Known facts are shown as one editable line above the plan and above fixed cards ("Verstanden: Mutter · 1100 Wien · OEGK", with "Ändern"), not above questions, where they would repeat the answers just given. This is how the user corrects extraction errors, and it shows what the plan is based on.
@@ -499,7 +500,7 @@ Rules:
 ## 20. Open decisions
 
 1. Corpus storage: YAML in the repo (recommended) or database tables.
-2. Whether the LLM may translate corpus texts into other languages, or only questions and scripts.
+2. Whether the LLM may translate corpus texts into other languages, or only questions and scripts. Decided: ahead of time only, with checks (section 11).
 3. Rule format: declarative fields per service (recommended) or Python predicates.
 4. Graph rendering: plain CSS columns or a graph library.
 5. OCR/vision provider for photos of letters.
@@ -622,10 +623,9 @@ In order of value per effort:
 
 1. Graph view of the plan (instead of the list).
 2. Outcome branching beyond `done` / `not_reached`.
-3. Translation to other languages (section 11).
-4. Form prefilling (only for PDFs with fillable fields; to check per form).
-5. Screening by family history (12.2), only if the team accepts the risk in 15.4.
-6. Photos of letters (OCR/vision provider).
+3. Form prefilling (only for PDFs with fillable fields; to check per form).
+4. Screening by family history (12.2), only if the team accepts the risk in 15.4.
+5. Photos of letters (OCR/vision provider).
 
 ### 21.5 Technical notes
 

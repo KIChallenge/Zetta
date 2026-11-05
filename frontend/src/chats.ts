@@ -1,4 +1,5 @@
 import { ApiError, GENERIC, getToken, request, respond, UNREACHABLE } from './auth'
+import { intlLocale, k, t, translating } from './i18n'
 
 export interface Chat {
   id: string | number
@@ -70,6 +71,11 @@ export interface Script {
   body?: string
   have_ready: { label: string; value: string | null }[]
   source: 'llm' | 'fallback'
+  // The corpus script with its placeholders: when translating it is shown instead, so both versions say the same.
+  plain?: null | {
+    template: { opening?: string; points?: { covers: string; text: string }[]; closing?: string; subject?: string; body?: string }
+    slots: Record<string, { value: string | null; gap: string }>
+  }
 }
 
 export interface Doctor {
@@ -206,9 +212,9 @@ export async function sendMessage(
   }
 }
 
-export const NOT_FOUND = 'Gespräch nicht gefunden.'
+export const NOT_FOUND = k('Gespräch nicht gefunden.')
 
-// Backend detail texts are English, so every error is shown with our own German wording.
+// Backend detail texts are English, so every error is shown with our own wording. Show the result with t().
 export function say(e: unknown, invalid = GENERIC) {
   const status = e instanceof ApiError ? e.status : 0
   if (status === 404) return NOT_FOUND
@@ -224,11 +230,11 @@ export function titleFrom(text: string, max = 48) {
   return (space > max / 2 ? cut.slice(0, space) : cut).trimEnd() + '…'
 }
 
-const day = new Intl.DateTimeFormat('de-AT', { day: 'numeric', month: 'short', year: 'numeric' })
-const time = new Intl.DateTimeFormat('de-AT', { hour: '2-digit', minute: '2-digit' })
-
 export function when(iso: string) {
   // A timestamp without offset is UTC by contract; without the Z the browser would read it as local time.
   const d = new Date(/(z|[+-]\d\d:?\d\d)$/i.test(iso) ? iso : iso + 'Z')
-  return `${d.toDateString() === new Date().toDateString() ? 'Heute' : day.format(d)}, ${time.format(d)} Uhr`
+  const day = new Intl.DateTimeFormat(intlLocale.value, { day: 'numeric', month: 'short', year: 'numeric' })
+  const time = new Intl.DateTimeFormat(intlLocale.value, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+  const date = d.toDateString() === new Date().toDateString() ? t('Heute') : day.format(d)
+  return `${date}, ${time.format(d)}${translating.value ? '' : ' Uhr'}`
 }

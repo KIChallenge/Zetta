@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { Chip, Fact } from '../chats'
+import { t } from '../i18n'
 
 // "Verstanden": what the plan is based on, in one line. "Ändern" opens the facts; a pick is sent like a chip answer.
 defineProps<{ facts: Fact[]; disabled: boolean }>()
@@ -10,7 +11,7 @@ const editing = ref<string | null>(null)
 const same = (f: Fact, c: Chip) => (Array.isArray(f.value) ? f.value.length === 1 && f.value[0] === c.value : f.value === c.value)
 // The letter's recommendations are listed in the confirm card already; here only their number.
 const shown = (f: Fact) =>
-  f.key === 'documented_recommendations' && Array.isArray(f.value) ? `${f.value.length} Empfehlungen` : f.value_label
+  f.key === 'documented_recommendations' && Array.isArray(f.value) ? t('{n} Empfehlungen', { n: f.value.length }) : t(f.value_label)
 
 function pick(f: Fact, c: Chip) {
   editing.value = null
@@ -22,17 +23,17 @@ function pick(f: Fact, c: Chip) {
 <template>
   <section class="facts" aria-labelledby="facts-h">
     <p class="facts-line">
-      <span id="facts-h" class="facts-ok"><svg class="i" aria-hidden="true"><use href="#i-check" /></svg>Verstanden:</span>
+      <span id="facts-h" class="facts-ok"><svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ t('Verstanden:') }}</span>
       <template v-for="(f, i) in facts" :key="f.key">
         <span v-if="i" class="sep" aria-hidden="true">·</span>
-        <span><span class="fact-k">{{ f.label }}: </span><b>{{ shown(f) }}</b></span>
+        <span><span class="fact-k">{{ t(f.label) }}: </span><b>{{ shown(f) }}</b></span>
       </template>
       <button type="button" class="linkbtn" :aria-expanded="open" aria-controls="facts-edit" :disabled="disabled" @click="open = !open">
-        <svg class="i" aria-hidden="true"><use href="#i-pencil" /></svg>Ändern
+        <svg class="i" aria-hidden="true"><use href="#i-pencil" /></svg>{{ t('Ändern') }}
       </button>
     </p>
     <div v-if="open" id="facts-edit" class="facts-edit">
-      <p class="hint">Was stimmt nicht?</p>
+      <p class="hint">{{ t('Was stimmt nicht?') }}</p>
       <ul class="fact-list">
         <li v-for="f in facts" :key="f.key">
           <button
@@ -43,14 +44,14 @@ function pick(f: Fact, c: Chip) {
             :disabled="disabled"
             @click="editing = editing === f.key ? null : f.key"
           >
-            <span class="fact-k">{{ f.label }}</span>
+            <span class="fact-k">{{ t(f.label) }}</span>
             <b>{{ shown(f) }}</b>
           </button>
         </li>
       </ul>
       <template v-for="f in facts" :key="f.key">
         <div v-if="editing === f.key" :id="`fe-${f.key}`" class="fact-edit">
-          <p class="mini-h">{{ f.label }} ändern<span v-if="f.source === 'profile'" class="muted">bisher aus Ihren Daten</span></p>
+          <p class="mini-h">{{ t('{label} ändern', { label: t(f.label) }) }}<span v-if="f.source === 'profile'" class="muted">{{ t('bisher aus Ihren Daten') }}</span></p>
           <div class="chips">
             <button
               v-for="c in f.chips"
@@ -60,7 +61,7 @@ function pick(f: Fact, c: Chip) {
               :aria-pressed="same(f, c)"
               @click="pick(f, c)"
             >
-              {{ c.label }}
+              {{ t(c.label) }}
             </button>
           </div>
         </div>

@@ -1,10 +1,11 @@
 import { api } from './chats'
+import { k } from './i18n'
 
 export const LANGS = {
-  de: 'Deutsch', en: 'English', tr: 'Türkçe', bks: 'Bosanski / Hrvatski / Srpski', ro: 'Română',
+  de: 'Deutsch', en: 'English', fr: 'Français', cs: 'Čeština', sk: 'Slovenčina', sl: 'Slovenščina', tr: 'Türkçe', bks: 'Bosanski / Hrvatski / Srpski', ro: 'Română',
   pl: 'Polski', hu: 'Magyar', uk: 'Українська', ar: 'العربية',
 } as const
-export const LENGTHS = { short: 'Kurz und knapp', detailed: 'Ausführlich erklärt' } as const
+export const LENGTHS = { short: k('Kurz und knapp'), detailed: k('Ausführlich erklärt') } as const
 
 /** Everything is optional: personal fields are "" when unset. */
 export interface Profile {
@@ -39,11 +40,11 @@ export const fmtSvnr = (d: string) => (d.length === 10 ? `${d.slice(0, 4)} ${d.s
 export function facts(p: Profile): [string, string][] {
   const place = `${p.postal_code} ${p.city}`.trim()
   const all: [string, string][] = [
-    ['Name', p.full_name],
-    ['Adresse', [p.street, place].filter(Boolean).join(', ')],
-    ['SV-Nummer', fmtSvnr(p.svnr)],
-    ['Telefon', p.phone],
-    ['E-Mail', p.contact_email],
+    [k('Name'), p.full_name],
+    [k('Adresse'), [p.street, place].filter(Boolean).join(', ')],
+    [k('SV-Nummer'), fmtSvnr(p.svnr)],
+    [k('Telefon'), p.phone],
+    [k('E-Mail'), p.contact_email],
   ]
   return all.filter(([, v]) => v)
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import type { Plan, StepUpdate } from '../chats'
+import { k, t } from '../i18n'
 import StepCard from './StepCard.vue'
 
 const props = defineProps<{ plan: Plan; error: string }>()
@@ -28,7 +29,7 @@ function toggleMore(id: string) {
 
 // Overview: one column per service, steps as stations; a click opens the step in the list.
 const view = ref<'list' | 'overview'>('list')
-const STATE = { done: 'Erledigt', skipped: 'Übersprungen', available: 'Offen', blocked: 'Danach' } as const
+const STATE = { done: k('Erledigt'), skipped: k('Übersprungen'), available: k('Offen'), blocked: k('Danach') } as const
 function show(id: string) {
   view.value = 'list'
   open.value.add(id)
@@ -39,23 +40,23 @@ function show(id: string) {
 <template>
   <section id="plan" class="plan" aria-labelledby="plan-h">
     <div class="plan-h">
-      <h2 id="plan-h" tabindex="-1">Ihr Plan</h2>
+      <h2 id="plan-h" tabindex="-1">{{ t('Ihr Plan') }}</h2>
       <p class="plan-n">
-        <span class="bar" aria-hidden="true"><span :style="{ width: `${(100 * doneCount) / (plan.steps.length || 1)}%` }"></span></span>{{ doneCount }} von {{ plan.steps.length }} erledigt
+        <span class="bar" aria-hidden="true"><span :style="{ width: `${(100 * doneCount) / (plan.steps.length || 1)}%` }"></span></span>{{ t('{done} von {total} erledigt', { done: doneCount, total: plan.steps.length }) }}
       </p>
-      <div class="seg-switch" role="group" aria-label="Ansicht">
-        <button type="button" :aria-pressed="view === 'list'" @click="view = 'list'">Liste</button>
-        <button type="button" :aria-pressed="view === 'overview'" @click="view = 'overview'">Übersicht</button>
+      <div class="seg-switch" role="group" :aria-label="t('Ansicht')">
+        <button type="button" :aria-pressed="view === 'list'" @click="view = 'list'">{{ t('Liste') }}</button>
+        <button type="button" :aria-pressed="view === 'overview'" @click="view = 'overview'">{{ t('Übersicht') }}</button>
       </div>
     </div>
     <div v-if="view === 'overview'" class="overview">
-      <section v-for="{ svc, steps } in groups" :key="svc.id" class="ov-col" :aria-label="svc.title">
-        <h3 class="ov-h">{{ svc.title }}</h3>
+      <section v-for="{ svc, steps } in groups" :key="svc.id" class="ov-col" :aria-label="t(svc.title)">
+        <h3 class="ov-h">{{ t(svc.title) }}</h3>
         <ol class="ov-steps">
           <li v-for="s in steps" :key="s.id" class="ov-node" :data-status="s.id === nowId ? 'now' : s.status">
             <button type="button" @click="show(s.id)">
-              <span class="ov-title">{{ s.title }}</span>
-              <span class="ov-state">{{ s.id === nowId ? 'Jetzt dran' : STATE[s.status] }}</span>
+              <span class="ov-title">{{ t(s.title) }}</span>
+              <span class="ov-state">{{ s.id === nowId ? t('Jetzt dran') : t(STATE[s.status]) }}</span>
             </button>
           </li>
         </ol>
@@ -65,29 +66,29 @@ function show(id: string) {
 
     <section v-for="{ svc, steps } in groups" v-show="view === 'list'" :key="svc.id" class="svc" :aria-labelledby="`svc-${svc.id}`">
       <div class="svc-h">
-        <h3 :id="`svc-${svc.id}`">{{ svc.title }}</h3>
+        <h3 :id="`svc-${svc.id}`">{{ t(svc.title) }}</h3>
         <span class="pill" :data-tone="svc.eligibility === 'likely' ? 'ready' : 'wait'">
-          {{ svc.eligibility === 'likely' ? 'Kommt in Frage' : 'Kommt vielleicht in Frage' }}
+          {{ svc.eligibility === 'likely' ? t('Kommt in Frage') : t('Kommt vielleicht in Frage') }}
         </span>
-        <span v-if="svc.quotes.length" class="pill" data-tone="wait">Laut Ihrem Brief</span>
-        <button type="button" class="linkbtn svc-more-btn" :aria-expanded="more.has(svc.id)" :aria-controls="`more-${svc.id}`" @click="toggleMore(svc.id)">Mehr dazu</button>
+        <span v-if="svc.quotes.length" class="pill" data-tone="wait">{{ t('Laut Ihrem Brief') }}</span>
+        <button type="button" class="linkbtn svc-more-btn" :aria-expanded="more.has(svc.id)" :aria-controls="`more-${svc.id}`" @click="toggleMore(svc.id)">{{ t('Mehr dazu') }}</button>
       </div>
       <div v-if="more.has(svc.id)" :id="`more-${svc.id}`" class="svc-more">
-        <p>{{ svc.summary }}</p>
-        <blockquote v-for="qt in svc.quotes" :key="qt" class="quote">In Ihrem Brief steht: „{{ qt }}“</blockquote>
+        <p>{{ t(svc.summary) }}</p>
+        <blockquote v-for="qt in svc.quotes" :key="qt" class="quote">{{ t('In Ihrem Brief steht:') }} „{{ qt }}“</blockquote>
         <ul v-if="svc.criteria.length" class="crit">
           <li v-for="c in svc.criteria" :key="c.text" :data-state="c.state">
             <svg class="i" aria-hidden="true"><use :href="c.state === 'met' ? '#i-check' : '#i-info'" /></svg>
-            <span>{{ c.text }}<span class="muted"> · {{ c.state === 'met' ? 'erfüllt' : 'noch offen' }}</span></span>
+            <span>{{ t(c.text) }}<span class="muted"> · {{ c.state === 'met' ? t('erfüllt') : t('noch offen') }}</span></span>
           </li>
         </ul>
-        <p v-for="c in svc.checked_by" :key="c">{{ c }}</p>
+        <p v-for="c in svc.checked_by" :key="c">{{ t(c) }}</p>
         <p v-if="svc.responsible">
-          Zuständig: <b>{{ svc.responsible }}</b>.
-          <template v-if="svc.responsible_note">{{ svc.responsible_note }}</template>
-          <a v-if="svc.responsible_source" class="src-link" :href="svc.responsible_source" target="_blank" rel="noopener noreferrer">Quelle</a>
+          {{ t('Zuständig:') }} <b>{{ svc.responsible }}</b>.
+          <template v-if="svc.responsible_note">{{ t(svc.responsible_note) }}</template>
+          <a v-if="svc.responsible_source" class="src-link" :href="svc.responsible_source" target="_blank" rel="noopener noreferrer">{{ t('Quelle') }}</a>
         </p>
-        <p><a class="src-link" :href="svc.source_url" target="_blank" rel="noopener noreferrer">Mehr dazu bei der Quelle</a></p>
+        <p><a class="src-link" :href="svc.source_url" target="_blank" rel="noopener noreferrer">{{ t('Mehr dazu bei der Quelle') }}</a></p>
       </div>
       <ol class="steps">
         <StepCard
@@ -105,12 +106,12 @@ function show(id: string) {
     </section>
 
     <div v-if="plan.dropped.length" class="dropped">
-      <p class="mini-h">Nicht im Plan</p>
-      <p v-for="d in plan.dropped" :key="d.id">{{ d.title }}: {{ d.reason }}</p>
+      <p class="mini-h">{{ t('Nicht im Plan') }}</p>
+      <p v-for="d in plan.dropped" :key="d.id">{{ t(d.title) }}: {{ t(d.reason) }}</p>
     </div>
     <details class="more plan-src">
-      <summary>„Kommt in Frage“ ist keine Zusage</summary>
-      <p>Darüber entscheidet die zuständige Stelle. Telefonnummern, Zeiten und Adressen kommen aus dem geprüften Verzeichnis des Lotsen, nicht von der KI. Der Lotse bereitet vor, er bucht und sendet nichts selbst und stellt keine Diagnosen.</p>
+      <summary>{{ t('„Kommt in Frage“ ist keine Zusage') }}</summary>
+      <p>{{ t('Darüber entscheidet die zuständige Stelle. Telefonnummern, Zeiten und Adressen kommen aus dem geprüften Verzeichnis des Lotsen, nicht von der KI. Der Lotse bereitet vor, er bucht und sendet nichts selbst und stellt keine Diagnosen.') }}</p>
     </details>
   </section>
 </template>

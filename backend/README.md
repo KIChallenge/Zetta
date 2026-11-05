@@ -17,6 +17,10 @@ The API runs on http://localhost:8000, with interactive docs at `/docs`. Tables 
 uv run pytest
 ```
 
+## Translations
+
+After changing a text in the corpus or the frontend, run `uv run scripts/translate.py`. The tests fail until the catalogs in `frontend/src/locales/` match.
+
 ## Layout
 
 - `src/backend/routers/` - one module per API area, registered in `app.py`

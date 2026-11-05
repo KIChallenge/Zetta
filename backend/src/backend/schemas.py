@@ -126,7 +126,7 @@ class ProfileData(BaseModel):
     svnr: Annotated[str, AfterValidator(check_svnr)] = ""
     phone: str = Field("", max_length=30, pattern="^[0-9 +()-]*$")
     contact_email: Email | Literal[""] = ""
-    answer_language: Literal["de", "en", "tr", "bks", "ro", "pl", "hu", "uk", "ar"] = "de"
+    answer_language: Literal["de", "en", "fr", "cs", "sk", "sl", "tr", "bks", "ro", "pl", "hu", "uk", "ar"] = "de"
     answer_length: Literal["short", "detailed"] = "short"
 
 

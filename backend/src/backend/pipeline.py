@@ -204,6 +204,7 @@ def render_plan(plan: Plan, states: dict[str, StepState], profile: ProfileData, 
         if scripts.needs_text(step) and state and state.script:
             view["script"] = scripts.render(state.script, step, profile, facts)
             view["script"]["source"] = state.script["source"]
+            view["script"]["plain"] = scripts.plain(step, profile, facts, get_corpus())
         out.append(view)
     return {
         "version": plan.version,

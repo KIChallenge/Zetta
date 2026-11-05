@@ -3,8 +3,12 @@ import { computed, nextTick, ref, watch } from 'vue'
 import AuthCard from './components/AuthCard.vue'
 import ChatApp from './components/ChatApp.vue'
 import { ApiError, clearToken, getToken, me, type User } from './auth'
+import { locale, setLocale, t } from './i18n'
+import { LANGS } from './profile'
 
 const user = ref<User | null>(null)
+// Fully translated. Once signed in, the language is a setting of the profile.
+const ENTRY_LANGS = ['de', 'en', 'fr', 'cs', 'sk', 'sl'] as const
 const ready = ref(!getToken())
 const main = ref<HTMLElement>()
 const initials = computed(() =>
@@ -33,7 +37,7 @@ watch(user, () => nextTick(() => main.value?.focus()))
 </script>
 
 <template>
-  <a class="skip" href="#inhalt">Zum Inhalt springen</a>
+  <a class="skip" href="#inhalt">{{ t('Zum Inhalt springen') }}</a>
   <header class="top">
     <div class="wrap">
       <span class="brand">
@@ -41,18 +45,21 @@ watch(user, () => nextTick(() => main.value?.focus()))
         <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
           <circle cx="16" cy="16" r="16" class="mark-disc" /><circle cx="16" cy="16" r="8.75" class="mark-ring" /><circle cx="16" cy="16" r="3.75" class="mark-dot" />
         </svg>
-        <span class="brand-t" :class="{ bl: user }"><b>SV KI-Lotse</b><small v-if="user">Ihr Wegweiser durch die Sozialversicherung</small></span>
+        <span class="brand-t" :class="{ bl: user }"><b>SV KI-Lotse</b><small v-if="user">{{ t('Ihr Wegweiser durch die Sozialversicherung') }}</small></span>
       </span>
+      <select v-if="!user" class="lang" :aria-label="t('Sprache')" :value="locale" @change="setLocale(($event.target as HTMLSelectElement).value)">
+        <option v-for="code in ENTRY_LANGS" :key="code" :value="code">{{ LANGS[code] }}</option>
+      </select>
       <span v-if="user" class="me">
-        <a class="btn btn-quiet bar-btn bar-list" href="#gespraeche" title="Alle Gespräche">
-          <svg class="i" aria-hidden="true"><use href="#i-list" /></svg><span class="xs">Alle Gespräche</span>
+        <a class="btn btn-quiet bar-btn bar-list" href="#gespraeche" :title="t('Alle Gespräche')">
+          <svg class="i" aria-hidden="true"><use href="#i-list" /></svg><span class="xs">{{ t('Alle Gespräche') }}</span>
         </a>
-        <a class="btn btn-quiet bar-btn me-btn" href="#einstellungen" title="Einstellungen">
+        <a class="btn btn-quiet bar-btn me-btn" href="#einstellungen" :title="t('Einstellungen')">
           <span class="avatar" aria-hidden="true">{{ initials }}</span>
-          <span class="me-l"><b>{{ user.display_name }}</b><small>Einstellungen</small></span>
+          <span class="me-l"><b>{{ user.display_name }}</b><small>{{ t('Einstellungen') }}</small></span>
         </a>
-        <button type="button" class="btn btn-quiet bar-btn" title="Abmelden" @click="signOut">
-          <svg class="i" aria-hidden="true"><use href="#i-logout" /></svg><span>Abmelden</span>
+        <button type="button" class="btn btn-quiet bar-btn" :title="t('Abmelden')" @click="signOut">
+          <svg class="i" aria-hidden="true"><use href="#i-logout" /></svg><span>{{ t('Abmelden') }}</span>
         </button>
       </span>
     </div>
@@ -64,8 +71,8 @@ watch(user, () => nextTick(() => main.value?.focus()))
       <template v-else>
         <div class="entry-text">
           <!-- avoid-ai-design-ignore: SD5 (two-weight headline: a bold first line, as asked in the brief) -->
-          <h1 class="entry-h"><b>Ihr Wegweiser</b> durch die Sozialversicherung</h1>
-          <p class="entry-lead">Beschreiben Sie Ihr Anliegen. Der Lotse sagt Ihnen, wen Sie anrufen und was Sie mitbringen.</p>
+          <h1 class="entry-h"><b>{{ t('Ihr Wegweiser') }}</b> {{ t('durch die Sozialversicherung') }}</h1>
+          <p class="entry-lead">{{ t('Beschreiben Sie Ihr Anliegen. Der Lotse sagt Ihnen, wen Sie anrufen und was Sie mitbringen.') }}</p>
         </div>
         <div class="entry-side">
           <AuthCard @done="user = $event" />
@@ -76,6 +83,7 @@ watch(user, () => nextTick(() => main.value?.focus()))
 </template>
 
 <style scoped>
+.lang { width: auto; min-height: 2.5rem; margin-left: auto; padding: .3rem .6rem; }
 .top { background: var(--paper); border-bottom: 3px solid var(--accent); }
 .top .wrap { display: flex; align-items: center; justify-content: space-between; gap: .75rem 1rem; padding-block: .6rem; }
 .brand { display: flex; align-items: center; gap: .7rem; min-width: 0; }

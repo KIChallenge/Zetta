@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { nextTick, reactive, ref } from 'vue'
 import { ApiError, authenticate, type User } from '../auth'
+import { k, markRegistering, t } from '../i18n'
 
 type Mode = 'login' | 'register'
 type Field = 'display_name' | 'email' | 'password'
 
 const emit = defineEmits<{ done: [user: User] }>()
 
-const TABS = [['login', 'Anmelden'], ['register', 'Neu registrieren']] as const
+const TABS = [['login', k('Anmelden')], ['register', k('Neu registrieren')]] as const
 const MESSAGES: Record<string, string> = {
-  'login 401': 'E-Mail-Adresse oder Passwort stimmt nicht.',
-  'register 409': 'Mit dieser E-Mail-Adresse gibt es schon ein Konto. Bitte melden Sie sich an.',
+  'login 401': k('E-Mail-Adresse oder Passwort stimmt nicht.'),
+  'register 409': k('Mit dieser E-Mail-Adresse gibt es schon ein Konto. Bitte melden Sie sich an.'),
 }
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -22,15 +23,15 @@ const busy = ref(false)
 const showPw = ref(false)
 
 const rules: Record<Field, (v: string) => string> = {
-  display_name: (v) => (v.trim() ? '' : 'Bitte sagen Sie uns, wie wir Sie nennen dürfen.'),
+  display_name: (v) => (v.trim() ? '' : t('Bitte sagen Sie uns, wie wir Sie nennen dürfen.')),
   email: (v) =>
-    !v.trim() ? 'Bitte geben Sie Ihre E-Mail-Adresse ein.'
-    : !EMAIL.test(v.trim()) ? 'Bitte prüfen Sie die E-Mail-Adresse. Sie sieht so aus: name@beispiel.at'
+    !v.trim() ? t('Bitte geben Sie Ihre E-Mail-Adresse ein.')
+    : !EMAIL.test(v.trim()) ? t('Bitte prüfen Sie die E-Mail-Adresse. Sie sieht so aus: name@beispiel.at')
     : '',
   password: (v) =>
     mode.value === 'register'
-      ? v.length < 10 ? 'Das Passwort braucht mindestens 10 Zeichen.' : ''
-      : v ? '' : 'Bitte geben Sie Ihr Passwort ein.',
+      ? v.length < 10 ? t('Das Passwort braucht mindestens 10 Zeichen.') : ''
+      : v ? '' : t('Bitte geben Sie Ihr Passwort ein.'),
 }
 const check = (f: Field) => !(errors[f] = rules[f](form[f]))
 // Live re-check only once a field has been flagged, as in the demo.
@@ -61,6 +62,7 @@ async function submit() {
   busy.value = true
   try {
     const creds = { email: form.email.trim(), password: form.password }
+    if (mode.value === 'register') markRegistering()
     emit(
       'done',
       mode.value === 'login'
@@ -68,7 +70,7 @@ async function submit() {
         : await authenticate('/auth/register', { ...creds, display_name: form.display_name.trim() }),
     )
   } catch (e) {
-    formError.value = (e instanceof ApiError && MESSAGES[`${mode.value} ${e.status}`]) || (e as Error).message
+    formError.value = t((e instanceof ApiError && MESSAGES[`${mode.value} ${e.status}`]) || (e as Error).message)
   } finally {
     busy.value = false
   }
@@ -76,34 +78,34 @@ async function submit() {
 </script>
 
 <template>
-  <section class="auth" aria-label="Anmelden oder registrieren">
-    <div class="tabs" role="tablist" aria-label="Anmelden oder registrieren">
+  <section class="auth" :aria-label="t('Anmelden oder registrieren')">
+    <div class="tabs" role="tablist" :aria-label="t('Anmelden oder registrieren')">
       <button
-        v-for="[t, label] in TABS"
-        :id="`t-${t}`"
-        :key="t"
+        v-for="[tab, label] in TABS"
+        :id="`t-${tab}`"
+        :key="tab"
         type="button"
         class="tab"
         role="tab"
         aria-controls="auth-panel"
-        :aria-selected="mode === t"
-        :tabindex="mode === t ? 0 : -1"
-        @click="select(t)"
+        :aria-selected="mode === tab"
+        :tabindex="mode === tab ? 0 : -1"
+        @click="select(tab)"
         @keydown="onTabKey"
       >
-        {{ label }}
+        {{ t(label) }}
       </button>
     </div>
 
     <div id="auth-panel" role="tabpanel" :aria-labelledby="`t-${mode}`">
       <form novalidate @submit.prevent="submit">
-        <h2 class="sr">{{ mode === 'login' ? 'Anmelden' : 'Neu registrieren' }}</h2>
+        <h2 class="sr">{{ mode === 'login' ? t('Anmelden') : t('Neu registrieren') }}</h2>
         <p v-if="formError" class="form-err" role="alert">
           <svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ formError }}</span>
         </p>
 
         <div v-if="mode === 'register'" class="field">
-          <label class="field-l" for="f-display_name">Wie dürfen wir Sie nennen?</label>
+          <label class="field-l" for="f-display_name">{{ t('Wie dürfen wir Sie nennen?') }}</label>
           <input
             id="f-display_name"
             v-model="form.display_name"
@@ -119,7 +121,7 @@ async function submit() {
         </div>
 
         <div class="field">
-          <label class="field-l" for="f-email">E-Mail-Adresse</label>
+          <label class="field-l" for="f-email">{{ t('E-Mail-Adresse') }}</label>
           <input
             id="f-email"
             v-model="form.email"
@@ -136,7 +138,7 @@ async function submit() {
         </div>
 
         <div class="field">
-          <label class="field-l" for="f-password">Passwort</label>
+          <label class="field-l" for="f-password">{{ t('Passwort') }}</label>
           <div class="pw">
             <input
               id="f-password"
@@ -149,11 +151,11 @@ async function submit() {
               @input="recheck('password')"
             />
             <button type="button" class="btn btn-quiet" aria-controls="f-password" :aria-pressed="showPw" @click="showPw = !showPw">
-              <svg class="i" aria-hidden="true"><use href="#i-eye" /></svg>Anzeigen
+              <svg class="i" aria-hidden="true"><use href="#i-eye" /></svg>{{ t('Anzeigen') }}
             </button>
           </div>
           <p v-if="mode === 'register'" id="f-password-rule" class="hint pw-rule" :class="{ ok: form.password.length >= 10 }">
-            <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>Mindestens 10 Zeichen
+            <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ t('Mindestens 10 Zeichen') }}
           </p>
           <p v-if="errors.password" id="f-password-err" class="err">
             <svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ errors.password }}</span>
@@ -161,7 +163,7 @@ async function submit() {
         </div>
 
         <button type="submit" class="btn btn-primary btn-block" :aria-disabled="busy">
-          {{ busy ? 'Einen Moment …' : mode === 'login' ? 'Anmelden' : 'Konto erstellen' }}
+          {{ busy ? t('Einen Moment …') : mode === 'login' ? t('Anmelden') : t('Konto erstellen') }}
         </button>
       </form>
     </div>

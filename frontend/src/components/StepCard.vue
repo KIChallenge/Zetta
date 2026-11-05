@@ -1,36 +1,37 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { when, type Step, type StepUpdate } from '../chats'
+import { hours, k, locale, t, translating } from '../i18n'
 
 const props = defineProps<{ step: Step; now: boolean; open: boolean; forServices: string[] }>()
 const emit = defineEmits<{ toggle: []; update: [body: StepUpdate]; upload: [] }>()
 
 const KIND = {
-  call: ['phone', 'Anrufen'],
-  email: ['mail', 'E-Mail schreiben'],
-  form: ['file', 'Antrag'],
-  info: ['info', 'Gut zu wissen'],
-  wait: ['clock', 'Abwarten'],
-  documents: ['list-check', 'Unterlagen'],
-  upload: ['file', 'Hochladen'],
-  book: ['ext', 'Online'],
+  call: ['phone', k('Anrufen')],
+  email: ['mail', k('E-Mail schreiben')],
+  form: ['file', k('Antrag')],
+  info: ['info', k('Gut zu wissen')],
+  wait: ['clock', k('Abwarten')],
+  documents: ['list-check', k('Unterlagen')],
+  upload: ['file', k('Hochladen')],
+  book: ['ext', k('Online')],
 } as const
 
 const s = computed(() => props.step)
 const done = computed(() => s.value.status === 'done' || s.value.status === 'skipped')
 const state = computed(() => (done.value ? 'done' : props.now ? 'now' : s.value.status === 'blocked' ? 'later' : 'open'))
 const stateLabel = computed(
-  () => ({ done: 'Erledigt', now: s.value.type === 'wait' ? 'Läuft gerade' : 'Jetzt dran', later: 'Danach', open: 'Offen' })[state.value],
+  () => t(({ done: k('Erledigt'), now: s.value.type === 'wait' ? k('Läuft gerade') : k('Jetzt dran'), later: k('Danach'), open: k('Offen') })[state.value]),
 )
-const outcomeLabel = computed(() => s.value.outcomes.find((o) => o.id === s.value.outcome)?.label ?? 'Erledigt')
+const outcomeLabel = computed(() => t(s.value.outcomes.find((o) => o.id === s.value.outcome)?.label ?? 'Erledigt'))
 const docs = computed(() => s.value.documents ?? [])
 
 // Collapsed, a card shows one line (who, or the result) and the one thing to do now; the rest opens on demand.
 const line = computed(() => {
   const st = s.value
   if (done.value) return `${outcomeLabel.value}${st.updated_at ? ' · ' + when(st.updated_at) : ''}`
-  if (st.type === 'documents') return `${st.checks.length} von ${docs.value.length} bereit`
-  return st.institution?.name ?? ''
+  if (st.type === 'documents') return t('{done} von {total} bereit', { done: st.checks.length, total: docs.value.length })
+  return t(st.institution?.name ?? '')
 })
 const reach = computed(() => (!done.value && s.value.type === 'call' ? s.value.contact?.reachable : undefined))
 // Info and wait steps have nothing to open elsewhere: their outcome is the action.
@@ -47,8 +48,35 @@ const notReached = computed(() => !done.value && s.value.outcome === 'not_reache
 
 // Gaps like "[Ihr Name]" are highlighted, so the user sees what is still missing.
 const parts = (text = '') => text.split(/(\[[^\]]+\])/).filter(Boolean).map((t) => ({ t, gap: /^\[.*\]$/.test(t) }))
+// In another language the German line is read out and the translation sits below it. Both come from the corpus,
+// so they say the same; an LLM script could differ from its translation.
+const plain = computed(() => (translating.value ? s.value.script?.plain : undefined))
+function fillSlots(text: string | undefined, translate: boolean) {
+  if (!text) return text
+  const slots = plain.value!.slots
+  return text.replace(/\{([a-z_]+\.[a-z_]+)\}/g, (m, name: string) => {
+    const slot = slots[name]
+    if (!slot) return m
+    if (slot.value) return translate && name === 'subject.relation' ? t(slot.value) : slot.value
+    return `[${translate ? t(slot.gap) : slot.gap}]`
+  })
+}
+function scriptOf(translate: boolean) {
+  const tpl = plain.value!.template
+  const show = (text?: string) => fillSlots(text && translate ? t(text) : text, translate)
+  return {
+    opening: show(tpl.opening),
+    points: tpl.points?.map((p) => ({ covers: p.covers, text: show(p.text)! })),
+    closing: show(tpl.closing),
+    subject: show(tpl.subject),
+    body: show(tpl.body),
+  }
+}
+const script = computed(() => (s.value.script && plain.value ? { ...s.value.script, ...scriptOf(false) } : s.value.script))
+const translated = computed(() => (plain.value ? scriptOf(true) : null))
+const pointText = (covers: string) => translated.value?.points?.find((p) => p.covers === covers)?.text
 const hasGap = computed(() => {
-  const sc = s.value.script
+  const sc = script.value
   const texts = [sc?.opening, sc?.closing, sc?.body, sc?.subject, ...(sc?.points ?? []).map((p) => p.text)]
   return texts.some((t) => t && /\[[^\]]+\]/.test(t))
 })
@@ -69,16 +97,16 @@ function saveOutcome() {
 
 // Email: editable before sending, so the user's changes go into the mail client or the clipboard.
 const body = ref('')
-watch(() => s.value.script?.body, (b) => (body.value = b ?? ''), { immediate: true })
+watch(() => script.value?.body, (b) => (body.value = b ?? ''), { immediate: true })
 const mailto = computed(() => {
   const c = s.value.contact
   if (!c) return ''
-  return `mailto:${c.value}?subject=${encodeURIComponent(s.value.script?.subject ?? '')}&body=${encodeURIComponent(body.value)}`
+  return `mailto:${c.value}?subject=${encodeURIComponent(script.value?.subject ?? '')}&body=${encodeURIComponent(body.value)}`
 })
 const copied = ref(false)
 async function copy() {
   try {
-    await navigator.clipboard.writeText(`Betreff: ${s.value.script?.subject ?? ''}\n\n${body.value}`)
+    await navigator.clipboard.writeText(`Betreff: ${script.value?.subject ?? ''}\n\n${body.value}`)
     copied.value = true
     setTimeout(() => (copied.value = false), 2500)
   } catch {
@@ -101,7 +129,7 @@ async function copy() {
           @click="emit('toggle')"
         >
           <svg class="i kind" aria-hidden="true"><use :href="`#i-${KIND[s.type][0]}`" /></svg>
-          <span class="card-title"><span class="sr">{{ KIND[s.type][1] }}: </span>{{ s.title }}</span>
+          <span class="card-title"><span class="sr">{{ t(KIND[s.type][1]) }}: </span>{{ t(s.title) }}</span>
           <span class="state" :class="{ sr: state === 'open' }"><svg v-if="state === 'done'" class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ stateLabel }}</span>
           <svg class="i chev" aria-hidden="true"><use href="#i-chev" /></svg>
         </button>
@@ -110,43 +138,43 @@ async function copy() {
       <div v-if="line || reach || notReached || act" class="card-sub">
         <p v-if="line || reach" class="card-line" :aria-live="s.type === 'documents' ? 'polite' : undefined">
           <span v-if="line">{{ line }}</span>
-          <span v-if="reach" class="avail" :data-open="reach.open">{{ reach.text }}</span>
+          <span v-if="reach" class="avail" :data-open="reach.open">{{ t(reach.text) }}</span>
         </p>
         <p v-if="notReached" class="attempt">
           <svg class="i" aria-hidden="true"><use href="#i-alert" /></svg>
-          <span>Nicht erreicht<template v-if="s.updated_at"> ({{ when(s.updated_at) }})</template>. Versuchen Sie es noch einmal.</span>
+          <span>{{ t('Nicht erreicht') }}<template v-if="s.updated_at"> ({{ when(s.updated_at) }})</template>. {{ t('Versuchen Sie es noch einmal.') }}</span>
         </p>
         <ul v-if="act && s.doctors" class="doctors">
           <li v-for="d in s.doctors" :key="d.id" class="doctor">
             <div class="doctor-info">
               <strong>{{ d.name }}</strong>
-              <span v-if="d.warning" class="err"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ d.warning }} <a v-if="d.warning_source" :href="d.warning_source" target="_blank" rel="noopener noreferrer">Mehr dazu</a></span></span>
-              <span v-else class="doctor-contract">{{ d.contract }}</span>
+              <span v-if="d.warning" class="err"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ t(d.warning) }} <a v-if="d.warning_source" :href="d.warning_source" target="_blank" rel="noopener noreferrer">{{ t('Mehr dazu') }}</a></span></span>
+              <span v-else class="doctor-contract">{{ t(d.contract) }}</span>
               <span>{{ d.address }}</span>
-              <span class="hint">Öffnungszeiten: {{ d.contact.hours ?? 'in der Quelle nicht angegeben' }}</span>
+              <span class="hint">{{ t('Öffnungszeiten:') }} {{ d.contact.hours ? hours(d.contact.hours) : t('in der Quelle nicht angegeben') }}</span>
             </div>
-            <a class="btn btn-secondary call" :href="d.contact.href"><svg class="i" aria-hidden="true"><use href="#i-phone" /></svg><span class="num">{{ d.contact.value }}</span><span class="sr"> anrufen</span></a>
+            <a class="btn btn-secondary call" :href="d.contact.href"><svg class="i" aria-hidden="true"><use href="#i-phone" /></svg><span class="num">{{ d.contact.value }}</span><span class="sr"> {{ t('anrufen') }}</span></a>
           </li>
         </ul>
         <p v-if="act && s.doctors" class="hint">
-          Gereiht nach Kassenvertrag, Bezirk und Zeit, keine Empfehlung. Quelle: <a :href="s.doctors_source?.url" target="_blank" rel="noopener noreferrer">praxisplan.at</a>, Stand {{ s.doctors_source?.scraped_at.split('-').reverse().join('.') }}.
-          <a v-if="s.more" :href="s.more.href" target="_blank" rel="noopener noreferrer">Weitere Ordinationen suchen</a>
+          {{ t('Gereiht nach Kassenvertrag, Bezirk und Zeit, keine Empfehlung.') }} {{ t('Quelle:') }} <a :href="s.doctors_source?.url" target="_blank" rel="noopener noreferrer">praxisplan.at</a>, {{ t('Stand') }} {{ s.doctors_source?.scraped_at.split('-').reverse().join('.') }}.
+          <a v-if="s.more" :href="s.more.href" target="_blank" rel="noopener noreferrer">{{ t('Weitere Ordinationen suchen') }}</a>
         </p>
         <div v-if="act" class="actions">
           <template v-if="s.type === 'call'">
-            <a v-if="s.contact" class="btn btn-primary call" :href="s.contact.href"><svg class="i" aria-hidden="true"><use href="#i-phone" /></svg><span class="num">{{ s.contact.value }}</span><span class="sr"> anrufen</span></a>
-            <button v-if="s.script" type="button" class="btn btn-quiet" :aria-expanded="open" :aria-controls="`b-${s.id}`" @click="emit('toggle')">Gesprächsleitfaden</button>
+            <a v-if="s.contact" class="btn btn-primary call" :href="s.contact.href"><svg class="i" aria-hidden="true"><use href="#i-phone" /></svg><span class="num">{{ s.contact.value }}</span><span class="sr"> {{ t('anrufen') }}</span></a>
+            <button v-if="s.script" type="button" class="btn btn-quiet" :aria-expanded="open" :aria-controls="`b-${s.id}`" @click="emit('toggle')">{{ t('Gesprächsleitfaden') }}</button>
           </template>
           <template v-else-if="s.type === 'email'">
-            <a class="btn btn-primary" :href="mailto"><svg class="i" aria-hidden="true"><use href="#i-mail" /></svg>E-Mail öffnen</a>
-            <button type="button" class="btn btn-quiet" :aria-expanded="open" :aria-controls="`b-${s.id}`" @click="emit('toggle')">E-Mail ansehen</button>
+            <a class="btn btn-primary" :href="mailto"><svg class="i" aria-hidden="true"><use href="#i-mail" /></svg>{{ t('E-Mail öffnen') }}</a>
+            <button type="button" class="btn btn-quiet" :aria-expanded="open" :aria-controls="`b-${s.id}`" @click="emit('toggle')">{{ t('E-Mail ansehen') }}</button>
           </template>
           <a v-else-if="s.type === 'form' && s.form" class="btn btn-primary" :href="s.form.url" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ s.form.title }} (PDF)</a>
-          <a v-else-if="s.type === 'book' && s.contact" class="btn btn-primary" :href="s.contact.href" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-ext" /></svg>{{ s.contact.label ?? 'Öffnen' }}</a>
-          <button v-else-if="s.type === 'upload'" type="button" class="btn btn-primary" @click="emit('upload')"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>PDF auswählen</button>
+          <a v-else-if="s.type === 'book' && s.contact" class="btn btn-primary" :href="s.contact.href" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-ext" /></svg>{{ t(s.contact.label ?? 'Öffnen') }}</a>
+          <button v-else-if="s.type === 'upload'" type="button" class="btn btn-primary" @click="emit('upload')"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ t('PDF auswählen') }}</button>
           <template v-else-if="outcomeFirst">
             <button v-for="o in s.outcomes" :key="o.id" type="button" class="btn btn-secondary" @click="emit('update', { outcome: o.id })">
-              <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ o.label }}
+              <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ t(o.label) }}
             </button>
           </template>
         </div>
@@ -158,61 +186,62 @@ async function copy() {
           <p v-if="s.note">{{ s.note }}</p>
           <p v-if="s.contact" class="contact">
             <svg class="i" aria-hidden="true"><use :href="s.type === 'call' ? '#i-phone' : '#i-mail'" /></svg>
-            <a :href="s.contact.href">{{ s.contact.value }}</a><span v-if="s.institution">· {{ s.institution.name }}</span>
+            <a :href="s.contact.href">{{ s.contact.value }}</a><span v-if="s.institution">· {{ t(s.institution.name) }}</span>
           </p>
-          <p><button type="button" class="linkbtn" @click="emit('update', { status: 'open' })">Doch noch nicht erledigt</button></p>
+          <p><button type="button" class="linkbtn" @click="emit('update', { status: 'open' })">{{ t('Doch noch nicht erledigt') }}</button></p>
         </template>
 
         <template v-else>
-          <p class="why"><svg class="i" aria-hidden="true"><use href="#i-info" /></svg><span>{{ s.why }}</span></p>
-          <p v-if="forServices.length > 1" class="hint">Gilt für: {{ forServices.join(' und ') }}</p>
+          <p class="why"><svg class="i" aria-hidden="true"><use href="#i-info" /></svg><span>{{ t(s.why) }}</span></p>
+          <p v-if="forServices.length > 1" class="hint">{{ t('Gilt für:') }} {{ forServices.map((f) => t(f)).join(', ') }}</p>
 
           <!-- Call -->
           <template v-if="s.type === 'call'">
-            <p v-if="!s.contact && !s.doctors" class="hint">Die Nummer kennen Sie selbst: Der Lotse hat keine Daten zu Ihrer Ordination.</p>
-            <p v-else-if="s.contact" class="hint">Telefonzeiten: {{ s.contact.hours ?? 'in der Quelle nicht angegeben' }}</p>
-            <div v-if="s.script" class="script">
+            <p v-if="!s.contact && !s.doctors" class="hint">{{ t('Die Nummer kennen Sie selbst: Der Lotse hat keine Daten zu Ihrer Ordination.') }}</p>
+            <p v-else-if="s.contact" class="hint">{{ t('Telefonzeiten:') }} {{ s.contact.hours ? hours(s.contact.hours) : t('in der Quelle nicht angegeben') }}</p>
+            <p v-if="translated" class="hint">{{ t('Sprechen Sie den deutschen Text. Die Übersetzung darunter hilft Ihnen beim Verstehen.') }}</p>
+            <div v-if="script" class="script">
               <ol class="script-steps">
-                <li><span class="lab caps">Sagen Sie</span><p class="say">„<template v-for="(p, i) in parts(s.script.opening)" :key="i"><mark v-if="p.gap" class="gap">{{ p.t }}</mark><template v-else>{{ p.t }}</template></template>“</p></li>
-                <li v-if="s.script.have_ready.length">
-                  <span class="lab caps">Halten Sie bereit</span>
+                <li><span class="lab caps">{{ t('Sagen Sie') }}</span><p class="say">„<template v-for="(p, i) in parts(script.opening)" :key="i"><mark v-if="p.gap" class="gap">{{ p.t }}</mark><template v-else>{{ p.t }}</template></template>“</p><p v-if="translated" class="say-tr" :lang="locale">{{ translated.opening }}</p></li>
+                <li v-if="script.have_ready.length">
+                  <span class="lab caps">{{ t('Halten Sie bereit') }}</span>
                   <dl class="kv">
-                    <div v-for="h in s.script.have_ready" :key="h.label"><dt>{{ h.label }}</dt><dd>{{ h.value ?? 'bitte bereithalten' }}</dd></div>
+                    <div v-for="h in script.have_ready" :key="h.label"><dt>{{ t(h.label) }}</dt><dd>{{ h.value ?? t('bitte bereithalten') }}</dd></div>
                   </dl>
                 </li>
                 <li>
-                  <span class="lab caps">Fragen Sie nach</span>
+                  <span class="lab caps">{{ t('Fragen Sie nach') }}</span>
                   <ul class="checks">
-                    <li v-for="p in s.script.points" :key="p.covers">
+                    <li v-for="p in script.points" :key="p.covers">
                       <label class="check">
                         <input type="checkbox" :checked="s.checks.includes(p.covers)" @change="tick(p.covers, ($event.target as HTMLInputElement).checked)" />
-                        <span><template v-for="(q, i) in parts(p.text)" :key="i"><mark v-if="q.gap" class="gap">{{ q.t }}</mark><template v-else>{{ q.t }}</template></template></span>
+                        <span><template v-for="(q, i) in parts(p.text)" :key="i"><mark v-if="q.gap" class="gap">{{ q.t }}</mark><template v-else>{{ q.t }}</template></template><small v-if="pointText(p.covers)" class="say-tr" :lang="locale">{{ pointText(p.covers) }}</small></span>
                       </label>
                     </li>
                   </ul>
                 </li>
-                <li><span class="lab caps">Zum Schluss</span><p class="say">„<template v-for="(p, i) in parts(s.script.closing)" :key="i"><mark v-if="p.gap" class="gap">{{ p.t }}</mark><template v-else>{{ p.t }}</template></template>“</p></li>
+                <li><span class="lab caps">{{ t('Zum Schluss') }}</span><p class="say">„<template v-for="(p, i) in parts(script.closing)" :key="i"><mark v-if="p.gap" class="gap">{{ p.t }}</mark><template v-else>{{ p.t }}</template></template>“</p><p v-if="translated" class="say-tr" :lang="locale">{{ translated.closing }}</p></li>
               </ol>
-              <p v-if="hasGap" class="hint">Markierte Stellen fehlen noch. <a href="#einstellungen">In den Einstellungen ergänzen</a></p>
+              <p v-if="hasGap" class="hint">{{ t('Markierte Stellen fehlen noch.') }} <a href="#einstellungen">{{ t('In den Einstellungen ergänzen') }}</a></p>
             </div>
             <div class="outcome">
               <button type="button" class="btn btn-secondary" :aria-expanded="outcomeOpen" :aria-controls="`of-${s.id}`" @click="outcomeOpen = !outcomeOpen">
-                <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>Anruf erledigt
+                <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ t('Anruf erledigt') }}
               </button>
               <form v-if="outcomeOpen" :id="`of-${s.id}`" class="outcome-form" @submit.prevent="saveOutcome">
                 <fieldset>
-                  <legend class="field-l">Wie ist das Gespräch gelaufen?</legend>
+                  <legend class="field-l">{{ t('Wie ist das Gespräch gelaufen?') }}</legend>
                   <div class="seg">
-                    <label v-for="o in s.outcomes" :key="o.id" class="opt"><input v-model="picked" type="radio" :name="`r-${s.id}`" :value="o.id" /><span>{{ o.label }}</span></label>
+                    <label v-for="o in s.outcomes" :key="o.id" class="opt"><input v-model="picked" type="radio" :name="`r-${s.id}`" :value="o.id" /><span>{{ t(o.label) }}</span></label>
                   </div>
                 </fieldset>
                 <div class="field">
-                  <label class="field-l" :for="`on-${s.id}`">Was wurde gesagt? <span class="muted">(freiwillig)</span></label>
-                  <textarea :id="`on-${s.id}`" v-model="note" class="input" rows="3" maxlength="2000" placeholder="z. B. Antrag kommt per Post"></textarea>
+                  <label class="field-l" :for="`on-${s.id}`">{{ t('Was wurde gesagt?') }} <span class="muted">{{ t('(freiwillig)') }}</span></label>
+                  <textarea :id="`on-${s.id}`" v-model="note" class="input" rows="3" maxlength="2000" :placeholder="t('z. B. Antrag kommt per Post')"></textarea>
                 </div>
                 <div class="actions">
-                  <button type="submit" class="btn btn-primary">Speichern</button>
-                  <button type="button" class="btn btn-quiet" @click="outcomeOpen = false">Abbrechen</button>
+                  <button type="submit" class="btn btn-primary">{{ t('Speichern') }}</button>
+                  <button type="button" class="btn btn-quiet" @click="outcomeOpen = false">{{ t('Abbrechen') }}</button>
                 </div>
               </form>
             </div>
@@ -221,28 +250,29 @@ async function copy() {
           <!-- Email -->
           <template v-else-if="s.type === 'email' && s.contact">
             <dl class="mail-meta">
-              <dt>An</dt><dd><a :href="s.contact.href">{{ s.contact.value }}</a></dd>
-              <dt>Betreff</dt><dd>{{ s.script?.subject }}</dd>
-              <template v-if="s.form"><dt>Anhang</dt><dd><a :href="s.form.url" target="_blank" rel="noopener noreferrer">{{ s.form.title }}</a> und die Unterlagen aus der Checkliste</dd></template>
+              <dt>{{ t('An') }}</dt><dd><a :href="s.contact.href">{{ s.contact.value }}</a></dd>
+              <dt>{{ t('Betreff') }}</dt><dd>{{ script?.subject }}<small v-if="translated" class="say-tr" :lang="locale">{{ translated.subject }}</small></dd>
+              <template v-if="s.form"><dt>{{ t('Anhang') }}</dt><dd><a :href="s.form.url" target="_blank" rel="noopener noreferrer">{{ s.form.title }}</a> {{ t('und die Unterlagen aus der Checkliste') }}</dd></template>
             </dl>
             <div class="field">
-              <label class="field-l" :for="`m-${s.id}`">Ihre E-Mail <span class="muted">(änderbar)</span></label>
+              <label class="field-l" :for="`m-${s.id}`">{{ t('Ihre E-Mail') }} <span class="muted">{{ t('(änderbar)') }}</span></label>
               <textarea :id="`m-${s.id}`" v-model="body" class="input mail" rows="12"></textarea>
-              <p v-if="hasGap" class="hint">Stellen in [eckigen Klammern] fehlen noch. <a href="#einstellungen">In den Einstellungen ergänzen</a></p>
+              <p v-if="hasGap" class="hint">{{ t('Stellen in [eckigen Klammern] fehlen noch.') }} <a href="#einstellungen">{{ t('In den Einstellungen ergänzen') }}</a></p>
+              <details v-if="translated" class="more"><summary>{{ t('Übersetzung der E-Mail') }}</summary><p class="say-tr mail-tr" :lang="locale">{{ translated.body }}</p></details>
             </div>
             <div class="actions">
-              <button type="button" class="btn btn-secondary" @click="copy"><svg class="i" aria-hidden="true"><use href="#i-copy" /></svg>{{ copied ? 'Kopiert' : 'Text kopieren' }}</button>
+              <button type="button" class="btn btn-secondary" @click="copy"><svg class="i" aria-hidden="true"><use href="#i-copy" /></svg>{{ copied ? t('Kopiert') : t('Text kopieren') }}</button>
             </div>
-            <p class="sr" aria-live="polite">{{ copied ? 'Text kopiert' : '' }}</p>
+            <p class="sr" aria-live="polite">{{ copied ? t('Text kopiert') : '' }}</p>
           </template>
 
           <!-- Form -->
           <template v-else-if="s.type === 'form' && s.form">
-            <p v-if="s.text">{{ s.text }}</p>
+            <p v-if="s.text">{{ t(s.text) }}</p>
             <div v-if="s.form.online_url" class="actions">
-              <a class="btn btn-secondary" :href="s.form.online_url" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-ext" /></svg>Online stellen</a>
+              <a class="btn btn-secondary" :href="s.form.online_url" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-ext" /></svg>{{ t('Online stellen') }}</a>
             </div>
-            <p v-if="s.institution" class="contact"><svg class="i" aria-hidden="true"><use href="#i-building" /></svg><span>Einreichen bei: {{ s.institution.name }}<template v-if="s.institution.address">, {{ s.institution.address }}</template></span></p>
+            <p v-if="s.institution" class="contact"><svg class="i" aria-hidden="true"><use href="#i-building" /></svg><span>{{ t('Einreichen bei:') }} {{ t(s.institution.name) }}<template v-if="s.institution.address">, {{ s.institution.address }}</template></span></p>
           </template>
 
           <!-- Checklist -->
@@ -250,23 +280,23 @@ async function copy() {
             <li v-for="d in docs" :key="d.id">
               <label class="check">
                 <input type="checkbox" :checked="s.checks.includes(d.id)" @change="tick(d.id, ($event.target as HTMLInputElement).checked)" />
-                <span><b>{{ d.title }}</b><small>{{ d.where_to_get }}</small></span>
+                <span><b>{{ t(d.title) }}</b><small>{{ t(d.where_to_get) }}</small></span>
               </label>
             </li>
           </ul>
 
           <!-- Book, upload, info, wait, or a call/email without curated contact data -->
-          <p v-else-if="s.text">{{ s.text }}</p>
+          <p v-else-if="s.text">{{ t(s.text) }}</p>
 
           <div v-if="s.type !== 'call' && s.type !== 'upload' && !(outcomeFirst && act)" class="outcome">
-            <p v-if="s.outcomes.length > 1" class="field-l">Wie ist es ausgegangen?</p>
+            <p v-if="s.outcomes.length > 1" class="field-l">{{ t('Wie ist es ausgegangen?') }}</p>
             <div class="actions">
               <button v-for="o in s.outcomes" :key="o.id" type="button" class="btn btn-secondary" @click="emit('update', { outcome: o.id })">
-                <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ o.label }}
+                <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ t(o.label) }}
               </button>
             </div>
           </div>
-          <a v-if="s.contact?.source_url" class="src-link" :href="s.contact.source_url" target="_blank" rel="noopener noreferrer">Quelle</a>
+          <a v-if="s.contact?.source_url" class="src-link" :href="s.contact.source_url" target="_blank" rel="noopener noreferrer">{{ t('Quelle') }}</a>
         </template>
       </div>
     </article>
@@ -337,6 +367,8 @@ async function copy() {
 .opt:has(input:checked) { border-color: var(--action); background: var(--band); color: var(--head); font-weight: 600; }
 .opt:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
 .opt input { accent-color: var(--action); }
+.say-tr { display: block; margin-top: .2rem; font-size: var(--fs-small); color: var(--ink-3); }
+.mail-tr { white-space: pre-line; }
 .doctors { display: grid; gap: .75rem; margin: 0; padding: 0; list-style: none; }
 .doctor { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; padding-bottom: .75rem; border-bottom: 1px solid var(--rule-2); }
 .doctor-info { display: grid; gap: .1rem; min-width: 0; flex: 1 1 14rem; }
