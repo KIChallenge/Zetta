@@ -9,7 +9,7 @@ export interface Chat {
 
 export interface Message {
   id: string | number
-  role: 'user'
+  role: 'user' | 'assistant'
   text: string
   created_at: string
 }
@@ -30,7 +30,7 @@ export const renameChat = (id: string | number, title: string) => api<Chat>(at(i
 export const deleteChat = (id: string | number) => api<null>(at(id), 'DELETE')
 export const listMessages = (id: string | number) => api<Message[]>(`${at(id)}/messages`)
 export const sendMessage = (id: string | number, text: string) =>
-  api<{ status: 'delivered'; message: Message }>(`${at(id)}/messages`, 'POST', { text })
+  api<{ status: 'delivered'; message: Message; reply: Message }>(`${at(id)}/messages`, 'POST', { text })
 
 export const NOT_FOUND = 'Gespräch nicht gefunden.'
 

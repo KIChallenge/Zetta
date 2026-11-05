@@ -70,3 +70,4 @@ class MessageResponse(BaseModel):
 class SendMessageResponse(BaseModel):
     status: Literal["delivered"] = "delivered"
     message: MessageResponse
+    reply: MessageResponse
