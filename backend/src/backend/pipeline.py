@@ -20,6 +20,7 @@ from backend.models import Chat, ChatFact, Message, Plan, Profile, StepState, ut
 from backend.schemas import MessageResponse, ProfileData
 
 logger = logging.getLogger(__name__)
+NOTHING_NEW = "Ihre Angaben sind unverändert, Ihr Plan bleibt gleich. Unter „Mehr dazu“ steht bei jedem Thema, worum es geht."
 
 # Outcome id -> (label, effect). "keep" leaves the step open, e.g. to call again in the next window.
 OUTCOMES = {
@@ -268,6 +269,7 @@ async def respond(
     # Yields `facts`, then `plan` for a plan, then `done` with the saved assistant message.
     corpus = get_corpus()
     rows = fact_rows(db, chat.id)
+    before = {k: r.value for k, r in rows.items()}
     medical = False
     if answer:
         key, value, source, quote = answer
@@ -295,8 +297,16 @@ async def respond(
 
     letter = rows.get("documented_recommendations")
     quotes = (letter.quote or {}) if letter else {}
-    result = evaluate(facts, corpus, asked=questions_asked(db, chat.id), medical=medical, quotes=quotes)
-    if result.kind == "question":
+    # A message that changes no fact leaves an existing plan as it is: a re-plan would only post it again.
+    latest = latest_plan(db, chat.id)
+    unchanged = answer is None and not medical and facts == before and latest is not None
+    result = None if unchanged else evaluate(facts, corpus, asked=questions_asked(db, chat.id), medical=medical, quotes=quotes)
+    if result is None:
+        # A topic of the plan named in the message ("Was ist Pflegegeld?") gets its corpus summary.
+        named = next((s for s in latest.graph["services"] if s["title"].casefold() in (text or "").casefold()), None)
+        reply_text = named["summary"] if named else NOTHING_NEW
+        reply = Message(chat_id=chat.id, role="assistant", kind="text", text=reply_text, created_at=utcnow())
+    elif result.kind == "question":
         reply = question_message(chat.id, result.question, facts, corpus)
     elif result.kind != "plan":
         card = corpus.cards[result.kind]

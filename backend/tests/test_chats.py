@@ -428,6 +428,30 @@ def test_replan_keeps_step_states_and_unchanged_scripts(client, anna, llm):
     assert [[s["step_id"] for s in batch] for batch in rewritten] == [["home_care_fsw.call"]]
 
 
+def test_a_message_without_new_facts_keeps_the_plan(client, anna, llm):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+    llm.facts = {}
+
+    events = send(client, anna, chat["id"], "Was ist 1+1?")
+
+    assert "plan" not in dict(events)
+    assert (reply(events)["kind"], reply(events)["text"]) == ("text", pipeline.NOTHING_NEW)
+    assert client.get(f"/chats/{chat['id']}/state", headers=anna).json()["plan"]["version"] == 1
+
+
+def test_a_plan_topic_named_without_new_facts_gets_its_summary(client, anna, llm):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+    llm.facts = {}
+
+    events = send(client, anna, chat["id"], "Was ist Pflegegeld?")
+
+    summary = next(s.summary for s in pipeline.get_corpus().services if s.id == "care_allowance")
+    assert "plan" not in dict(events)
+    assert (reply(events)["kind"], reply(events)["text"]) == ("text", summary)
+
+
 def test_a_long_plan_intro_falls_back_to_one_fixed_sentence(client, anna, llm):
     llm.intro_text = (
         "Gerne, ich bereite die nächsten Schritte zu Pflegegeld, Pflege und Betreuung zu Hause sowie Entlastung "
