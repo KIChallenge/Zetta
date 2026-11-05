@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import AuthCard from './components/AuthCard.vue'
+import ChatApp from './components/ChatApp.vue'
 import { ApiError, clearToken, getToken, me, type User } from './auth'
 
 const user = ref<User | null>(null)
@@ -19,6 +20,11 @@ function logout() {
   user.value = null
 }
 
+function signOut() {
+  history.replaceState(null, '', location.pathname + location.search)
+  logout()
+}
+
 // The screen swaps under the user, so move focus to the new content.
 watch(user, () => nextTick(() => main.value?.focus()))
 </script>
@@ -29,20 +35,23 @@ watch(user, () => nextTick(() => main.value?.focus()))
     <div class="wrap">
       <span class="brand">
         <span class="brand-mark"><svg class="i" aria-hidden="true"><use href="#i-route" /></svg></span>
-        <span><b>SV KI-Lotse</b><small>Ihr Wegweiser durch die Sozialversicherung</small></span>
+        <span :class="{ bl: user }"><b>SV KI-Lotse</b><small>Ihr Wegweiser durch die Sozialversicherung</small></span>
       </span>
       <span v-if="user" class="me">
-        <b>{{ user.display_name }}</b>
-        <button type="button" class="btn btn-quiet" @click="logout">
-          <svg class="i" aria-hidden="true"><use href="#i-logout" /></svg>Abmelden
+        <a class="btn btn-quiet bar-list" href="#gespraeche">
+          <svg class="i" aria-hidden="true"><use href="#i-list" /></svg>Alle Gespräche
+        </a>
+        <b class="bl">{{ user.display_name }}</b>
+        <button type="button" class="btn btn-quiet" title="Abmelden" @click="signOut">
+          <svg class="i" aria-hidden="true"><use href="#i-logout" /></svg><span class="bl">Abmelden</span>
         </button>
       </span>
     </div>
   </header>
 
-  <main id="inhalt" ref="main" class="wrap" tabindex="-1">
+  <main id="inhalt" ref="main" :class="user ? 'signed-in' : 'wrap login'" tabindex="-1">
     <template v-if="ready">
-      <h1 v-if="user" class="hello">Guten Tag, {{ user.display_name }}.</h1>
+      <ChatApp v-if="user" :user="user" @expired="logout" />
       <AuthCard v-else @done="user = $event" />
     </template>
   </main>
@@ -57,6 +66,10 @@ watch(user, () => nextTick(() => main.value?.focus()))
 .brand b { display: block; font-size: 1.15rem; line-height: 1.2; }
 .brand small { display: block; font-size: .875rem; color: var(--ink-3); line-height: 1.3; }
 .me { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .25rem .75rem; }
-main { display: grid; padding-block: clamp(1.25rem, 4vh, 2.5rem); }
-.hello { font-size: clamp(1.75rem, 4vw, 2.4rem); letter-spacing: -.02em; }
+main { display: grid; min-height: 0; overflow-y: auto; }
+.login { padding-block: clamp(1.25rem, 4vh, 2.5rem); }
+.signed-in { grid-template-rows: minmax(0, 1fr); }
+@media (min-width: 56rem) { .bar-list { display: none; } }
+/* Narrow, signed in: one bar row, labels stay for screen readers (as in the demo). */
+@media (max-width: 55.99rem) { .bl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
 </style>

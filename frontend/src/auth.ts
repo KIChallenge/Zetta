@@ -13,13 +13,14 @@ export class ApiError extends Error {
 }
 
 const KEY = 'access_token'
-const UNREACHABLE = 'Der Server ist gerade nicht erreichbar. Bitte versuchen Sie es später noch einmal.'
+export const UNREACHABLE = 'Der Server ist gerade nicht erreichbar. Bitte versuchen Sie es später noch einmal.'
+export const GENERIC = 'Das hat leider nicht geklappt. Bitte versuchen Sie es noch einmal.'
 
 // shortcut: JWT in localStorage is readable by any script on the page; move to an httpOnly cookie before production.
 export const getToken = () => localStorage.getItem(KEY)
 export const clearToken = () => localStorage.removeItem(KEY)
 
-async function request<T>(path: string, init: RequestInit): Promise<T> {
+export async function request<T>(path: string, init: RequestInit): Promise<T> {
   let res: Response
   try {
     res = await fetch(path, init)
@@ -31,7 +32,7 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   const body = await res.json().catch(() => null)
   if (!res.ok) {
     const detail = body?.detail
-    throw new ApiError(res.status, typeof detail === 'string' ? detail : 'Das hat leider nicht geklappt. Bitte versuchen Sie es noch einmal.')
+    throw new ApiError(res.status, typeof detail === 'string' ? detail : GENERIC)
   }
   return body as T
 }
