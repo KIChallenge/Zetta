@@ -87,6 +87,7 @@ FACTS: dict[str, Fact] = {
         {
             "apply_care_allowance": "Pflegegeld beantragen",
             "find_support_services": "Hilfe im Alltag finden",
+            "in_hospital": "Gerade im Spital: Entlassung und Besuch",
             "after_hospital": "Nach dem Spital: Entlassungsbrief",
             "health_promotion": "Etwas für die Gesundheit tun",
             "child_offers": "Angebote für mein Kind",
@@ -98,11 +99,25 @@ FACTS: dict[str, Fact] = {
         hints={
             "apply_care_allowance": "Pflegegeld: money for people who need care",
             "find_support_services": "help at home, e.g. home help, meals, nursing, someone to accompany",
-            "after_hospital": "what to organise after a hospital stay, e.g. with a discharge letter (Entlassungsbrief)",
+            "in_hospital": "the person is in hospital now and has not come home yet, even if a discharge date is"
+            " already planned (\"wird morgen entlassen\")",
+            "after_hospital": "the person has already come home from hospital or already has the discharge letter"
+            " (Entlassungsbrief) and asks what to organise now; if coming home is still in the future, use in_hospital"
+            " instead, never both",
             "health_promotion": "do something for one's health: exercise, nutrition, check-ups, vaccinations",
             "child_offers": "offers for a child: check-ups, vaccinations, family allowance (Familienbeihilfe), counselling",
             "doctor_appointment": "get an appointment with a doctor",
             "financial_help": "own money problems, low or no income, social assistance (Mindestsicherung); not child benefits",
+        },
+    ),
+    "hospital_topic": Fact(
+        "Zum Spitalsaufenthalt",
+        {"discharge": "Entlassung", "visit": "Besuch"},
+        "What the user asks about a current hospital stay. Only if asked, not if they just mention the stay.",
+        multi=True,
+        hints={
+            "discharge": "when the person will be discharged, how long they stay, or what to organise before they come home",
+            "visit": "visiting the person in hospital, e.g. visiting hours or visitor rules",
         },
     ),
     "subject_age_band": Fact(
@@ -210,8 +225,8 @@ def extraction_schema() -> dict:
             "type": "boolean",
             "description": "True if the user asks for medical advice: symptoms, diagnoses, medication, dosage,"
             " treatment, health risks or an emergency. False for questions about benefits, applications,"
-            " care services, appointments, preventive check-ups, vaccinations offered, or what to organise after a"
-            " hospital stay or discharge letter. Wanting a doctor's appointment is not medical either; it is only"
+            " care services, appointments, preventive check-ups, vaccinations offered, when someone is discharged"
+            " from or can be visited in hospital, or what to organise after a hospital stay or discharge letter. Wanting a doctor's appointment is not medical either; it is only"
             " medical if the user asks what is wrong, what to take or what to do about symptoms.",
         }
     }
@@ -243,6 +258,10 @@ def extraction_schema() -> dict:
 
 def merge(current: dict[str, tuple[object, str]], extracted: dict) -> dict[str, object]:
     """Facts from an extraction that may be stored: valid, non-empty, and not overriding a chip answer."""
+    goals = extracted.get("goal")
+    if isinstance(goals, list) and (extracted.get("hospital_topic") or "in_hospital" in goals):
+        # A current stay rules out "after the stay": there is no discharge letter to ask for yet.
+        extracted = {**extracted, "goal": [g for g in goals if g != "after_hospital"]}
     return {
         key: value
         for key, value in extracted.items()

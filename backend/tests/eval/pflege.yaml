@@ -180,3 +180,34 @@ cases:
     facts: {subject: father, goal: [after_hospital]}
     expect: plan
     services: [after_hospital]
+
+  # Still in hospital: no letter exists yet, so the plan starts with the ward.
+  - id: tuning-10
+    split: tuning
+    text: mein vater liegt im krankenhaus. wann wird er entlassen?
+    facts: {subject: father, goal: [in_hospital], hospital_topic: [discharge]}
+    expect: plan
+    services: [before_discharge]
+
+  - id: tuning-11
+    split: tuning
+    text: Meine Mutter ist seit gestern im Spital. Wie lange muss sie bleiben?
+    facts: {subject: mother, goal: [in_hospital], hospital_topic: [discharge]}
+    expect: plan
+    services: [before_discharge]
+
+  # Only mentioning the hospital: the question decides, here for both topics.
+  - id: tuning-12
+    split: tuning
+    text: mein vater liegt im krankenhaus
+    facts: {subject: father, goal: [in_hospital]}
+    answers: {hospital_topic: [discharge, visit]}
+    expect: plan
+    services: [before_discharge, hospital_visit]
+
+  - id: tuning-13
+    split: tuning
+    text: Wann kann ich meine Mutter im Spital besuchen?
+    facts: {subject: mother, goal: [in_hospital], hospital_topic: [visit]}
+    expect: plan
+    services: [hospital_visit]

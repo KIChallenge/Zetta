@@ -262,6 +262,81 @@
         covers: [request, situation, contact]
 
 
+# Still in hospital: there is no letter yet, and only the hospital knows the discharge date.
+- id: before_discharge
+  title: Entlassung aus dem Spital vorbereiten
+  summary: Den Entlassungstermin kennt nur das Spital. Fragen Sie auf der Station nach, und klären Sie gleich, was danach zu organisieren ist.
+  priority: 2
+  triggers:
+    - {hospital_topic: [discharge]}
+  requires: [subject]
+  responsible: []
+  source_url: https://www.gesundheit.gv.at/gesundheitsleistungen/krankenhausaufenthalt/entlassungstag-krankenhaus.html
+  verified_at: 2026-11-05
+  steps:
+    - id: call
+      type: call
+      title: Auf der Station nach dem Entlassungstermin fragen
+      why: Den Termin bespricht die behandelnde Ärztin oder der behandelnde Arzt im Spital.
+      contact_label: Die Station im Spital
+      script_facts: [subject]
+      have_ready: [subject.name]
+      slots: [user.name, user.phone, subject.relation, subject.name]
+      must_ask:
+        - {id: date, text: "Fragen, wann die Entlassung voraussichtlich geplant ist"}
+        - {id: management, text: "Fragen, wer im Spital beim Entlassungsmanagement die Zeit nach der Entlassung mit organisiert"}
+        - {id: letter, text: "Fragen, ob der Entlassungsbrief am Entlassungstag mitgegeben wird"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Es geht um die Entlassung von {subject.name}.
+        points:
+          - {covers: date, text: "Wann ist die Entlassung voraussichtlich geplant?"}
+          - {covers: management, text: "Wer vom Entlassungsmanagement organisiert mit uns die Zeit nach der Entlassung?"}
+          - {covers: letter, text: "Wird der Entlassungsbrief am Entlassungstag mitgegeben?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+    - id: upload
+      type: upload
+      title: Später den Entlassungsbrief hochladen
+      why: Den Brief gibt es am Entlassungstag. Darin steht, was nach dem Spital empfohlen wird.
+      after: [call]
+      text: >-
+        Der Lotse sucht nur Empfehlungen zu Anträgen und Unterstützung, keine Befunde, und zeigt Ihnen jede Stelle
+        wörtlich. Der Brief wird nicht gespeichert.
+
+# Hours differ by hospital and even by ward, so the plan never states them: the script asks the ward.
+- id: hospital_visit
+  title: Besuch im Spital
+  summary: Besuchszeiten und Regeln sind je nach Spital und Station verschieden. Fragen Sie vor dem Besuch auf der Station nach.
+  priority: 3
+  triggers:
+    - {hospital_topic: [visit]}
+  requires: [subject]
+  responsible: []
+  source_url: https://klinik-ottakring.gesundheitsverbund.at/besuchszeiten/
+  verified_at: 2026-11-05
+  steps:
+    - id: call
+      type: call
+      title: Auf der Station nach dem Besuch fragen
+      why: Manche Stationen haben eigene Besuchszeiten, oder Sie müssen sich vorher anmelden.
+      contact_label: Die Station im Spital
+      script_facts: [subject]
+      have_ready: [subject.name]
+      slots: [user.name, user.phone, subject.relation, subject.name]
+      must_ask:
+        - {id: hours, text: "Fragen, wann auf dieser Station Besuchszeit ist"}
+        - {id: register, text: "Fragen, ob der Besuch vorher angemeldet werden muss"}
+        - {id: visitors, text: "Fragen, wie viele Personen kommen dürfen und ob Kinder mitkommen dürfen"}
+        - {id: where, text: "Fragen, wo die Station und das Zimmer zu finden sind"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich möchte {subject.name} besuchen.
+        points:
+          - {covers: hours, text: "Wann ist auf Ihrer Station Besuchszeit?"}
+          - {covers: register, text: "Muss ich den Besuch vorher anmelden?"}
+          - {covers: visitors, text: "Wie viele Personen dürfen kommen, und dürfen Kinder mitkommen?"}
+          - {covers: where, text: "Wo finde ich die Station und das Zimmer?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+
 # Phase 2: after a hospital stay (spec 12.3). The letter's confirmed recommendations trigger the services below.
 - id: after_hospital
   title: Nach dem Spital
@@ -794,6 +869,18 @@
   requires: [subject, interests]
   responsible: []
   source_url: https://www.oegk.at/cdscontent/?contentid=10007.912730&portal=oegkportal
+  verified_at: 2026-11-05
+  steps: []
+
+- id: hospital_topics
+  title: Gerade im Spital
+  summary: Entlassung und Besuch.
+  priority: 92
+  triggers:
+    - {goal: [in_hospital]}
+  requires: [subject, hospital_topic]
+  responsible: []
+  source_url: https://www.gesundheit.gv.at/gesundheitsleistungen/krankenhausaufenthalt/entlassungstag-krankenhaus.html
   verified_at: 2026-11-05
   steps: []
 

@@ -10,6 +10,7 @@
   chips:
     - {value: apply_care_allowance}
     - {value: find_support_services}
+    - {value: in_hospital}
     - {value: after_hospital}
     - {value: health_promotion}
     - {value: child_offers}
@@ -53,6 +54,17 @@
     other: Was interessiert Sie am meisten?
   why_we_ask: Sie sehen nur Angebote zu Ihrer Wahl.
   multi: true
+
+- fact_key: hospital_topic
+  text:
+    self: Was möchten Sie zum Spitalsaufenthalt wissen?
+    other: Was möchten Sie zum Spitalsaufenthalt wissen?
+  why_we_ask: Sie sehen nur die Schritte, die Sie brauchen.
+  multi: true
+  chips:
+    - {value: discharge}
+    - {value: visit}
+    - {value: unknown, label: Etwas anderes}
 
 - fact_key: appointment_reason
   text:

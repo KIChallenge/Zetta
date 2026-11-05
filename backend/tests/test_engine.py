@@ -4,6 +4,7 @@ import pytest
 
 from backend.corpus import get_corpus
 from backend.engine import QUESTION_CAP, check, evaluate, statuses
+from backend.facts import merge
 
 corpus = get_corpus()
 MOTHER = {"subject": "mother", "needs_daily_help": "a_lot"}
@@ -123,6 +124,58 @@ def test_statuses_follow_the_after_edges():
     assert status["care_allowance.call"] == "done"
     assert status["care_allowance.submit"] == "available"
     assert status["care_allowance.assessment"] == "blocked"
+
+
+def test_while_still_in_hospital_the_plan_starts_with_the_ward_not_the_letter():
+    plan = evaluate({"subject": "father", "goal": ["in_hospital"], "hospital_topic": ["discharge"]}, corpus).plan
+    call, upload = plan["steps"]
+
+    assert (call["id"], upload["id"]) == ("before_discharge.call", "before_discharge.upload")
+    assert "contact" not in call  # the ward is named, its number is never guessed
+    assert statuses(plan["steps"], {}) == {call["id"]: "available", upload["id"]: "blocked"}
+
+
+def test_only_mentioning_the_hospital_asks_who_and_what_before_any_plan():
+    assert evaluate({"goal": ["in_hospital"]}, corpus).question == "subject"
+    assert evaluate({"goal": ["in_hospital"], "subject": "father"}, corpus).question == "hospital_topic"
+
+
+@pytest.mark.parametrize(
+    ("topic", "expected"),
+    [
+        (["discharge"], ["before_discharge"]),
+        (["visit"], ["hospital_visit"]),
+        (["discharge", "visit"], ["before_discharge", "hospital_visit"]),
+    ],
+)
+def test_the_hospital_topic_decides_the_plan(topic, expected):
+    plan = evaluate({"subject": "father", "goal": ["in_hospital"], "hospital_topic": topic}, corpus).plan
+
+    assert [s["id"] for s in plan["services"]] == expected
+    assert all("contact" not in s for s in plan["steps"])  # hours and numbers depend on the ward: never guessed
+
+
+def test_a_named_hospital_topic_skips_the_question():
+    assert evaluate({"subject": "father", "hospital_topic": ["visit"]}, corpus).kind == "plan"
+
+
+@pytest.mark.parametrize(
+    "extracted",
+    [
+        {"goal": ["after_hospital", "find_support_services"], "hospital_topic": ["discharge"]},
+        {"goal": ["in_hospital", "after_hospital", "find_support_services"], "hospital_topic": []},
+    ],
+)
+def test_a_current_hospital_stay_rules_out_after_the_stay(extracted):
+    assert "after_hospital" not in merge({}, extracted)["goal"]
+
+
+def test_after_the_stay_is_kept_without_a_current_stay():
+    assert merge({}, {"goal": ["after_hospital"], "hospital_topic": []})["goal"] == ["after_hospital"]
+
+
+def test_something_else_about_the_hospital_leads_to_the_general_card():
+    assert evaluate({"subject": "father", "goal": ["in_hospital"], "hospital_topic": "unknown"}, corpus).kind == "general"
 
 
 def test_after_a_hospital_stay_the_plan_asks_for_the_letter_until_it_is_confirmed():
