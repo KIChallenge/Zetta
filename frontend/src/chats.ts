@@ -108,7 +108,8 @@ export interface Step {
   doctors?: Doctor[] // practices to choose from, instead of one contact
   doctors_source?: { url: string; scraped_at: string }
   more?: Channel // a search for further practices
-  form?: { title: string; url: string; online_url: string | null }
+  // prefill: the form can be downloaded filled in with these profile details (labels); missing: not in the profile yet
+  form?: { id?: string; title: string; url: string; online_url: string | null; prefill?: { filled: string[]; missing: string[] } }
   documents?: Doc[]
   script?: Script
 }
@@ -178,6 +179,15 @@ export const uploadDocument = async (id: string | number, file: File) => {
 }
 export const updateStep = (id: string | number, step: string, body: StepUpdate) =>
   api<Plan>(`${at(id)}/steps/${encodeURIComponent(step)}`, 'PATCH', body)
+// The step's form filled in with the profile. Fetched with the token, so a plain link cannot do it.
+export async function downloadForm(id: string | number, step: string) {
+  const res = await respond(`${at(id)}/steps/${encodeURIComponent(step)}/form`, init('GET'))
+  const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'Antrag.pdf'
+  const url = URL.createObjectURL(await res.blob())
+  const a = Object.assign(document.createElement('a'), { href: url, download: name })
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 
 /**
  * Sends a message (or, with `answer`, a chip answer) and calls `on` for each Server-Sent Event of the reply.
