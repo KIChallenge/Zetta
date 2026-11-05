@@ -256,6 +256,17 @@ def extraction_schema() -> dict:
     }
 
 
+def extraction_guide() -> str:
+    """The schema's meanings as text: some servers only enforce a schema's shape and never show the model its descriptions."""
+    lines = []
+    for key, field in extraction_schema()["properties"].items():
+        enum = field["items"]["enum"] if "items" in field else next((o["enum"] for o in field.get("anyOf", []) if "enum" in o), [])
+        # The description of `district` already says how to write its many values.
+        allowed = f" Allowed: {', '.join(enum)}." if enum and key != "district" else ""
+        lines.append(f"- {key}: {field['description']}{allowed}")
+    return "\n".join(lines)
+
+
 def merge(current: dict[str, tuple[object, str]], extracted: dict) -> dict[str, object]:
     """Facts from an extraction that may be stored: valid, non-empty, and not overriding a chip answer."""
     goals = extracted.get("goal")

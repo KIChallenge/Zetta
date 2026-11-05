@@ -4,7 +4,7 @@ import pytest
 
 from backend.corpus import get_corpus
 from backend.engine import QUESTION_CAP, check, evaluate, statuses
-from backend.facts import merge
+from backend.facts import extraction_guide, merge
 
 corpus = get_corpus()
 MOTHER = {"subject": "mother", "needs_daily_help": "a_lot"}
@@ -172,6 +172,16 @@ def test_a_current_hospital_stay_rules_out_after_the_stay(extracted):
 
 def test_after_the_stay_is_kept_without_a_current_stay():
     assert merge({}, {"goal": ["after_hospital"], "hospital_topic": []})["goal"] == ["after_hospital"]
+
+
+def test_the_extraction_guide_explains_every_field_and_value():
+    guide = extraction_guide()
+
+    assert "- medical_question: True if the user asks for medical advice" in guide
+    assert "in_hospital: the person is in hospital now" in guide
+    assert "Allowed: apply_care_allowance," in guide
+    district = next(line for line in guide.splitlines() if line.startswith("- district: "))
+    assert "Allowed:" not in district  # described, not listed
 
 
 def test_something_else_about_the_hospital_leads_to_the_general_card():

@@ -11,7 +11,7 @@ from fastapi import Depends
 from openai import AsyncOpenAI
 
 from backend.config import settings
-from backend.facts import FACTS, extraction_schema
+from backend.facts import FACTS, extraction_guide, extraction_schema
 
 LANGUAGES = {
     "de": 'German (as used in Austria, addressing the user formally with "Sie")',
@@ -168,7 +168,8 @@ class Llm:
 
     async def extract(self, text: str, question: str | None) -> dict:
         """Facts from one user message. `question`: the question the user is answering, if any."""
-        system = EXTRACT_PROMPT + (f"\nThe user is answering this question: {question}" if question else "")
+        system = f"{EXTRACT_PROMPT}\n\nFields:\n{extraction_guide()}"
+        system += f"\n\nThe user is answering this question: {question}" if question else ""
         return json.loads(await self._complete(system, text, _format("facts", extraction_schema())))
 
     async def intro(self, plan: dict, language: str) -> str:
