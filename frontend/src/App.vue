@@ -51,23 +51,10 @@ watch(user, () => nextTick(() => main.value?.focus()))
 <template>
   <a class="skip" href="#inhalt">{{ t('Zum Inhalt springen') }}</a>
   <!-- Signed in, the bar is only the way back to the list on narrow screens; the sidebar holds the rest. -->
-  <header class="top" :class="{ signed: user }">
+  <header v-if="user" class="top signed">
     <div class="wrap">
-      <span v-if="!user" class="brand">
-        <!-- The mark: a "you are here" marker from hospital wayfinding. -->
-        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
-          <circle cx="16" cy="16" r="16" class="mark-disc" /><circle cx="16" cy="16" r="8.75" class="mark-ring" /><circle cx="16" cy="16" r="3.75" class="mark-dot" />
-        </svg>
-        <span class="brand-t"><b>SV KI-Lotse</b></span>
-      </span>
-      <select v-if="!user" class="lang" :aria-label="t('Sprache')" :value="locale" @change="setLocale(($event.target as HTMLSelectElement).value)">
-        <option v-for="code in ENTRY_LANGS" :key="code" :value="code">{{ LANGS[code] }}</option>
-      </select>
       <span class="me">
-        <button v-if="!user" type="button" class="btn btn-quiet bar-btn" :title="dark ? t('Hell') : t('Dunkel')" @click="view.theme = dark ? 'light' : 'dark'">
-          <svg class="i" aria-hidden="true"><use :href="dark ? '#i-sun' : '#i-moon'" /></svg><span>{{ dark ? t('Hell') : t('Dunkel') }}</span>
-        </button>
-        <a v-else class="btn btn-quiet bar-btn" href="#gespraeche" :title="t('Alle Gespräche')">
+        <a class="btn btn-quiet bar-btn" href="#gespraeche" :title="t('Alle Gespräche')">
           <svg class="i" aria-hidden="true"><use href="#i-list" /></svg><span class="xs">{{ t('Alle Gespräche') }}</span>
         </a>
       </span>
@@ -97,6 +84,14 @@ watch(user, () => nextTick(() => main.value?.focus()))
         </div>
         <div class="entry-side">
           <AuthCard @done="user = $event" />
+          <div class="entry-tools">
+            <select class="lang" :aria-label="t('Sprache')" :value="locale" @change="setLocale(($event.target as HTMLSelectElement).value)">
+              <option v-for="code in ENTRY_LANGS" :key="code" :value="code">{{ LANGS[code] }}</option>
+            </select>
+            <button type="button" class="btn btn-quiet" :title="dark ? t('Hell') : t('Dunkel')" @click="view.theme = dark ? 'light' : 'dark'">
+              <svg class="i" aria-hidden="true"><use :href="dark ? '#i-sun' : '#i-moon'" /></svg><span>{{ dark ? t('Hell') : t('Dunkel') }}</span>
+            </button>
+          </div>
         </div>
       </template>
     </template>
@@ -104,17 +99,9 @@ watch(user, () => nextTick(() => main.value?.focus()))
 </template>
 
 <style scoped>
-.lang { width: auto; min-height: 2.5rem; margin-left: auto; padding: .3rem .6rem; }
+.lang { width: auto; min-height: 2.5rem; padding: .3rem .6rem; }
 .top { background: var(--paper); border-bottom: 3px solid var(--accent); }
 .top .wrap { display: flex; align-items: center; justify-content: space-between; gap: .75rem 1rem; padding-block: .6rem; }
-.brand { display: flex; align-items: center; gap: .7rem; min-width: 0; }
-.mark { width: 2.25rem; height: 2.25rem; flex: none; }
-.mark-disc { fill: var(--navy); }
-.mark-ring { fill: none; stroke: var(--on-navy); stroke-width: 2.5; }
-.mark-dot { fill: var(--ready-mark); }
-[data-scheme="dark"] .mark-disc { fill: var(--on-navy); }
-[data-scheme="dark"] .mark-ring { stroke: var(--paper); }
-.brand-t b { display: block; font-size: var(--fs-h3); font-weight: 700; line-height: 1.15; color: var(--ink); }
 .me { display: inline-flex; align-items: center; gap: .25rem .5rem; }
 /* Bar buttons are full-height targets, so the focus ring sits inside the bar. */
 .bar-btn:focus-visible { outline-offset: 0; }
@@ -131,7 +118,11 @@ main:focus-visible { outline: none; }
 .entry-h { font-size: clamp(var(--fs-h1), 6cqi, var(--fs-display)); line-height: 1.15; hyphens: manual; }
 .entry-h b { display: block; font-weight: 700; }
 .entry-lead { max-width: 30rem; font-size: var(--fs-lead); color: var(--ink-2); }
-.entry-side { display: grid; place-items: center; padding: clamp(1.5rem, 5vh, 3rem) clamp(1rem, 4vw, 2.5rem); background: var(--accent-bg); }
+.entry-side { display: grid; align-content: center; justify-items: center; gap: .75rem; padding: clamp(1.5rem, 5vh, 3rem) clamp(1rem, 4vw, 2.5rem); background: var(--accent-bg); }
+/* Language and theme: one quiet row under the card. */
+.entry-tools { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .25rem .5rem; }
+.entry-tools .lang { min-height: 2.25rem; padding: .2rem .5rem; font: inherit; font-size: var(--fs-small); }
+.entry-tools .btn { min-height: 2.25rem; padding: .2rem .6rem; font-size: var(--fs-small); }
 @container (min-width: 56rem) {
   .entry { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-content: stretch; }
 }
