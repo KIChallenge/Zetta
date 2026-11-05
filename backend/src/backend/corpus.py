@@ -90,12 +90,19 @@ class Document(Model):
     verified_at: date
 
 
+class FormField(Model):
+    field: str  # the field's name in the PDF
+    value: str  # text with placeholders like {user.last_name}, or the state of a checkbox or radio button
+    when: Condition | None = None  # filled only when known to be true
+
+
 class Form(Model):
     id: str
     title: str
     url: str
     online_url: str | None = None
-    svbox_file: str | None = None
+    file: str | None = None  # the blank PDF in corpus/forms; with `fields` the user gets it filled in
+    fields: list[FormField] = []
     submit_to: str
     source_url: str
     verified_at: date

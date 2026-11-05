@@ -4,7 +4,7 @@ import { when, type Step, type StepUpdate } from '../chats'
 import { hours, k, locale, t, translating } from '../i18n'
 
 const props = defineProps<{ step: Step; now: boolean; open: boolean; forServices: string[] }>()
-const emit = defineEmits<{ toggle: []; update: [body: StepUpdate]; upload: [] }>()
+const emit = defineEmits<{ toggle: []; update: [body: StepUpdate]; upload: []; form: [] }>()
 
 const KIND = {
   call: ['phone', k('Anrufen')],
@@ -169,6 +169,7 @@ async function copy() {
             <a class="btn btn-primary" :href="mailto"><svg class="i" aria-hidden="true"><use href="#i-mail" /></svg>{{ t('E-Mail öffnen') }}</a>
             <button type="button" class="btn btn-quiet" :aria-expanded="open" :aria-controls="`b-${s.id}`" @click="emit('toggle')">{{ t('E-Mail ansehen') }}</button>
           </template>
+          <button v-else-if="s.type === 'form' && s.form?.prefill" type="button" class="btn btn-primary" @click="emit('form')"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ s.form.title }} (PDF, {{ t('vorausgefüllt') }})</button>
           <a v-else-if="s.type === 'form' && s.form" class="btn btn-primary" :href="s.form.url" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ s.form.title }} (PDF)</a>
           <a v-else-if="s.type === 'book' && s.contact" class="btn btn-primary" :href="s.contact.href" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-ext" /></svg>{{ t(s.contact.label ?? 'Öffnen') }}</a>
           <button v-else-if="s.type === 'upload'" type="button" class="btn btn-primary" @click="emit('upload')"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ t('PDF auswählen') }}</button>
@@ -252,7 +253,7 @@ async function copy() {
             <dl class="mail-meta">
               <dt>{{ t('An') }}</dt><dd><a :href="s.contact.href">{{ s.contact.value }}</a></dd>
               <dt>{{ t('Betreff') }}</dt><dd>{{ script?.subject }}<small v-if="translated" class="say-tr" :lang="locale">{{ translated.subject }}</small></dd>
-              <template v-if="s.form"><dt>{{ t('Anhang') }}</dt><dd><a :href="s.form.url" target="_blank" rel="noopener noreferrer">{{ s.form.title }}</a> {{ t('und die Unterlagen aus der Checkliste') }}</dd></template>
+              <template v-if="s.form"><dt>{{ t('Anhang') }}</dt><dd><button v-if="s.form.prefill" type="button" class="linkbtn" @click="emit('form')">{{ s.form.title }} ({{ t('vorausgefüllt') }})</button><a v-else :href="s.form.url" target="_blank" rel="noopener noreferrer">{{ s.form.title }}</a> {{ t('und die Unterlagen aus der Checkliste') }}</dd></template>
             </dl>
             <div class="field">
               <label class="field-l" :for="`m-${s.id}`">{{ t('Ihre E-Mail') }} <span class="muted">{{ t('(änderbar)') }}</span></label>
@@ -269,6 +270,11 @@ async function copy() {
           <!-- Form -->
           <template v-else-if="s.type === 'form' && s.form">
             <p v-if="s.text">{{ t(s.text) }}</p>
+            <p v-if="s.form.prefill" class="hint">
+              <template v-if="s.form.prefill.filled.length">{{ t('Schon eingetragen:') }} {{ s.form.prefill.filled.map((l) => t(l)).join(', ') }}. </template>
+              <template v-if="s.form.prefill.missing.length">{{ t('Im Profil fehlt noch:') }} {{ s.form.prefill.missing.map((l) => t(l)).join(', ') }}. <a href="#einstellungen">{{ t('In den Einstellungen ergänzen') }}</a>. </template>
+              {{ t('Bitte prüfen, den Rest ergänzen und unterschreiben.') }} <a :href="s.form.url" target="_blank" rel="noopener noreferrer">{{ t('Leeres Formular') }}</a>
+            </p>
             <div v-if="s.form.online_url" class="actions">
               <a class="btn btn-secondary" :href="s.form.online_url" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-ext" /></svg>{{ t('Online stellen') }}</a>
             </div>

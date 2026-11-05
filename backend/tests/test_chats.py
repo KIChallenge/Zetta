@@ -1,8 +1,10 @@
 import asyncio
+import io
 import json
 import re
 
 import pytest
+from pypdf import PdfReader
 from sqlalchemy import func, select
 
 from backend import pipeline
@@ -644,3 +646,27 @@ def test_an_outcome_opens_its_branch(client, anna, llm):
     assert (clarify["status"], clarify["contact"]["href"]) == ("available", "tel:+4350303")
     assert clarify["script"]["opening"]  # written with the plan, shown once the branch opens
     assert "care_allowance.clarify" not in steps_of(client.patch(url, json={"outcome": "granted"}, headers=anna).json())
+
+
+def test_form_steps_offer_the_form_filled_in_with_the_profile(client, anna, bob, llm):
+    client.put("/me/profile", json=PROFILE, headers=anna)
+    chat = create_chat(client, anna)
+    steps = steps_of(dict(to_plan(client, anna, llm, chat["id"]))["plan"])
+
+    # The mother's details are not in the profile: only Anna's own part of the form is filled in.
+    assert steps["care_allowance.submit"]["form"]["prefill"] == {
+        "filled": ["Ihr Name", "Ihre Telefonnummer", "Ihre E-Mail-Adresse", "Ihre Adresse"],
+        "missing": [],
+    }
+    assert steps["home_care_fsw.send_application"]["form"]["prefill"] == {"filled": [], "missing": []}
+    response = client.get(f"/chats/{chat['id']}/steps/care_allowance.submit/form", headers=anna)
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["cache-control"] == "no-store"
+    fields = PdfReader(io.BytesIO(response.content)).get_fields()
+    assert fields["Familienname andere"]["/V"] == "Berger"
+    assert fields["Email2"]["/V"] == "anna@example.at"
+    assert fields["Fam.Name"].get("/V") in (None, "")
+    assert_error(client.get(f"/chats/{chat['id']}/steps/care_allowance.call/form", headers=anna), 404)
+    assert_error(client.get(f"/chats/{chat['id']}/steps/care_allowance.submit/form", headers=bob), 404)

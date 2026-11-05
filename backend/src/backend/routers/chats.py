@@ -5,12 +5,13 @@ from typing import Annotated
 
 from urllib.parse import unquote
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from sqlalchemy import func, literal_column, select
 from sqlalchemy.orm import Session
 
-from backend import documents, pipeline
+from backend import documents, forms, pipeline
+from backend.corpus import get_corpus
 from backend.database import SessionLocal
 from backend.dependencies import CurrentUser, DbSession
 from backend.facts import FACTS, value_label
@@ -257,3 +258,20 @@ def update_step(step_id: str, body: StepUpdate, chat: OwnedChat, db: DbSession) 
     state.updated_at = utcnow()
     db.commit()
     return pipeline.current_plan(db, chat)
+
+
+@router.get("/{chat_id}/steps/{step_id}/form", response_class=Response)
+def download_form(step_id: str, chat: OwnedChat, db: DbSession) -> Response:
+    """The step's form as a PDF, filled in with the user's details. Built on request, never stored."""
+    plan = pipeline.latest_plan(db, chat.id)
+    step = next((s for s in plan.graph["steps"] if s["id"] == step_id), None) if plan else None
+    form = get_corpus().forms.get(step.get("form", {}).get("id")) if step else None
+    if form is None or not (form.file and form.fields):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Form not found")
+    facts = {k: r.value for k, r in pipeline.fact_rows(db, chat.id).items()}
+    data = forms.fill(form, pipeline.profile_of(db, chat.user_id), facts)
+    return Response(
+        data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{form.id}.pdf"', "Cache-Control": "no-store"},
+    )

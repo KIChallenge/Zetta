@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, 
 import { ApiError, UNREACHABLE, type User } from '../auth'
 import {
   createChat, deleteChat, getState, listChats, listMessages, NOT_FOUND, renameChat, say, sendMessage, titleFrom,
-  updateStep, uploadDocument, when,
+  downloadForm, updateStep, uploadDocument, when,
   type AnswerPayload, type CardPayload, type Chat, type Chip, type ConfirmPayload, type Fact, type Message, type Plan,
   type PlanPayload,
   type QuestionPayload, type StepUpdate,
@@ -330,6 +330,17 @@ async function retry(id: string, m: Bubble) {
   else if (done || (m.state === 'failed' && messages.value.at(-1) === m)) scrollDown()
 }
 
+async function getForm(step: string) {
+  const id = activeId.value
+  if (!id) return
+  planErr.value = ''
+  try {
+    await downloadForm(id, step)
+  } catch (e) {
+    planErr.value = fail(e)
+  }
+}
+
 async function patchStep(step: string, body: StepUpdate) {
   const id = activeId.value
   if (!id) return
@@ -474,7 +485,7 @@ async function confirmDelete() {
             />
             <div v-else-if="m.kind === 'plan'" class="plan-msg">
               <div class="bubble"><p>{{ t(m.text) }}</p></div>
-              <PlanView v-if="isCurrent(m)" :plan="plan!" :error="planErr" @update="patchStep" @upload="fileInput?.click()" />
+              <PlanView v-if="isCurrent(m)" :plan="plan!" :error="planErr" @update="patchStep" @upload="fileInput?.click()" @form="getForm" />
               <p v-else class="muted">{{ t('Dieser Plan wurde später angepasst. Der aktuelle Plan steht weiter unten.') }}</p>
             </div>
             <div v-else class="bubble" :class="m.state">
