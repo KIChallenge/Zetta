@@ -97,7 +97,7 @@ async function submit() {
 
     <div id="auth-panel" role="tabpanel" :aria-labelledby="`t-${mode}`">
       <form novalidate @submit.prevent="submit">
-        <h1 class="sr">{{ mode === 'login' ? 'Anmelden' : 'Neu registrieren' }}</h1>
+        <h2 class="sr">{{ mode === 'login' ? 'Anmelden' : 'Neu registrieren' }}</h2>
         <p v-if="formError" class="form-err" role="alert">
           <svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ formError }}</span>
         </p>
@@ -169,12 +169,14 @@ async function submit() {
 </template>
 
 <style scoped>
-.auth { align-self: center; justify-self: center; width: min(100%, 26rem); padding: clamp(1.1rem, 2.5vw, 1.5rem); border-radius: var(--r-l); background: var(--sheet); box-shadow: var(--lift); }
-.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: .25rem; padding: .3rem; margin-bottom: 1.25rem; border-radius: calc(var(--r-s) + .3rem); background: var(--sunk); }
-.tab { min-height: 2.75rem; padding: .4rem .5rem; border: 0; border-radius: var(--r-s); background: transparent; font: inherit; font-weight: 700; color: var(--ink-2); cursor: pointer; transition: background-color .15s, color .15s; }
-.tab:hover { color: var(--ink); }
-.tab[aria-selected="true"] { background: var(--sheet); color: var(--ink); box-shadow: var(--lift); }
-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: .9rem; }
+.auth { width: min(100%, 26rem); padding: clamp(1.1rem, 3vw, 1.75rem); border: var(--hair); border-radius: var(--r-l); background: var(--sheet); }
+/* Tabs: an underline marks the open one. */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 1.5rem; border-bottom: var(--hair); }
+.tab { min-height: 2.75rem; padding: .4rem .5rem; border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; background: transparent; font: inherit; font-weight: 600; color: var(--ink-2); cursor: pointer; transition: color .15s, border-color .15s; }
+.tab:hover { color: var(--head); border-bottom-color: var(--rule-2); }
+.tab[aria-selected="true"] { color: var(--head); font-weight: 700; border-bottom-color: var(--accent); }
+.tab:focus-visible { outline-offset: -3px; border-radius: var(--r-s) var(--r-s) 0 0; }
+form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
 .pw { display: flex; gap: .5rem; }
 .pw .input { flex: 1; min-width: 0; }
 .pw .btn { flex: none; }
@@ -183,5 +185,4 @@ form { display: grid; grid-template-columns: minmax(0, 1fr); gap: .9rem; }
 .pw-rule { display: flex; gap: .4em; align-items: center; }
 .pw-rule.ok { color: var(--ready-ink); }
 .pw-rule .i { width: 1.05em; height: 1.05em; }
-@media (forced-colors: active) { .auth { border: 1px solid CanvasText; } }
 </style>

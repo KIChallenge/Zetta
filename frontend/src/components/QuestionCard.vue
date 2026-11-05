@@ -40,10 +40,11 @@ function pick(c: Chip, multi: boolean) {
 </template>
 
 <style scoped>
-.ask { display: grid; gap: .7rem; max-width: 40rem; padding: 1.15rem 1.25rem; border-radius: var(--r-l); background: var(--sheet); box-shadow: var(--lift); }
-.ask.done { padding: .7rem 1rem; box-shadow: 0 0 0 1px var(--rule); }
-.ask-h { font-size: 1.25rem; }
-.ask.done .ask-h { font-size: 1rem; font-weight: 600; }
+/* The open question is the one card on screen; answered ones fall back to a plain line. */
+.ask { display: grid; gap: .8rem; max-width: 40rem; padding: 1.25rem 1.4rem 1.4rem; border: var(--hair); border-radius: var(--r-m); background: var(--sheet); }
+.ask-h { font-size: var(--fs-h3); font-weight: 600; color: var(--head); }
+.ask.done { padding: 0; border: 0; background: none; }
+.ask.done .ask-h { font-size: 1rem; color: var(--ink-2); }
 .chips { margin-top: .2rem; }
-@media (forced-colors: active) { .ask { border: 1px solid CanvasText; } }
+.chip:focus-visible { outline-offset: 2px; }
 </style>
