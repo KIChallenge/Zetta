@@ -72,6 +72,16 @@ export interface Script {
   source: 'llm' | 'fallback'
 }
 
+export interface Doctor {
+  id: string
+  name: string
+  address: string
+  contract: string
+  warning: string | null // shown in red: the practice may not take the user's insurance
+  warning_source: string | null
+  contact: Channel
+}
+
 export interface Step {
   id: string
   service: string
@@ -89,6 +99,9 @@ export interface Step {
   outcomes: { id: string; label: string }[]
   institution?: { id: string | null; name: string; address: string | null } // id null: the user's own doctor
   contact?: Channel
+  doctors?: Doctor[] // practices to choose from, instead of one contact
+  doctors_source?: { url: string; scraped_at: string }
+  more?: Channel // a search for further practices
   form?: { title: string; url: string; online_url: string | null }
   documents?: Doc[]
   script?: Script

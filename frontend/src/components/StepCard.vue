@@ -116,6 +116,22 @@ async function copy() {
           <svg class="i" aria-hidden="true"><use href="#i-alert" /></svg>
           <span>Nicht erreicht<template v-if="s.updated_at"> ({{ when(s.updated_at) }})</template>. Versuchen Sie es noch einmal.</span>
         </p>
+        <ul v-if="act && s.doctors" class="doctors">
+          <li v-for="d in s.doctors" :key="d.id" class="doctor">
+            <div class="doctor-info">
+              <strong>{{ d.name }}</strong>
+              <span v-if="d.warning" class="err"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ d.warning }} <a v-if="d.warning_source" :href="d.warning_source" target="_blank" rel="noopener noreferrer">Mehr dazu</a></span></span>
+              <span v-else class="doctor-contract">{{ d.contract }}</span>
+              <span>{{ d.address }}</span>
+              <span class="hint">Öffnungszeiten: {{ d.contact.hours ?? 'in der Quelle nicht angegeben' }}</span>
+            </div>
+            <a class="btn btn-secondary call" :href="d.contact.href"><svg class="i" aria-hidden="true"><use href="#i-phone" /></svg><span class="num">{{ d.contact.value }}</span><span class="sr"> anrufen</span></a>
+          </li>
+        </ul>
+        <p v-if="act && s.doctors" class="hint">
+          Gereiht nach Kassenvertrag, Bezirk und Zeit, keine Empfehlung. Quelle: <a :href="s.doctors_source?.url" target="_blank" rel="noopener noreferrer">praxisplan.at</a>, Stand {{ s.doctors_source?.scraped_at.split('-').reverse().join('.') }}.
+          <a v-if="s.more" :href="s.more.href" target="_blank" rel="noopener noreferrer">Weitere Ordinationen suchen</a>
+        </p>
         <div v-if="act" class="actions">
           <template v-if="s.type === 'call'">
             <a v-if="s.contact" class="btn btn-primary call" :href="s.contact.href"><svg class="i" aria-hidden="true"><use href="#i-phone" /></svg><span class="num">{{ s.contact.value }}</span><span class="sr"> anrufen</span></a>
@@ -153,8 +169,8 @@ async function copy() {
 
           <!-- Call -->
           <template v-if="s.type === 'call'">
-            <p v-if="!s.contact" class="hint">Die Nummer kennen Sie selbst: Der Lotse hat keine Daten zu Ihrer Ordination.</p>
-            <p v-else class="hint">Telefonzeiten: {{ s.contact.hours ?? 'in der Quelle nicht angegeben' }}</p>
+            <p v-if="!s.contact && !s.doctors" class="hint">Die Nummer kennen Sie selbst: Der Lotse hat keine Daten zu Ihrer Ordination.</p>
+            <p v-else-if="s.contact" class="hint">Telefonzeiten: {{ s.contact.hours ?? 'in der Quelle nicht angegeben' }}</p>
             <div v-if="s.script" class="script">
               <ol class="script-steps">
                 <li><span class="lab caps">Sagen Sie</span><p class="say">„<template v-for="(p, i) in parts(s.script.opening)" :key="i"><mark v-if="p.gap" class="gap">{{ p.t }}</mark><template v-else>{{ p.t }}</template></template>“</p></li>
@@ -321,6 +337,10 @@ async function copy() {
 .opt:has(input:checked) { border-color: var(--action); background: var(--band); color: var(--head); font-weight: 600; }
 .opt:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
 .opt input { accent-color: var(--action); }
+.doctors { display: grid; gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.doctor { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; padding-bottom: .75rem; border-bottom: 1px solid var(--rule-2); }
+.doctor-info { display: grid; gap: .1rem; min-width: 0; flex: 1 1 14rem; }
+.doctor-contract { font-size: var(--fs-small); font-weight: 600; color: var(--ink-2); }
 .contact { display: flex; gap: .5em; align-items: flex-start; color: var(--ink-2); }
 .contact .i { margin-top: .15em; color: var(--head); }
 .mail-meta { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .3rem 1rem; padding: .85rem 1.1rem; border-radius: var(--r-m); background: var(--sunk); }

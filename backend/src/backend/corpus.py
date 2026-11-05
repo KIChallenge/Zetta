@@ -3,6 +3,7 @@
 References between records are checked by tests/test_corpus.py.
 """
 
+import json
 from datetime import date
 from functools import cache
 from pathlib import Path
@@ -55,6 +56,29 @@ class Institution(Model):
     channels: list[Channel]
     source_url: str
     verified_at: date
+
+
+class Doctor(Model):
+    """One practice from corpus/doctors.json, built by scripts/import_doctors.py."""
+
+    id: str
+    name: str
+    specialty: str  # a value of the `specialty` fact
+    postal_code: str
+    address: str
+    lat: float
+    lon: float
+    phone: str
+    hours: list[Window] | None
+    insurers: list[str]  # "ALLE" for all insurers, empty for no contract
+    source_url: str
+
+
+class DoctorDirectory(Model):
+    source: str
+    cost_source: str  # what a visit without a contract costs
+    scraped_at: date
+    doctors: list[Doctor]
 
 
 class Document(Model):
@@ -118,6 +142,8 @@ class StepTemplate(Model):
     after: list[str] = []
     text: str | None = None
     done_label: str | None = None
+    # list: shows the matching practices from the directory. fallback: only shown when there are none.
+    directory: Literal["list", "fallback"] | None = None
     must_ask: list[Item] = []  # call
     must_include: list[Item] = []  # email
     slots: list[str] = []
@@ -195,6 +221,7 @@ class Corpus(Model):
     services: list[Service]
     questions: list[Question]
     cards: dict[Literal["boundary", "out_of_scope", "general"], Card]
+    directory: DoctorDirectory
 
     def question(self, fact_key: str) -> Question:
         return next(q for q in self.questions if q.fact_key == fact_key)
@@ -218,6 +245,7 @@ def load(directory: Path = CORPUS_DIR) -> Corpus:
         services=read("services"),
         questions=read("questions"),
         cards=read("cards"),
+        directory=json.loads((directory / "doctors.json").read_text(encoding="utf-8")),
     )
 
 

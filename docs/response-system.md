@@ -395,9 +395,11 @@ Plan, filtered by age band:
 
 Input: "Ich möchte einen Arzttermin."
 
-Questions: `appointment_reason` (acute -> boundary card) -> `specialty` (chips, chosen by the user) -> `near_home` -> `preferred_time`.
+Questions: `appointment_reason` (acute -> boundary card) -> `specialty` (chips, chosen by the user) -> `district` -> `preferred_time`.
 
-Plan: book step (online booking from the corpus if available) or doctor search link -> call step with script ("Ich hätte gerne einen Termin für {reason}, am liebsten vormittags") -> outcome `appointment_made` stores date and time.
+Plan: call step with up to five practices from `corpus/doctors.json` and a script ("Ich hätte gerne einen Termin für {reason}, am liebsten vormittags") -> outcome `appointment_made` stores date and time. The engine ranks by contract (all insurers or ÖGK first, no contract last), own district, preferred time, then distance. A practice that may not take the user's insurance shows a red warning about the costs. The list is never sent to the LLM. Without a match (dentistry has no data, or the specialty is unknown), a doctor search step comes before the call.
+
+The directory is built from the scraped praxisplan.at profiles with `scripts/import_doctors.py`.
 
 Limit: there is no booking API. The system prepares and guides; it does not book.
 
@@ -603,14 +605,14 @@ Mostly data. Code changes are limited to new fact keys, the `available` date fil
 |---|---|---|
 | 12.2 Gesundheitsförderung | Vorsorgeuntersuchung, Impfungen, Bewegt im Park (seasonal), ÖGK courses | `data/raw/web/text/vorsorge/`, `text/impfen/wien.gv.at_gesundheit_impfen_71d83c.txt`, `text/bewegung/`, `text/gesundheitsfoerderung/` |
 | 12.4 Kind | Eltern-Kind-Pass, Kinderimpfprogramm, Familienbeihilfe, MA 11 Familienberatung, Familienzentren, Enorm in Form | `data/raw/web/text/kind/`, `data/raw/web/forms/bmf/beih3_Familienbeihilfe_Antrag.pdf` |
-| 12.5 Arzttermin | doctor search link, call script | `data/raw/web/text/arzt/` (the ÖGK search is a web app; only the link is used) |
+| 12.5 Arzttermin | doctor directory, doctor search link, call script | `corpus/doctors.json`, `data/raw/web/text/arzt/` (the ÖGK search is a web app; only the link is used) |
 | Area E (social) | Mindestsicherung, Hilfe in besonderen Lebenslagen | `data/raw/web/text/sozial/`, `text/contacts/wien.gv.at_zusammenleben_sozialhilfe-mindestsicherung-standorte-oeffnungszeiten_9330bb.txt` |
 
 Gaps in the data:
 
 - `impfservice.wien` blocks automated download (403). Vaccination details must be copied by hand or taken from wien.gv.at.
 - Bewegt im Park course list is offline until May 2027. Model it as seasonal with a link only.
-- No doctor directory. Scenario 12.5 uses the ÖGK search link.
+- The doctor directory has no dentists. Scenario 12.5 falls back to the ÖGK search link for them.
 
 Done when: the held-out eval sets for 12.2, 12.4, 12.5 and the multi-topic case (12.6) meet the same thresholds as phase 1.
 

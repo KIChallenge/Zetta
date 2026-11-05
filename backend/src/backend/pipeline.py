@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from backend import scripts
 from backend.corpus import Corpus, Institution, get_corpus
-from backend.engine import DONE, evaluate, statuses, visible
+from backend.engine import DONE, ENTRY_FACT, evaluate, statuses, visible
 from backend.facts import FACTS, SENTINELS, VIENNA_POSTAL_CODE, merge, subject_words, value_label
 from backend.hours import now as vienna_now
 from backend.hours import reachable, summary
@@ -99,12 +99,17 @@ def pending_question(db: Session, chat_id: str) -> Message | None:
 
 
 def questions_asked(db: Session, chat_id: str) -> int:
-    """Questions since the last plan or card, for the question cap."""
+    """Questions since the last plan or card, for the question cap.
+
+    The entry question does not count once answered: it only picks the topic. Unanswered, it does, or it would
+    be asked forever.
+    """
+    topic_known = ENTRY_FACT in fact_rows(db, chat_id)
     asked = 0
     for message in assistant_messages(db, chat_id, 20):
         if message.kind != "question":
             break
-        asked += 1
+        asked += not (topic_known and message.payload["fact_key"] == ENTRY_FACT)
     return asked
 
 
@@ -192,6 +197,10 @@ def render_plan(plan: Plan, states: dict[str, StepState], profile: ProfileData, 
             view["outcomes"][0]["label"] = step["done_label"]
         if "contact" in step:
             view["contact"] = contact_view(step["contact"], now)
+        if "doctors" in step:
+            view["doctors"] = [{**d, "contact": contact_view(d["contact"], now)} for d in step["doctors"]]
+        if step.get("more"):
+            view["more"] = contact_view(step["more"], now)
         if scripts.needs_text(step) and state and state.script:
             view["script"] = scripts.render(state.script, step, profile, facts)
             view["script"]["source"] = state.script["source"]

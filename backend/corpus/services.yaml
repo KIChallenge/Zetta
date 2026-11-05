@@ -773,7 +773,7 @@
   priority: 16
   triggers:
     - {goal: [doctor_appointment]}
-  requires: [appointment_reason, specialty, preferred_time]
+  requires: [appointment_reason, specialty, district, preferred_time]
   responsible:
     - {institution: oegk_health_check}
   source_url: https://www.oegk.at/vaso/
@@ -783,6 +783,7 @@
       type: book
       title: Ordination finden
       done_label: Erledigt
+      directory: fallback
       why: Die Vertragspartnersuche zeigt Ordinationen mit Kassenvertrag nach Fachrichtung und Ort.
       institution: responsible
       text: Suchen Sie nach der Fachrichtung und Ihrem Bezirk. Notieren Sie Name und Telefonnummer der Ordination.
@@ -791,6 +792,7 @@
       title: Termin vereinbaren
       why: Mit dem fertigen Leitfaden ist der Anruf schnell erledigt.
       contact_label: Die Ordination, die Sie gefunden haben
+      directory: list
       after: [find]
       script_facts: [subject, appointment_reason, specialty, preferred_time]
       have_ready: [subject.svnr]

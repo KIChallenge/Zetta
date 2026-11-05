@@ -47,6 +47,14 @@ def all_plans():
             yield facts, result.plan
 
 
+def test_doctor_lists_show_only_directory_data():
+    for specialty in ["general_practice", "dermatology", "paediatrics"]:
+        facts = {"goal": ["doctor_appointment"], "appointment_reason": "check_up", "specialty": specialty,
+                 "district": "1100", "preferred_time": "morning"}  # fmt: skip
+        plan = evaluate(facts, corpus).plan
+        assert violations(rendered(plan, {}, facts, NOW)) == []
+
+
 def test_plans_show_only_corpus_contact_data_even_if_the_llm_invents_some():
     plans = list(all_plans())
     assert len(plans) > 100

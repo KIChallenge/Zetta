@@ -4,10 +4,11 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import date
 
-from backend.corpus import Condition, Corpus, Not, Service, StepTemplate
+from backend.corpus import Channel, Condition, Corpus, Doctor, Not, Service, StepTemplate
 from backend.facts import is_sentinel
 
 QUESTION_CAP = 4
+DOCTOR_LIMIT = 5
 # Asked when nothing matches yet, so a vague first message (or a failed extraction) still leads somewhere.
 ENTRY_FACT = "goal"
 # Fact values that mean "this is medical": the boundary card, never a plan (spec 10).
@@ -160,6 +161,75 @@ def _must(step: dict, template: StepTemplate, facts: dict) -> None:
     step["script_facts"] = {k: facts[k] for k in template.script_facts if k in facts}
 
 
+def _contract_rank(doctor: Doctor) -> int:
+    """Most people are insured with the ÖGK: its contracts first, a practice without any contract last."""
+    if {"ALLE", "ÖGK"} & set(doctor.insurers):
+        return 0
+    return 1 if doctor.insurers else 2
+
+
+def _contract(doctor: Doctor) -> str:
+    if "ALLE" in doctor.insurers:
+        return "Alle Kassen"
+    return f"Kassen: {', '.join(doctor.insurers)}" if doctor.insurers else "Wahlarztpraxis, kein Kassenvertrag"
+
+
+def _contract_warning(doctor: Doctor) -> str | None:
+    """What the user pays attention to before calling a practice that may not take their insurance."""
+    if _contract_rank(doctor) == 0:
+        return None
+    if doctor.insurers:
+        return f"Vertrag nur mit: {', '.join(doctor.insurers)}. Bei einer anderen Kasse zahlen Sie die Behandlung zuerst selbst."
+    return "Kein Kassenvertrag: Sie zahlen die Behandlung zuerst selbst und bekommen meist nur einen Teil zurück."
+
+
+def _fits_time(doctor: Doctor, preferred: str | None) -> bool:
+    """Whether the stated opening hours suit the preferred time; unknown hours never do."""
+    hours = doctor.hours or []
+    if preferred == "morning":
+        return any(w.from_ < "12:00" for w in hours)
+    if preferred == "afternoon":
+        return any(w.to > "12:00" for w in hours)
+    return bool(hours)
+
+
+def find_doctors(facts: dict, corpus: Corpus) -> list[dict]:
+    """The best practices for the chosen specialty: by contract, district, preferred time, then distance."""
+    specialty = _value(facts, "specialty")
+    if not specialty:
+        return []  # the Lotse never chooses a specialty for the user
+    doctors = corpus.directory.doctors
+    district = (_value(facts, "district") or [None])[0]
+    time = (_value(facts, "preferred_time") or [None])[0]
+    nearby = [d for d in doctors if d.postal_code == district]
+    # The middle of the district's practices: good enough to rank neighbouring districts, no geocoding needed.
+    lat = sum(d.lat for d in nearby) / len(nearby) if nearby else 0
+    lon = sum(d.lon for d in nearby) / len(nearby) if nearby else 0
+
+    def rank(d: Doctor) -> tuple:
+        distance = (d.lat - lat) ** 2 + (d.lon - lon) ** 2 if nearby else 0
+        return (_contract_rank(d), d.postal_code != district, not _fits_time(d, time), distance, d.id)
+
+    # A group practice lists each doctor with the same number: one call, so one entry.
+    by_phone: dict[str, Doctor] = {}
+    for doctor in sorted((d for d in doctors if d.specialty == specialty[0]), key=rank):
+        by_phone.setdefault(doctor.phone, doctor)
+    return [
+        {
+            "id": d.id,
+            "name": d.name,
+            "address": d.address,
+            "contract": _contract(d),
+            "warning": _contract_warning(d),
+            "warning_source": corpus.directory.cost_source if _contract_rank(d) else None,
+            "contact": Channel(id=d.id, type="phone", value=d.phone, hours=d.hours, source_url=d.source_url).model_dump(
+                mode="json", by_alias=True
+            ),
+        }
+        for d in list(by_phone.values())[:DOCTOR_LIMIT]
+    ]
+
+
 def _order(steps: list[dict]) -> list[dict]:
     """Topological order, keeping the corpus order where the edges allow it."""
     ids = {s["id"] for s in steps}
@@ -172,6 +242,10 @@ def _order(steps: list[dict]) -> list[dict]:
         ordered.append(ready[0])
         placed.add(ready[0]["id"])
     return ordered
+
+
+def _directory_step(service: Service, role: str) -> StepTemplate:
+    return next(t for t in service.steps if t.directory == role)
 
 
 def in_season(service: Service, today: date) -> bool:
@@ -194,7 +268,13 @@ def build_plan(
             dropped.append({"id": service.id, "title": service.title, "reason": f"Voraussetzung nicht erfüllt: {failed}"})
             continue
         # An upload step is only shown until its result (the confirmed letter) is known.
-        templates = [t for t in service.steps if not (t.type == "upload" and _value(facts, "documented_recommendations"))]
+        doctors = find_doctors(facts, corpus) if any(t.directory for t in service.steps) else []
+        templates = [
+            t
+            for t in service.steps
+            if not (t.type == "upload" and _value(facts, "documented_recommendations"))
+            and not (t.directory == "fallback" and doctors)
+        ]
         if not templates:
             continue
         institution_id = responsible(service, facts)
@@ -212,6 +292,14 @@ def build_plan(
             "source_url": service.source_url,
         })
         steps += [_step(service, t, institution_id, facts, corpus) for t in templates]
+        if doctors:
+            step = next(s for s in steps if s["id"] == f"{service.id}.{_directory_step(service, 'list').id}")
+            step["doctors"] = doctors
+            step["doctors_source"] = {"url": corpus.directory.source, "scraped_at": corpus.directory.scraped_at.isoformat()}
+            step["institution"]["name"] = "Eine Ordination aus der Liste"
+            # The search the list comes instead of stays available, for anyone who wants more to choose from.
+            search = _step(service, _directory_step(service, "fallback"), institution_id, facts, corpus)
+            step["more"] = search.get("contact")
 
     # Document steps of several services become one checklist (spec 6.4).
     collect = [s for s in steps if s["type"] == "documents"]

@@ -454,6 +454,25 @@ def test_without_the_llm_the_chips_and_fallback_scripts_still_lead_to_a_plan(cli
     assert call["script"]["opening"] == "Guten Tag, mein Name ist [Ihr Name]. Ich rufe wegen eines Antrags auf Pflegegeld für meine Mutter an."
 
 
+def test_a_doctor_appointment_picked_by_chip_still_asks_when(client, anna, llm):
+    llm.fail, llm.title_text = True, None
+    chat = create_chat(client, anna)
+    reply(send(client, anna, chat["id"]))
+
+    asked = []
+    events = answer(client, anna, chat["id"], "goal", ["doctor_appointment"])
+    values = {"district": "1100", "appointment_reason": "check_up", "specialty": "dermatology", "preferred_time": "morning"}
+    while (message := reply(events))["kind"] == "question":
+        key = message["payload"]["fact_key"]
+        asked.append(key)
+        events = answer(client, anna, chat["id"], key, values[key])
+
+    assert sorted(asked) == sorted(values)
+    doctors = steps_of(dict(events)["plan"])["doctor_appointment.call"]["doctors"]
+    assert len(doctors) == 5
+    assert doctors[0]["contact"]["href"].startswith("tel:+43")
+
+
 def test_medical_question_gets_the_boundary_card(client, anna, llm):
     llm.medical = True
     chat = create_chat(client, anna)

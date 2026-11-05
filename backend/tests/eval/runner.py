@@ -63,7 +63,7 @@ def passed(case: dict, result, asked: int) -> bool:
         return False
     if result.kind != "plan":
         return True
-    return asked <= MAX_QUESTIONS and set(case["services"]) <= {s["id"] for s in result.plan["services"]}
+    return asked <= case.get("max_questions", MAX_QUESTIONS) and set(case["services"]) <= {s["id"] for s in result.plan["services"]}
 
 
 # Hallucination check (spec 14): every phone number, email and URL shown must be in the corpus.
@@ -81,6 +81,7 @@ def _digits(phone: str) -> str:
 def allowed(profile: ProfileData) -> tuple[set[str], set[str]]:
     """Phone numbers (as digits) and other strings the output may contain."""
     phones = {_digits(c.value) for i in corpus.institutions.values() for c in i.channels if c.type == "phone"}
+    phones |= {_digits(d.phone) for d in corpus.directory.doctors}
     phones |= {_digits(profile.phone), re.sub(r"\D", "", profile.svnr)}
     texts = {corpus.model_dump_json(), profile.contact_email}
     return phones, texts
@@ -88,6 +89,8 @@ def allowed(profile: ProfileData) -> tuple[set[str], set[str]]:
 
 def violations(output: object, profile: ProfileData = PROFILE) -> list[str]:
     text = TIMESTAMP.sub("", json.dumps(output, ensure_ascii=False))
+    for doctor in corpus.directory.doctors:
+        text = text.replace(doctor.address, "")  # house numbers like "12 - 14/3" are not phone numbers
     phones, texts = allowed(profile)
     found = [m for m in URL.findall(text) if not any(m in t for t in texts)]
     text = URL.sub("", text)  # digits in URLs are not phone numbers
