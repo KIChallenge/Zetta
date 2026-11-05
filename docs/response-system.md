@@ -86,7 +86,8 @@ Initial keys (to be finalized with the corpus):
 | `needs_daily_help` | enum | none, some, a_lot (as reported, not assessed) |
 | `recent_hospital_stay` | bool | |
 | `documented_recommendations` | list of enum | outpatient_rehab, inpatient_rehab, follow_up_check, medical_aid, home_nursing, home_help, transport_to_treatment, nutrition_counselling |
-| `goal` | list of enum | apply_care_allowance, find_support_services, prevention, exercise, nutrition, vaccination, doctor_appointment, child_offers, after_hospital |
+| `goal` | list of enum | apply_care_allowance, find_support_services, prevention, exercise, nutrition, vaccination, doctor_appointment, child_offers, in_hospital, after_hospital |
+| `hospital_topic` | list of enum | discharge, visit |
 | `interests` | list of enum | exercise, nutrition, stress, screening, vaccination |
 | `appointment_reason` | enum | check_up, prevention, follow_up, acute (acute -> boundary card) |
 | `specialty` | enum | fixed list from the corpus, chosen by the user, never derived from symptoms |
@@ -363,6 +364,11 @@ Risk note: the PDF asks for family-history-based screening explanations. This is
 Input: "Ich habe einen Entlassungsbrief bekommen, was muss ich jetzt erledigen?"
 
 Flow: upload step -> extraction with quotes -> user confirms -> `documented_recommendations` -> questions only for what the services need (e.g. `insurer`, `employment_status`).
+
+Still in hospital (`goal=in_hospital`, e.g. "Mein Vater liegt im Krankenhaus"): question "Was möchten Sie zum Spitalsaufenthalt wissen?" (multi chips) -> `hospital_topic`, skipped if the message already names the topic.
+
+- `discharge`: no letter exists yet and only the hospital knows the date. Call step to the ward -> upload step, which stays blocked until the call is done.
+- `visit`: call step to the ward. Hours differ by hospital and ward, so the script asks for them and the plan never states them.
 
 Plan per confirmed recommendation:
 
