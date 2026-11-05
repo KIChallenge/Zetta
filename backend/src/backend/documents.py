@@ -26,7 +26,7 @@ def checked(items: list[dict], text: str) -> list[dict]:
     haystack = _norm(text)
     out: dict[str, dict] = {}
     for item in items:
-        quote = item.get("quote", "").strip()
+        quote = re.sub(r"^[•·*–-]\s*", "", item.get("quote", "").strip())  # a list item's bullet is not part of it
         if item.get("recommendation") in RECOMMENDATIONS and len(_norm(quote)) >= 10 and _norm(quote) in haystack:
             out.setdefault(item["recommendation"], {"recommendation": item["recommendation"], "quote": quote})
     return list(out.values())

@@ -34,9 +34,9 @@
       title: Was ist Pflegegeld?
       why: Damit Sie wissen, worum es beim Antrag geht.
       text: >-
-        Pflegegeld ist eine monatliche Geldleistung für Menschen, die ständig Betreuung und Pflege brauchen.
-        Es deckt einen Teil der Mehrkosten durch die Pflege. Es gibt 7 Stufen; die Höhe hängt vom Pflegebedarf ab,
-        nicht vom Einkommen. Den Antrag dürfen auch Familienmitglieder, Haushaltsmitglieder und nahestehende Personen stellen.
+        Monatliches Geld für Menschen, die ständig Pflege brauchen. Es deckt einen Teil der Mehrkosten. Es gibt 7
+        Stufen; die Höhe hängt vom Pflegebedarf ab, nicht vom Einkommen. Den Antrag dürfen auch Familienmitglieder,
+        Haushaltsmitglieder und nahestehende Personen stellen.
 
     - id: call
       type: call
@@ -74,9 +74,9 @@
       form: care_allowance_form
       after: [call, documents]
       text: >-
-        Füllen Sie den Antrag aus und legen Sie vorhandene Befunde in Kopie bei. Unter Punkt 9 können Sie eine kostenlose
-        Pflegeberatung zu Hause durch eine diplomierte Pflegefachkraft ankreuzen. Der Antrag kann auch online gestellt werden.
-        Gültig ist auch ein Antrag bei einem anderen Sozialversicherungsträger: Er wird an die zuständige Stelle weitergeleitet.
+        Legen Sie vorhandene Befunde in Kopie bei. Unter Punkt 9 können Sie eine kostenlose Pflegeberatung zu Hause
+        durch eine diplomierte Pflegefachkraft ankreuzen. Auch ein anderer Sozialversicherungsträger nimmt den Antrag
+        an und leitet ihn weiter.
 
     - id: assessment
       type: wait
@@ -85,8 +85,8 @@
       after: [submit]
       done_label: Begutachtung war
       text: >-
-        Der Termin für den Hausbesuch wird vorher angekündigt. Eine Vertrauensperson, etwa eine pflegende Angehörige
-        oder ein pflegender Angehöriger, kann dabei sein und ergänzend beschreiben, welche Hilfe im Alltag nötig ist.
+        Der Hausbesuch wird vorher angekündigt. Eine Vertrauensperson, etwa eine Angehörige oder ein Angehöriger, kann
+        dabei sein und beschreiben, welche Hilfe im Alltag nötig ist.
 
     - id: decision
       type: wait
@@ -232,10 +232,9 @@
       title: Was ist das Angehörigengespräch?
       why: Pflege kann sehr belasten. Dieses Angebot ist für Sie selbst.
       text: >-
-        Das Angehörigengespräch ist kostenlos und wird von Psychologinnen und Psychologen geführt: zu Hause, an einem
-        anderen Ort, telefonisch oder online. Bei Bedarf sind bis zu zehn Termine möglich. Wer Pflegegeld bezieht, kann
-        außerdem kostenlos einen Hausbesuch durch eine diplomierte Pflegefachkraft anfordern, mit praktischen Pflegetipps
-        und Informationen zu Hilfsmitteln und sozialen Diensten.
+        Kostenlose Gespräche mit Psychologinnen und Psychologen: zu Hause, an einem anderen Ort, telefonisch oder
+        online, bis zu zehn Termine. Wer Pflegegeld bezieht, kann zusätzlich einen kostenlosen Hausbesuch einer
+        diplomierten Pflegefachkraft anfordern: Pflegetipps, Hilfsmittel, soziale Dienste.
 
     - id: request_talk
       type: email
@@ -280,8 +279,8 @@
       title: Entlassungsbrief hochladen
       why: Im Brief steht, was nach dem Spital empfohlen wird, zum Beispiel Reha oder Pflege zu Hause.
       text: >-
-        Laden Sie den Brief als PDF hoch. Der Lotse sucht nur Empfehlungen zu Anträgen und Unterstützung, keine Befunde,
-        und zeigt Ihnen jede Stelle wörtlich. Sie bestätigen, was stimmt. Der Brief selbst wird nicht gespeichert.
+        Der Lotse sucht nur Empfehlungen zu Anträgen und Unterstützung, keine Befunde, und zeigt Ihnen jede Stelle
+        wörtlich. Der Brief wird nicht gespeichert.
 - id: rehab
   title: Medizinische Rehabilitation
   summary: Ein Reha-Aufenthalt, stationär oder ambulant. Die Ärztin oder der Arzt füllt den Antrag aus, die Pensionsversicherung entscheidet.
@@ -305,9 +304,8 @@
       title: Reha laut Ihrem Brief
       why: Damit Sie wissen, wie der Weg zur Reha aussieht.
       text: >-
-        Für eine Reha braucht es einen Antrag, den die behandelnde Ärztin oder der behandelnde Arzt vollständig ausfüllt,
-        unterschreibt und medizinisch begründet. Ob stationär oder ambulant besser passt, besprechen Sie am besten mit ihr
-        oder ihm.
+        Den Reha-Antrag füllt Ihre Ärztin oder Ihr Arzt aus, unterschreibt und begründet ihn medizinisch. Ob stationär
+        oder ambulant besser passt, besprechen Sie mit ihr oder ihm.
     - id: call_doctor
       type: call
       title: Ärztin oder Arzt um den Reha-Antrag bitten
@@ -355,8 +353,8 @@
       after: [decision]
       unlocked_by: "decision:rejected"
       text: >-
-        Eine Ablehnung kann formelle oder medizinische Gründe haben. Ändert sich der Gesundheitszustand wesentlich, kann
-        ein neuer Antrag gestellt werden, der erneut geprüft wird. Besprechen Sie das mit Ihrer Ärztin oder Ihrem Arzt.
+        Eine Ablehnung kann formelle oder medizinische Gründe haben. Ändert sich der Gesundheitszustand wesentlich,
+        ist ein neuer Antrag möglich. Besprechen Sie das mit Ihrer Ärztin oder Ihrem Arzt.
 
 - id: transport_cost_subsidy
   title: Zuschuss zu Fahrtkosten
@@ -379,8 +377,8 @@
       title: Behandlungen bestätigen lassen
       why: Der Antrag braucht für jede Fahrt eine Bestätigung der Einrichtung.
       text: >-
-        Lassen Sie sich nach jeder Behandlung ein Feld auf dem Antragsformular abstempeln. Am Ende der Therapie reichen Sie
-        den Antrag für alle Sitzungen auf einmal ein. Belege über die Fahrtkosten legen Sie in Kopie bei.
+        Lassen Sie nach jeder Behandlung ein Feld am Antrag abstempeln. Am Ende reichen Sie den Antrag für alle
+        Sitzungen auf einmal ein, mit Kopien der Fahrtkosten-Belege.
     - id: submit
       type: form
       title: Fahrtkosten-Zuschuss beantragen
@@ -410,9 +408,8 @@
       title: Was ist medizinische Hauskrankenpflege?
       why: Damit Sie wissen, wer sie anordnet und wie lange sie gilt.
       text: >-
-        Medizinische Hauskrankenpflege ordnet die Ärztin oder der Arzt an. Sie gilt längstens vier Wochen. Eine
-        Verlängerung muss spätestens am 24. Tag beantragt werden. Für Hilfe im Alltag, etwa Heimhilfe oder Essen auf Rädern,
-        ist der FSW zuständig.
+        Die Ärztin oder der Arzt ordnet sie an, für längstens vier Wochen. Eine Verlängerung muss spätestens am 24.
+        Tag beantragt werden. Für Heimhilfe oder Essen auf Rädern ist der FSW zuständig.
 
 - id: medical_aids
   title: Heilbehelfe und Hilfsmittel
@@ -653,9 +650,8 @@
       title: Bekommen Sie schon Familienbeihilfe?
       why: Meist kommt sie automatisch, aber nicht in jedem Fall.
       text: >-
-        Bei der Geburt eines Kindes prüft die Finanzverwaltung alles automatisch und überweist die Familienbeihilfe. Fehlt
-        etwas, zum Beispiel die Bankverbindung, werden die Eltern gefragt. Kommt keine Familienbeihilfe, gibt es ein
-        Antragsformular.
+        Nach der Geburt prüft die Finanzverwaltung alles automatisch und überweist die Familienbeihilfe. Fehlt etwas,
+        etwa die Bankverbindung, fragt sie nach. Kommt nichts, gibt es einen Antrag.
     - id: form
       type: form
       title: Nur falls nötig - Antrag stellen

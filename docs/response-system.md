@@ -27,7 +27,7 @@ All institution names, responsibilities and eligibility rules mentioned in the s
 | Contact data, hours, address, documents | Deterministic | From the corpus only |
 | Phrase a question in the user's language | LLM | Based on a prewritten question |
 | Write the speaking script and email text | LLM | Placeholders only, validated, corpus fallback |
-| Short intro text for a plan | LLM | 1-2 sentences, no data |
+| Short intro text for a plan | LLM | One sentence, no data, no topic list |
 | Extract recommendations from an uploaded letter | LLM | Must quote, quote is checked |
 
 The LLM never searches, queries or looks anything up. It receives exactly the data the deterministic system hands it.
@@ -197,7 +197,7 @@ Wording rule: the UI never says "Sie haben Anspruch". It says "Kommt in Frage" a
 
 ### 7.1 Step types and what a step card contains
 
-Every card shows: title (one line), why (one line), institution, status, and an expandable detail. No card is a wall of text.
+Every card starts collapsed and shows: title (one line), institution or result (one line), status, and the step's main action if it can be done now (call, open the email, form, link, done). Why, script, email text, hours and the rest of the table below open on demand. No card is a wall of text.
 
 | Type | Card content | Actions |
 |---|---|---|
@@ -311,7 +311,7 @@ Not allowed in output: "Aufgrund Ihrer Diagnose benötigen Sie ...". Allowed: "I
 - Language and simple language: questions and service summaries are stored in German and simple German in the corpus. Other languages are translated by the LLM from those texts, never from scratch. Translated text is checked with the same regex rules as scripts (no new numbers, URLs, emails).
 - Detail level: `short` shows title, why and actions only; `detailed` expands summaries and criteria.
 - Preferences such as `preferred_time` and `near_home` shape the plan (call windows in the morning, institutions in or near the district first).
-- Known facts are shown as editable chips above the plan ("Verstanden: Mutter, 1100 Wien, OEGK"). This is how the user corrects extraction errors, and it shows what the plan is based on.
+- Known facts are shown as one editable line above the plan and above fixed cards ("Verstanden: Mutter · 1100 Wien · OEGK", with "Ändern"), not above questions, where they would repeat the answers just given. This is how the user corrects extraction errors, and it shows what the plan is based on.
 
 ## 12. Use cases from the PDF
 

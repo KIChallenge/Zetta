@@ -162,6 +162,8 @@ async def answer(
         offered = letter_items(db, owned.id)
         confirmed = body.value if isinstance(body.value, list) else []
         answer = (body.fact_key, body.value, "document", {r: offered[r] for r in confirmed if r in offered})
+        if isinstance(body.value, list) or body.value == "unknown":  # the confirm card, not a fact edit
+            label = "Stimmt so" if confirmed else "Keine davon stimmt"
     message = Message(kind="answer", text=label, payload={"fact_key": body.fact_key, "value": body.value})
     async for event in turn(owned.id, llm, message, answer=answer):
         yield event
@@ -212,7 +214,7 @@ async def upload_document(
         chat_id=chat.id,
         role="assistant",
         kind="confirm",
-        text="In Ihrem Brief stehen diese Empfehlungen, zu denen der Lotse helfen kann. Stimmt das?"
+        text="Das steht in Ihrem Brief. Stimmt das?"
         if items
         else "In Ihrem Brief habe ich keine Empfehlung gefunden, zu der der Lotse helfen kann.",
         payload={"items": [{**i, "label": labels[i["recommendation"]]} for i in items]},

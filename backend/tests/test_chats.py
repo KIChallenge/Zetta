@@ -426,6 +426,16 @@ def test_replan_keeps_step_states_and_unchanged_scripts(client, anna, llm):
     assert [[s["step_id"] for s in batch] for batch in rewritten] == [["home_care_fsw.call"]]
 
 
+def test_a_long_plan_intro_falls_back_to_one_fixed_sentence(client, anna, llm):
+    llm.intro_text = (
+        "Gerne, ich bereite die nächsten Schritte zu Pflegegeld, Pflege und Betreuung zu Hause sowie Entlastung "
+        "für pflegende Angehörige für Sie vor."
+    )
+    chat = create_chat(client, anna)
+
+    assert reply(to_plan(client, anna, llm, chat["id"]))["text"] == "Hier ist Ihr Plan."
+
+
 def test_without_the_llm_the_chips_and_fallback_scripts_still_lead_to_a_plan(client, anna, llm):
     llm.fail, llm.title_text = True, None
     chat = create_chat(client, anna)
@@ -438,7 +448,7 @@ def test_without_the_llm_the_chips_and_fallback_scripts_still_lead_to_a_plan(cli
     events = answer(client, anna, chat["id"], "pension_payer", "pv")
 
     plan = dict(events)["plan"]
-    assert reply(events)["text"] == "Hier ist Ihr Plan mit den nächsten Schritten: Pflegegeld."
+    assert reply(events)["text"] == "Hier ist Ihr Plan."
     call = steps_of(plan)["care_allowance.call"]
     assert call["script"]["source"] == "fallback"
     assert call["script"]["opening"] == "Guten Tag, mein Name ist [Ihr Name]. Ich rufe wegen eines Antrags auf Pflegegeld für meine Mutter an."

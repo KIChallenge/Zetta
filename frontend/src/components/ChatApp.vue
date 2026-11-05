@@ -86,7 +86,8 @@ const q = (m: Message) => m.payload as QuestionPayload
 const card = (m: Message) => m.payload as CardPayload
 // Only the plan of the latest version is interactive; older plan messages say they were replaced.
 const isCurrent = (m: Message) => !!plan.value && (m.payload as PlanPayload).version === plan.value.version
-// The facts sit above the latest assistant reply, so a wrong fact can be fixed where the user is looking.
+// The facts sit above the latest reply if it is a plan or card, so a wrong fact can be fixed where the user is
+// looking. Above a question they would only repeat the answers just given.
 const anchor = computed(() => [...messages.value].reverse().find((m) => m.role === 'assistant' && !m.pending))
 const lastMsg = computed(() => messages.value.at(-1))
 function setStatus(id: string, status: string | null) {
@@ -223,7 +224,7 @@ function answerMany(key: string, chips: Chip[]) {
 }
 function confirmLetter(values: string[], labels: string[]) {
   if (run.value || !activeId.value) return
-  const label = labels.length ? `Laut Ihrem Brief: ${labels.join(', ')}` : 'Keine der Empfehlungen stimmt'
+  const label = labels.length ? 'Stimmt so' : 'Keine davon stimmt'
   deliver(activeId.value, label, { fact_key: 'documented_recommendations', value: values.length ? values : 'unknown' })
 }
 
@@ -426,13 +427,13 @@ async function confirmDelete() {
           <svg class="i" aria-hidden="true"><use href="#i-route" /></svg><span>Ihr Plan · {{ plan.status }}</span><span class="pin-go">Zum Plan</span>
         </button>
         <h1 id="view-h" class="chat-h" tabindex="-1">{{ active?.title ?? 'Gespräch' }}</h1>
-        <ProfileCard class="chat-known" :profile="profile" :failed="profileFailed" />
+        <ProfileCard class="chat-known" compact :profile="profile" :failed="profileFailed" />
         <p v-if="loading" class="muted">Nachrichten werden geladen …</p>
         <p v-else-if="loadErr" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ loadErr }}</span></p>
         <p v-else-if="!messages.length" class="muted">Noch keine Nachrichten in diesem Gespräch.</p>
         <ol v-else class="msgs" aria-label="Nachrichten">
           <li v-for="m in messages" :id="`m-${m.key ?? m.id}`" :key="m.key ?? m.id" class="msg" :class="[m.role, m.kind]">
-            <FactChips v-if="m === anchor && facts.length" class="msg-facts" :facts="facts" :disabled="!!run" @answer="editFact" />
+            <FactChips v-if="m === anchor && facts.length && (m.kind === 'plan' || m.kind === 'card')" class="msg-facts" :facts="facts" :disabled="!!run" @answer="editFact" />
             <p v-if="m.pending" class="typing" role="status">
               Der Lotse sucht die passenden Stellen<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
             </p>

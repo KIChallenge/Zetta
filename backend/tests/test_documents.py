@@ -49,6 +49,8 @@ def test_only_quotes_that_are_in_the_letter_are_kept():
         {"recommendation": "home_help", "quote": "Therapie"},  # too short to prove anything
     ]
     assert [i["recommendation"] for i in checked(items, LETTER)] == ["home_nursing", "inpatient_rehab"]
+    bullet = [{"recommendation": "home_nursing", "quote": "• Mobile Hauskrankenpflege"}]
+    assert checked(bullet, LETTER)[0]["quote"] == "Mobile Hauskrankenpflege"
 
 
 def upload(client, headers, chat_id, data, name="Entlassungsbrief.pdf"):
@@ -79,7 +81,9 @@ def test_upload_confirm_and_plan_with_quotes(client, anna, llm):
     assert confirm["payload"]["items"][0]["label"] == "Stationäre Reha"
     assert LETTER not in str(client.get(f"/chats/{chat['id']}/messages", headers=anna).json())
 
-    for key, value in [("documented_recommendations", ["inpatient_rehab"]), ("district", "1100"), ("pension_payer", "pv")]:
+    events = answer(client, anna, chat["id"], "documented_recommendations", ["inpatient_rehab"])
+    assert events[0][1]["text"] == "Stimmt so"
+    for key, value in [("district", "1100"), ("pension_payer", "pv")]:
         events = answer(client, anna, chat["id"], key, value)
     events = answer(client, anna, chat["id"], "lives_alone", "yes")
 

@@ -232,7 +232,7 @@ def question_message(chat_id: str, key: str, facts: dict, corpus: Corpus) -> Mes
 
 
 async def intro(llm: Llm, graph: dict, facts: dict, language: str) -> str | None:
-    """1-2 sentences without data; None if the LLM fails or the text breaks the rules."""
+    """One sentence without data; None if the LLM fails or the text breaks the rules."""
     request = {
         "person": facts.get("subject"),
         "topics": [{"title": s["title"], "may_apply": s["eligibility"]} for s in graph["services"]],
@@ -314,12 +314,11 @@ async def respond(
             state.script = {**scripts.fallback(step, corpus), "source": "fallback", "hash": key}
             state.updated_at = utcnow()
             todo.append(step)
-        titles = ", ".join(s["title"] for s in graph["services"])
         reply = Message(
             chat_id=chat.id,
             role="assistant",
             kind="plan",
-            text=f"Hier ist Ihr Plan mit den nächsten Schritten: {titles}.",
+            text="Hier ist Ihr Plan.",
             payload={"version": plan.version},
             created_at=utcnow(),
         )

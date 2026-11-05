@@ -85,4 +85,10 @@ dialog::backdrop { background: rgba(8, 18, 22, .6); }
 .avail::before { content: ""; width: .7rem; height: .7rem; flex: none; border-radius: 50%; background: var(--done-mark); }
 .avail[data-open="true"] { color: var(--ready-ink); }
 .avail[data-open="true"]::before { background: var(--ready-mark); box-shadow: 0 0 0 4px var(--ready-bg); }
+/* "Mehr": details that open on demand */
+.more > summary { display: inline-flex; align-items: center; gap: .45em; min-height: 2.75rem; color: var(--harbor); font-weight: 600; cursor: pointer; list-style: none; }
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary::after { content: ""; width: .45em; height: .45em; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-.15em) rotate(45deg); }
+.more[open] > summary::after { transform: translateY(.1em) rotate(-135deg); }
+.more > :not(summary) { margin-top: .4rem; }
 textarea.input { display: block; line-height: var(--lh); resize: vertical; }
