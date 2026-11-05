@@ -1,6 +1,7 @@
 @import './base.css';
 
-#app { height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+/* A container, so layout breakpoints (@container, in rem) follow the chosen text size. */
+#app { height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); container-type: inline-size; }
 
 .i { width: 1.2em; height: 1.2em; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .sr { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -23,6 +24,7 @@
 .btn-secondary { background: transparent; color: var(--harbor); border-color: currentColor; }
 .btn-secondary:hover { background: var(--harbor-tint); }
 .btn-quiet.danger { color: var(--danger); }
+[data-contrast="high"] .btn-quiet { text-decoration: underline; text-underline-offset: .2em; }
 .btn-danger { background: var(--danger); color: var(--on-danger); }
 .btn-danger:hover { filter: brightness(.92); }
 .icon-only { width: 2.75rem; padding: 0; }
@@ -40,6 +42,13 @@
 .hint { font-size: .95rem; color: var(--ink-3); }
 .muted { color: var(--ink-3); font-weight: 400; }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { transition-duration: 0s !important; }
-}
+/* Dialoge */
+dialog { width: min(30rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); padding: 0; border: 0; border-radius: var(--r-l); background: var(--sheet); color: var(--ink); box-shadow: 0 24px 64px -20px rgba(0, 0, 0, .5); overflow: auto; }
+[data-contrast="high"] dialog { box-shadow: 0 0 0 3px var(--ink); }
+dialog::backdrop { background: rgba(8, 18, 22, .6); }
+.dlg-head, .dlg-foot { display: flex; align-items: center; gap: .75rem; padding: 1rem 1.5rem; }
+.dlg-head { justify-content: space-between; border-bottom: 1px solid var(--rule); }
+.dlg-head h2 { font-size: 1.35rem; }
+.dlg-foot { justify-content: flex-end; flex-wrap: wrap; border-top: 1px solid var(--rule); }
+.dlg-body { display: grid; gap: 1rem; padding: 1.25rem 1.5rem 1.5rem; }
+@media (forced-colors: active) { dialog { border: 1px solid CanvasText; } }

@@ -6,6 +6,9 @@ import {
   type Chat, type Message,
 } from '../chats'
 import { toHtml } from '../markdown'
+import { getProfile, type Profile } from '../profile'
+import ProfileCard from './ProfileCard.vue'
+import SettingsPage from './SettingsPage.vue'
 
 type Bubble = Message & {
   key?: number
@@ -16,14 +19,15 @@ type Bubble = Message & {
 }
 
 defineProps<{ user: User }>()
-const emit = defineEmits<{ expired: [] }>()
+const emit = defineEmits<{ expired: []; deleted: [] }>()
 
 const LIST = 'gespraeche'
+const SETTINGS = 'einstellungen'
 const STATE = { sending: 'Wird gesendet …', delivered: 'Zugestellt', failed: 'Nicht zugestellt' }
 const NO_REPLY = 'Die Antwort konnte gerade nicht erstellt werden.'
 
 const hash = ref(location.hash.slice(1))
-const activeId = computed(() => (hash.value && hash.value !== LIST ? decodeURIComponent(hash.value) : null))
+const activeId = computed(() => (hash.value && hash.value !== LIST && hash.value !== SETTINGS ? decodeURIComponent(hash.value) : null))
 const chats = ref<Chat[]>([])
 const active = computed(() => chats.value.find((c) => String(c.id) === activeId.value))
 const listLoaded = ref(false)
@@ -46,6 +50,8 @@ const dlgErr = ref('')
 const run = shallowRef<{ chat: string; ctrl: AbortController } | null>(null) // the reply being requested or written
 const writing = ref(false) // reply is streaming: Send becomes Stop
 const announce = ref('')
+const profile = ref<Profile | null>(null) // for the "Das weiß der Lotse" card; SettingsPage reports saves
+const profileFailed = ref(false)
 let seq = 0
 let preset: string | null = null // a chat opened right after creating it: its messages are already local
 let pendingFocus = ''
@@ -95,6 +101,17 @@ async function loadList() {
   listLoaded.value = true
 }
 loadList()
+getProfile()
+  .then((p) => (profile.value = p))
+  .catch((e) => {
+    fail(e)
+    profileFailed.value = true
+  })
+
+function profileSaved(p: Profile) {
+  profile.value = p
+  profileFailed.value = false
+}
 
 watch(activeId, async (id, _, onCleanup) => {
   let stale = false
@@ -322,9 +339,11 @@ async function confirmDelete() {
       </ul>
     </nav>
 
-    <section class="pane" :class="activeId ? 'is-chat' : 'is-home'" aria-labelledby="view-h">
+    <SettingsPage v-if="hash === SETTINGS" :user="user" @expired="emit('expired')" @saved="profileSaved" @deleted="emit('deleted')" />
+    <section v-else class="pane" :class="activeId ? 'is-chat' : 'is-home'" aria-labelledby="view-h">
       <div v-if="activeId" ref="scroller" class="view">
         <h1 id="view-h" class="chat-h" tabindex="-1">{{ active?.title ?? 'Gespräch' }}</h1>
+        <ProfileCard class="chat-known" :profile="profile" :failed="profileFailed" />
         <p v-if="loading" class="muted">Nachrichten werden geladen …</p>
         <p v-else-if="loadErr" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ loadErr }}</span></p>
         <p v-else-if="!messages.length" class="muted">Noch keine Nachrichten in diesem Gespräch.</p>
@@ -386,6 +405,7 @@ async function confirmDelete() {
         </div>
         <p v-if="draftErr" id="q-err" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ draftErr }}</span></p>
       </form>
+      <ProfileCard v-if="!activeId" :profile="profile" :failed="profileFailed" />
     </section>
 
     <dialog ref="renameDlg" class="small" aria-labelledby="rn-h">
@@ -474,6 +494,7 @@ async function confirmDelete() {
 
 .view { flex: 1; min-height: 0; overflow-y: auto; padding: 2rem var(--gut) 1.5rem; }
 .chat-h { font-size: 1.9rem; margin-bottom: 1.75rem; hyphens: auto; overflow-wrap: anywhere; }
+.chat-known { margin-bottom: 1.75rem; }
 .msgs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; }
 .msg { display: flex; justify-content: flex-end; }
 .msg.assistant { justify-content: flex-start; }
@@ -508,9 +529,6 @@ async function confirmDelete() {
 @keyframes dot { 0%, 70%, 100% { opacity: .35; transform: none; } 35% { opacity: 1; transform: translateY(-3px); } }
 @keyframes word-in { from { opacity: 0; } }
 @keyframes blink { 50% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .dots i, .md :deep(.w), .md :deep(.caret) { animation: none; }
-}
 .meta { display: flex; flex-wrap: wrap; gap: .1rem .75rem; font-size: .85rem; color: var(--ink-3); }
 .state { font-weight: 700; }
 .delivered .state { color: var(--ready-ink); }
@@ -532,23 +550,15 @@ async function confirmDelete() {
 .cbox-row .send { margin-left: auto; }
 @media (pointer: coarse) { .cbox-row .hint { display: none; } }
 
-dialog { width: min(30rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); padding: 0; border: 0; border-radius: var(--r-l); background: var(--sheet); color: var(--ink); box-shadow: 0 24px 64px -20px rgba(0, 0, 0, .5); overflow: auto; }
-dialog::backdrop { background: rgba(8, 18, 22, .6); }
-.dlg-head, .dlg-foot { display: flex; align-items: center; gap: .75rem; padding: 1rem 1.5rem; }
-.dlg-head { justify-content: space-between; border-bottom: 1px solid var(--rule); }
-.dlg-head h2 { font-size: 1.35rem; }
-.dlg-foot { justify-content: flex-end; flex-wrap: wrap; border-top: 1px solid var(--rule); }
-.dlg-body { display: grid; gap: 1rem; padding: 1.25rem 1.5rem 1.5rem; }
-
-@media (min-width: 56rem) {
+@container (min-width: 56rem) {
   .shell { grid-template-columns: 20rem minmax(0, 1fr); }
 }
 /* Narrow: either the list or the chat, like the demo. */
-@media (max-width: 55.99rem) {
+@container (max-width: 55.99rem) {
   [data-pane="list"] .pane, [data-pane="main"] .side { display: none; }
   .side { padding: 1rem clamp(1rem, 4vw, 2rem) 2rem; }
 }
 @media (forced-colors: active) {
-  .ci, .bubble, dialog { border: 1px solid CanvasText; }
+  .ci, .bubble { border: 1px solid CanvasText; }
 }
 </style>

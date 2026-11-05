@@ -21,20 +21,43 @@
   --font: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --lh: 1.55;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --paper: #0E171B; --sheet: #152227; --sunk: #0B1316;
-    --ink: #E8EEF0; --ink-2: #C3CFD4; --ink-3: #97A8AF;
-    --rule: rgba(255, 255, 255, .10); --rule-2: rgba(255, 255, 255, .26);
-    --harbor: #5CC4D9; --harbor-hi: #82D4E5; --on-harbor: #06232B; --harbor-tint: #163640;
-    --danger: #FF8A80; --on-danger: #2A0603;
-    --ready-ink: #A3E2B8;
-    --focus: #9DC2FF;
-    --lift: 0 0 0 1px rgba(255, 255, 255, .08);
-  }
+:root[data-scheme="dark"] {
+  color-scheme: dark;
+  --paper: #0E171B; --sheet: #152227; --sunk: #0B1316;
+  --ink: #E8EEF0; --ink-2: #C3CFD4; --ink-3: #97A8AF;
+  --rule: rgba(255, 255, 255, .10); --rule-2: rgba(255, 255, 255, .26);
+  --harbor: #5CC4D9; --harbor-hi: #82D4E5; --on-harbor: #06232B; --harbor-tint: #163640;
+  --danger: #FF8A80; --on-danger: #2A0603;
+  --ready-ink: #A3E2B8;
+  --focus: #9DC2FF;
+  --lift: 0 0 0 1px rgba(255, 255, 255, .08);
 }
-html { font-size: 112.5%; } /* 18px Grundschrift */
+:root[data-contrast="high"] {
+  --paper: #FFFFFF; --sheet: #FFFFFF; --sunk: #FFFFFF;
+  --ink: #000; --ink-2: #000; --ink-3: #1A1A1A;
+  --rule: #000; --rule-2: #000;
+  --harbor: #003A49; --harbor-hi: #00222B; --on-harbor: #FFF; --harbor-tint: #D6EEF3;
+  --danger: #8C0000; --on-danger: #FFF;
+  --ready-ink: #000;
+  --focus: #000;
+  --lift: 0 0 0 2px #000;
+}
+:root[data-contrast="high"][data-scheme="dark"] {
+  --paper: #000; --sheet: #000; --sunk: #000;
+  --ink: #FFF; --ink-2: #FFF; --ink-3: #EEE;
+  --rule: #FFF; --rule-2: #FFF;
+  --harbor: #8BE6F7; --harbor-hi: #B5F0FB; --on-harbor: #000; --harbor-tint: #00303A;
+  --danger: #FF9C9C; --on-danger: #000;
+  --ready-ink: #7CF0A6;
+  --focus: #FFE600;
+  --lift: 0 0 0 2px #FFF;
+}
+html { font-size: 112.5%; }                 /* 18px Grundschrift */
+html[data-text="l"] { font-size: 131.25%; }  /* 21px */
+html[data-text="xl"] { font-size: 150%; }    /* 24px */
+html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-motion="reduce"] *::after {
+  transition-duration: 0s !important; animation: none !important;
+}
 
 *, *::before, *::after { box-sizing: border-box; }
 body {
@@ -45,5 +68,6 @@ body {
 h1, h2, h3 { margin: 0; line-height: 1.2; letter-spacing: -.01em; text-wrap: balance; hyphens: auto; }
 p { margin: 0; text-wrap: pretty; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+[data-contrast="high"] :focus-visible { outline-width: 4px; }
 [tabindex="-1"]:focus:not(:focus-visible) { outline: none; }
 ::placeholder { color: var(--ink-3); opacity: 1; }
