@@ -1,4 +1,4 @@
-import { ApiError, GENERIC, getToken, request, respond, UNREACHABLE } from './auth'
+import { ApiError, GENERIC, HEADERS, request, respond, TOO_MANY, UNREACHABLE } from './auth'
 import { intlLocale, k, t, translating } from './i18n'
 
 export interface Chat {
@@ -153,7 +153,7 @@ export type ReplyEvent =
 
 const init = (method: string, body?: object, signal?: AbortSignal): RequestInit => ({
   method,
-  headers: { Authorization: `Bearer ${getToken()}`, ...(body && { 'Content-Type': 'application/json' }) },
+  headers: { ...HEADERS, ...(body && { 'Content-Type': 'application/json' }) },
   body: body && JSON.stringify(body),
   signal,
 })
@@ -172,14 +172,14 @@ export const getState = (id: string | number) => api<{ facts: Fact[]; plan: Plan
 export const uploadDocument = async (id: string | number, file: File) => {
   const res = await respond(`${at(id)}/documents`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/pdf', 'X-Filename': encodeURIComponent(file.name) },
+    headers: { ...HEADERS, 'Content-Type': 'application/pdf', 'X-Filename': encodeURIComponent(file.name) },
     body: file,
   })
   return (await res.json()) as Message[]
 }
 export const updateStep = (id: string | number, step: string, body: StepUpdate) =>
   api<Plan>(`${at(id)}/steps/${encodeURIComponent(step)}`, 'PATCH', body)
-// The step's form filled in with the profile. Fetched with the token, so a plain link cannot do it.
+// The step's form filled in with the profile. Fetched, so a failed download shows our error message.
 export async function downloadForm(id: string | number, step: string) {
   const res = await respond(`${at(id)}/steps/${encodeURIComponent(step)}/form`, init('GET'))
   const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'Antrag.pdf'
@@ -191,7 +191,7 @@ export async function downloadForm(id: string | number, step: string) {
 
 /**
  * Sends a message (or, with `answer`, a chip answer) and calls `on` for each Server-Sent Event of the reply.
- * fetch instead of EventSource, which can neither POST nor send the token. Resolves when the stream ends.
+ * fetch instead of EventSource, which cannot POST. Resolves when the stream ends.
  */
 export async function sendMessage(
   id: string | number,
@@ -229,6 +229,7 @@ export function say(e: unknown, invalid = GENERIC) {
   const status = e instanceof ApiError ? e.status : 0
   if (status === 404) return NOT_FOUND
   if (status === 422) return invalid
+  if (status === 429) return TOO_MANY
   return (e as Error).message === UNREACHABLE ? UNREACHABLE : GENERIC
 }
 

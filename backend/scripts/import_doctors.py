@@ -60,6 +60,7 @@ def practice(doctor: dict, ordination: dict) -> dict | None:
         and phones
         and coordinates.get("lat")
         and coordinates.get("lon")
+        and (ordination["url"] or "").startswith("https://")  # shown as a link
     ):
         return None
     return {

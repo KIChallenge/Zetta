@@ -1,22 +1,30 @@
+# Ports are bound to 127.0.0.1: anyone else on the network could otherwise register, upload and use up the LLM quota.
+# Images are pinned by digest, so a changed upstream tag is never pulled unnoticed.
 services:
   backend:
-    image: ghcr.io/astral-sh/uv:python3.14-bookworm-slim
+    image: ghcr.io/astral-sh/uv:python3.14-bookworm-slim@sha256:7cf77f594be8042dab6daa9fe326f90962252268b4f120a7f5dccce4d947e6c1
     working_dir: /app
     volumes:
       - ./backend:/app
       - /app/.venv
-    command: uv run uvicorn backend.app:app --host 0.0.0.0
+    command: uv run --frozen uvicorn backend.app:app --host 0.0.0.0
+    environment:
+      # The dev proxy forwards with the service name as the host.
+      ALLOWED_HOSTS: '["backend", "localhost", "127.0.0.1"]'
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
 
   frontend:
-    image: node:22-alpine
+    image: node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
     working_dir: /app
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    command: sh -c "npm install && npm run dev -- --host"
+    # npm ci installs exactly package-lock.json and never rewrites it.
+    command: sh -c "npm ci && npm run dev -- --host"
     environment:
       API_PROXY_TARGET: http://backend:8000
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
+    restart: unless-stopped

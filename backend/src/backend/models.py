@@ -22,6 +22,26 @@ class User(Base):
     # Deleted by the ORM with the user: SQLite does not enforce foreign keys by default.
     profile: Mapped["Profile | None"] = relationship(cascade="all, delete-orphan")
     chats: Mapped[list["Chat"]] = relationship(cascade="all, delete-orphan")
+    token_version: Mapped["TokenVersion | None"] = relationship(cascade="all, delete-orphan")
+
+    @property
+    def version(self) -> int:
+        return self.token_version.version if self.token_version else 0
+
+    def revoke_tokens(self) -> None:
+        """Ends every token issued so far, on all devices."""
+        if self.token_version is None:
+            self.token_version = TokenVersion(version=0)
+        self.token_version.version += 1
+
+
+class TokenVersion(Base):
+    """Own table, like profiles, so existing databases need no migration. No row: version 0."""
+
+    __tablename__ = "token_versions"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer)
 
 
 class Profile(Base):

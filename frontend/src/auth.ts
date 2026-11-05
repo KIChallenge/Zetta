@@ -14,13 +14,18 @@ export class ApiError extends Error {
   }
 }
 
-const KEY = 'access_token'
 export const UNREACHABLE = k('Der Server ist gerade nicht erreichbar. Bitte versuchen Sie es später noch einmal.')
 export const GENERIC = k('Das hat leider nicht geklappt. Bitte versuchen Sie es noch einmal.')
+export const TOO_MANY = k('Das waren gerade sehr viele Versuche. Bitte warten Sie ein paar Minuten.')
 
-// shortcut: JWT in localStorage is readable by any script on the page; move to an httpOnly cookie before production.
-export const getToken = () => localStorage.getItem(KEY)
-export const clearToken = () => localStorage.removeItem(KEY)
+// The session is an httpOnly cookie that the browser sends by itself: no script can read it. The server only
+// accepts it for changes together with this header, which another site cannot send.
+export const HEADERS = { 'X-Requested-With': 'fetch' }
+try {
+  localStorage.removeItem('access_token') // where older versions kept the token
+} catch {
+  // Storage blocked: nothing was stored there either.
+}
 
 /** fetch that throws an ApiError unless the response is ok. */
 export async function respond(path: string, init: RequestInit): Promise<Response> {
@@ -45,13 +50,14 @@ export async function request<T>(path: string, init: RequestInit): Promise<T> {
 }
 
 export async function authenticate(path: '/auth/login' | '/auth/register', payload: Record<string, string>): Promise<User> {
-  const { access_token, user } = await request<{ access_token: string; user: User }>(path, {
+  const { user } = await request<{ user: User }>(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...HEADERS, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  localStorage.setItem(KEY, access_token)
   return user
 }
 
-export const me = () => request<User>('/me', { headers: { Authorization: `Bearer ${getToken()}` } })
+export const me = () => request<User>('/me', { headers: HEADERS })
+// Ends the session on every device. A failure (already signed out, server down) changes nothing for the user.
+export const logout = () => respond('/auth/logout', { method: 'POST', headers: HEADERS }).catch(() => {})

@@ -99,6 +99,14 @@ def test_records_have_a_source_and_are_fresh():
         assert age <= MAX_AGE_DAYS, f"{record.id} was verified {age} days ago: check it against the source again"
 
 
+def test_every_link_a_user_can_open_is_https():
+    # They become href attributes: a javascript: or http: value from a scrape would be clickable.
+    links = [d.source_url for d in corpus.directory.doctors]
+    links += [c.value for i in corpus.institutions.values() for c in i.channels if c.type == "web"]
+    links += [c.source_url for i in corpus.institutions.values() for c in i.channels if c.source_url]
+    assert [link for link in links if not link.startswith("https://")] == []
+
+
 def test_fallback_scripts_pass_validation_with_all_items():
     for s, t in TEMPLATES:
         if t.type not in ("call", "email"):

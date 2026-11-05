@@ -15,7 +15,7 @@ from backend.engine import DONE, ENTRY_FACT, evaluate, statuses, visible
 from backend.facts import FACTS, SENTINELS, VIENNA_POSTAL_CODE, merge, subject_words, value_label
 from backend.hours import now as vienna_now
 from backend.hours import reachable, summary
-from backend.llm import Llm
+from backend.llm import Llm, redact
 from backend.models import Chat, ChatFact, Message, Plan, Profile, StepState, utcnow
 from backend.schemas import MessageResponse, ProfileData
 
@@ -278,7 +278,7 @@ async def respond(
     else:
         question = pending_question(db, chat.id)
         try:
-            extracted = await llm.extract(text, question.text if question else None)
+            extracted = await llm.extract(redact(text), question.text if question else None)
         except Exception:
             # The chips still lead to a plan without the LLM (spec 17).
             logger.exception("Fact extraction failed")

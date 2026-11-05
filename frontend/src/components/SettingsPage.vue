@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref } from 'vue'
-import { ApiError, GENERIC, UNREACHABLE, type User } from '../auth'
+import { ApiError, GENERIC, TOO_MANY, UNREACHABLE, type User } from '../auth'
 import { fmtDate, fmtPhone, fmtSvnr, joinSvnr, realDate, splitSvnr, svnrDigits, svnrOk, VIENNA } from '../fields'
 import { k, t } from '../i18n'
 import { view } from '../view'
@@ -63,7 +63,7 @@ const focus = (id: string) => nextTick(() => document.getElementById(id)?.focus(
 function fail(e: unknown, byStatus: Record<number, string> = {}) {
   const status = e instanceof ApiError ? e.status : 0
   if (status === 401) emit('expired')
-  return t(byStatus[status] ?? ((e as Error).message === UNREACHABLE ? UNREACHABLE : GENERIC))
+  return t(byStatus[status] ?? (status === 429 ? TOO_MANY : (e as Error).message === UNREACHABLE ? UNREACHABLE : GENERIC))
 }
 
 function fill(p: Profile) {

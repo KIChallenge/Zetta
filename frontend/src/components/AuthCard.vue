@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, reactive, ref } from 'vue'
-import { ApiError, authenticate, type User } from '../auth'
+import { ApiError, authenticate, TOO_MANY, type User } from '../auth'
 import { k, markRegistering, t } from '../i18n'
 
 type Mode = 'login' | 'register'
@@ -12,6 +12,8 @@ const TABS = [['login', k('Anmelden')], ['register', k('Neu registrieren')]] as 
 const MESSAGES: Record<string, string> = {
   'login 401': k('E-Mail-Adresse oder Passwort stimmt nicht.'),
   'register 409': k('Mit dieser E-Mail-Adresse gibt es schon ein Konto. Bitte melden Sie sich an.'),
+  'login 429': TOO_MANY,
+  'register 429': TOO_MANY,
 }
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 

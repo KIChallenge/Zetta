@@ -43,6 +43,7 @@ def server(tmp_path):
         **os.environ,
         "DATABASE_URL": f"sqlite:///{tmp_path / 'e2e.db'}",
         "JWT_SECRET": "e2e-secret-e2e-secret-e2e-secret-e2e-1234",
+        "ALLOWED_HOSTS": '["127.0.0.1"]',
     }
     with log_path.open("w") as log:
         # cwd is the temp dir so a developer's backend/.env is not picked up.
@@ -86,6 +87,7 @@ def test_register_login_and_me_over_http(server):
     assert me.status_code == 200
     assert me.json() == user
 
+    server.cookies.clear()  # the login also set the session cookie
     anonymous = server.get("/me")
     assert anonymous.status_code == 401
     assert anonymous.json()["status"] == 401

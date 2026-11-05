@@ -37,3 +37,7 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Secrets: Vite puts VITE_* variables into the public bundle
+.env
+.env.*

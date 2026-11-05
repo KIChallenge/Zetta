@@ -9,7 +9,7 @@ uv run scripts/generate_env.py    # creates .env with a random JWT_SECRET
 uv run backend
 ```
 
-The API runs on http://localhost:8000, with interactive docs at `/docs`. Tables are created on startup.
+The API runs on http://localhost:8000. Tables are created on startup. There are no interactive docs at `/docs`: they would publish a map of the whole API.
 
 ## Test
 

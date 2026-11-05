@@ -1,6 +1,6 @@
 import { reactive, watch } from 'vue'
 
-const KEY = 'lotse-ansicht' // read by applyView() in index.html
+const KEY = 'lotse-ansicht' // read by applyView() in public/view.js
 
 function stored() {
   try {

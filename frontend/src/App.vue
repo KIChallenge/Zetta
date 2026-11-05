@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import AuthCard from './components/AuthCard.vue'
 import ChatApp from './components/ChatApp.vue'
-import { ApiError, clearToken, getToken, me, type User } from './auth'
+import { logout as endSession, me, type User } from './auth'
 import { locale, setLocale, t } from './i18n'
 import { LANGS } from './profile'
 import { view } from './view'
@@ -10,27 +10,32 @@ import { view } from './view'
 const user = ref<User | null>(null)
 // Fully translated. Once signed in, the language is a setting of the profile.
 const ENTRY_LANGS = ['de', 'en', 'fr', 'cs', 'sk', 'sl'] as const
-const ready = ref(!getToken())
+const ready = ref(false)
 const main = ref<HTMLElement>()
 const initials = computed(() =>
   (user.value?.display_name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w.charAt(0).toUpperCase()).join(''),
 )
 
-if (!ready.value) {
-  me()
-    .then((u) => (user.value = u))
-    .catch((e) => e instanceof ApiError && e.status === 401 && clearToken())
-    .finally(() => (ready.value = true))
-}
+// The session cookie is invisible to scripts, so only the server can say whether someone is signed in.
+me()
+  .then((u) => (user.value = u))
+  .catch(() => {}) // 401 or unreachable: the login screen
+  .finally(() => (ready.value = true))
 
+// The session already ended on the server (401, account deleted).
 function logout() {
-  clearToken()
   user.value = null
 }
 
-function signOut() {
+// Back to the start without a chat in the URL, e.g. after the account was deleted.
+function leave() {
   history.replaceState(null, '', location.pathname + location.search)
   logout()
+}
+
+function signOut() {
+  endSession()
+  leave()
 }
 
 // "Wie mein Gerät" follows the device, so the button needs the device's current scheme too.
@@ -71,7 +76,7 @@ watch(user, () => nextTick(() => main.value?.focus()))
 
   <main id="inhalt" ref="main" :class="user ? 'signed-in' : 'entry'" tabindex="-1">
     <template v-if="ready">
-      <ChatApp v-if="user" :user="user" @expired="logout" @deleted="signOut">
+      <ChatApp v-if="user" :user="user" @expired="logout" @deleted="leave">
         <template #foot>
           <a class="dock dock-me" href="#einstellungen" :title="t('Einstellungen')">
             <span aria-hidden="true">{{ initials }}</span><span class="sr">{{ user.display_name }}, {{ t('Einstellungen') }}</span>

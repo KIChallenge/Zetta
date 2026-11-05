@@ -16,7 +16,21 @@ from pydantic import (
 from backend import facts
 
 Email = Annotated[EmailStr, AfterValidator(str.lower)]
-Password = Annotated[str, Field(min_length=8, max_length=128)]
+# The most used passwords of 10 or more characters: the first ones an attacker tries.
+COMMON_PASSWORDS = {
+    "1234567890", "0123456789", "0987654321", "1111111111", "123456789a", "1q2w3e4r5t", "qwertyuiop", "qwertzuiop",
+    "password12", "password123", "password1234", "passwort123", "passwort1234", "hallo12345", "iloveyou12",
+    "abcdefghij", "abcd123456", "asdfghjkl1", "a123456789", "1234567890a",
+}
+
+
+def not_common(value: str) -> str:
+    if value.lower() in COMMON_PASSWORDS or len(set(value)) < 4:
+        raise ValueError("is too common")
+    return value
+
+
+Password = Annotated[str, Field(min_length=10, max_length=128), AfterValidator(not_common)]
 ChatTitle = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 # Timestamps are always UTC, but SQLite returns them without a timezone.
 Timestamp = Annotated[datetime, PlainSerializer(lambda value: value.strftime("%Y-%m-%dT%H:%M:%SZ"))]
@@ -115,7 +129,7 @@ def check_svnr(value: str) -> str:
 
 
 class ProfileData(BaseModel):
-    """The user's own details, sent to the LLM. Every field is optional ("" when unset)."""
+    """The user's own details. Never sent to the LLM: they only fill placeholders after it. "" when unset."""
 
     model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)
 

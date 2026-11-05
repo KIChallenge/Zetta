@@ -130,3 +130,15 @@ def test_llm_input_has_no_contact_data_and_no_personal_values():
     assert set(sent) == {"step_id", "type", "service", "institution", "items", "placeholders", "facts"}
     assert sent["institution"] == "Pensionsversicherung (PV), Landesstelle Wien"
     assert sent["facts"] == {"subject": "mother", "pension_payer": "pv"}
+
+
+@pytest.mark.parametrize(
+    "text", ["Mehr unter bit.ly/pflege", "Infos auf pflege.wien", "Siehe hilfe.io/x", "Rufen Sie null-sechs-sechs-vier an"]
+)
+def test_contact_data_without_the_usual_endings_is_caught(text):
+    assert scripts.check_text(text, "intro", [])
+
+
+@pytest.mark.parametrize("text", ["z.B. bei der ÖGK", "bzw. mit der e-card", "Guten Tag, hier spricht {user.name}."])
+def test_ordinary_abbreviations_are_not_taken_for_web_addresses(text):
+    assert scripts.check_text(text, "intro", ["user.name"]) == []

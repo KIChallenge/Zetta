@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24
     database_url: str = "sqlite:///./zetta.db"
     cors_origins: list[str] = ["http://localhost:5173"]
+    # Host names the server answers to. The dev proxy forwards with the backend's own name ("backend" in compose).
+    allowed_hosts: list[str] = ["localhost", "127.0.0.1"]
     # Any OpenAI-compatible server. Not called OPENAI_*: shells and other tools set those, and the environment beats
     # .env, so a stray OPENAI_BASE_URL would send every chat elsewhere. The AZURE_ names are older and still work.
     llm_base_url: str = Field(

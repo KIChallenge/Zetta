@@ -1,9 +1,11 @@
 """The three narrow LLM calls (spec section 2): text -> facts, plan intro, scripts with placeholders.
 
-The LLM never searches or looks anything up and never gets personal values or contact data.
+The LLM never searches or looks anything up and never gets profile values or contact data. What the user types
+or uploads goes through `redact` first.
 """
 
 import json
+import re
 from functools import cache
 from typing import Annotated
 
@@ -144,6 +146,18 @@ SCRIPTS_SCHEMA = {
 }
 
 
+# Identifiers no extraction needs. Dates only in letters: in a chat message they can tell an age or a discharge day.
+SVNR = re.compile(r"\b\d{4}[ /-]?\d{2}[ .]?\d{2}[ .]?\d{2}\b")
+EMAIL = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
+DATE = re.compile(r"\b\d{1,2}\.\s?\d{1,2}\.(\s?\d{2,4}\b)?")
+
+
+def redact(text: str, dates: bool = False) -> str:
+    """The text without social security numbers, email addresses and, with `dates`, dates (GDPR data minimisation)."""
+    text = EMAIL.sub("[E-Mail]", SVNR.sub("[SV-Nummer]", text))
+    return DATE.sub("[Datum]", text) if dates else text
+
+
 def _format(name: str, schema: dict) -> dict:
     return {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}}
 
@@ -153,6 +167,9 @@ class Llm:
         self.client = AsyncOpenAI(
             base_url=settings.llm_base_url,
             api_key=settings.llm_api_key or "not-needed",  # the client refuses an empty key
+            # The defaults (10 minutes, 2 retries) would hold a reply and its database session open for half an hour.
+            timeout=60,
+            max_retries=1,
         )
 
     async def _complete(self, system: str, user: str, response_format: dict | None = None) -> str:

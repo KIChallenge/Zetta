@@ -10,12 +10,13 @@ from fastapi.sse import EventSourceResponse, ServerSentEvent
 from sqlalchemy import func, literal_column, select
 from sqlalchemy.orm import Session
 
-from backend import documents, forms, pipeline
+from backend import documents, forms, pipeline, scripts
 from backend.corpus import get_corpus
 from backend.database import SessionLocal
 from backend.dependencies import CurrentUser, DbSession
 from backend.facts import FACTS, value_label
-from backend.llm import Llm, LlmClient
+from backend.guards import TURNS, UPLOADS
+from backend.llm import Llm, LlmClient, redact
 from backend.models import Chat, Message, StepState, utcnow
 from backend.schemas import (
     AnswerRequest,
@@ -40,6 +41,19 @@ def get_owned_chat(chat_id: str, user: CurrentUser, db: DbSession) -> Chat:
 
 
 OwnedChat = Annotated[Chat, Depends(get_owned_chat)]
+
+
+# Each turn and each letter costs LLM calls: an account must not be able to use up the team's quota.
+def count_turn(user: CurrentUser) -> None:
+    TURNS.take(user.id)
+
+
+def count_upload(user: CurrentUser) -> None:
+    UPLOADS.take(user.id)
+
+
+TurnBudget = Annotated[None, Depends(count_turn)]
+UploadBudget = Annotated[None, Depends(count_upload)]
 
 
 def chat_response(db: Session, chat: Chat) -> ChatResponse:
@@ -100,11 +114,15 @@ def get_state(chat: OwnedChat, db: DbSession) -> dict:
 async def generate_title(llm: Llm, text: str) -> str | None:
     # A failed title must not fail the reply: the chat then keeps its title.
     try:
-        title = (await llm.title(text)).strip().strip('"„“').strip()
+        title = (await llm.title(redact(text))).strip().strip('"„“').strip()
     except Exception:
         logger.exception("Title generation failed")
         return None
-    return title[:200] or None
+    # Checked like every other LLM text: no contact data, nothing medical.
+    if errors := scripts.check_text(title, "title", []):
+        logger.warning("Title rejected: %s", "; ".join(errors))
+        return None
+    return title
 
 
 async def turn(chat_id: str, llm: Llm, message: Message, **kwargs) -> AsyncIterator[ServerSentEvent]:
@@ -141,14 +159,16 @@ async def turn(chat_id: str, llm: Llm, message: Message, **kwargs) -> AsyncItera
 
 
 @router.post("/{chat_id}/messages", response_class=EventSourceResponse)
-async def send_message(body: MessageRequest, owned: OwnedChat, llm: LlmClient) -> AsyncIterator[ServerSentEvent]:
+async def send_message(
+    body: MessageRequest, owned: OwnedChat, _: TurnBudget, llm: LlmClient
+) -> AsyncIterator[ServerSentEvent]:
     async for event in turn(owned.id, llm, Message(kind="text", text=body.text), text=body.text):
         yield event
 
 
 @router.post("/{chat_id}/answers", response_class=EventSourceResponse)
 async def answer(
-    body: AnswerRequest, owned: OwnedChat, db: DbSession, llm: LlmClient
+    body: AnswerRequest, owned: OwnedChat, _: TurnBudget, db: DbSession, llm: LlmClient
 ) -> AsyncIterator[ServerSentEvent]:
     """A chip answer, or an edited fact chip: sets the fact directly, without the LLM."""
     question = pipeline.pending_question(db, owned.id)
@@ -180,29 +200,27 @@ def letter_items(db: Session, chat_id: str) -> dict[str, str]:
     return {i["recommendation"]: i["quote"] for i in confirm.payload["items"]} if confirm else {}
 
 
-MAX_UPLOAD = 10 * 1024 * 1024
-
-
 @router.post("/{chat_id}/documents", status_code=status.HTTP_201_CREATED)
 async def upload_document(
     request: Request,
     chat: OwnedChat,
+    _: UploadBudget,
     db: DbSession,
     llm: LlmClient,
     x_filename: Annotated[str, Header()] = "Dokument.pdf",
 ) -> list[MessageResponse]:
     """A discharge letter as the raw PDF body. Only checked recommendations with quotes are kept, not the text."""
-    data = await request.body()
-    if len(data) > MAX_UPLOAD:
-        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail="File too large")
+    data = await request.body()  # at most guards.MAX_UPLOAD: the BodyLimit middleware stops reading there
     if not data.startswith(b"%PDF"):
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Only PDF files")
     try:
-        text = documents.pdf_text(data)
+        text = await documents.read_pdf(data)
     except Exception:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Unreadable PDF") from None
     if len(text.strip()) < 50:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No text in the PDF") from None
+    # The LLM gets the letter without identifiers; quotes are checked against the same text.
+    text = redact(text, dates=True)
     try:
         items = documents.checked(await llm.recommendations(text), text)
     except Exception:

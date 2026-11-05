@@ -588,6 +588,7 @@ async def stop_after_message(path, headers):
         "query_string": b"",
         "root_path": "",
         "headers": [
+            (b"host", b"testserver"),
             (b"authorization", headers["Authorization"].encode()),
             (b"content-type", b"application/json"),
         ],

@@ -31,7 +31,8 @@ SLOTS = {
 FORBIDDEN = {
     "phone number": re.compile(r"\+?\d[\d \t/()-]{4,}\d|\d{3,}"),
     "email address": re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+"),
-    "url": re.compile(r"https?://|www\.|\b[\w-]+\.(at|com|org|net|eu|de|info)\b", re.I),
+    # Any domain, not a list of endings: "bit.ly", "pflege.wien". Lower case only, so "Dr.Med" or "z.B." pass.
+    "url": re.compile(r"(?i:https?://|www\.)|\b[\w-]+\.[a-z]{2,}\b"),
     "iban": re.compile(r"\b[A-Z]{2}\d{2}\s?\d{4}"),
     "date": re.compile(
         r"\b\d{1,2}\.\s?\d{1,2}\.|\b\d{1,2}\.\s?(Jänner|Januar|Februar|März|April|Mai|Juni|Juli|August|"
@@ -39,6 +40,8 @@ FORBIDDEN = {
         re.I,
     ),
     "amount": re.compile(r"[€$]|\b(EUR|Euro)\b", re.I),
+    # A phone number in words: "null-sechs-sechs-vier".
+    "spelled number": re.compile(r"\b(null|eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun)([\s-]+(null|eins|zwei|drei|vier|fünf|sechs|sieben|acht|neun)){2,}\b", re.I),
 }
 # Diagnosis and medication wording (spec 10). Scripts are about administration only.
 MEDICAL = re.compile(
@@ -47,7 +50,7 @@ MEDICAL = re.compile(
     r"infektion|fieber|therapie",
     re.I,
 )
-LIMITS = {"opening": 300, "point": 300, "closing": 300, "subject": 150, "body": 2000, "intro": 120}
+LIMITS = {"opening": 300, "point": 300, "closing": 300, "subject": 150, "body": 2000, "intro": 120, "title": 100}
 
 
 def slot_values(profile: ProfileData, facts: dict) -> dict[str, str | None]:

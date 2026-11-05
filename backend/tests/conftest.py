@@ -8,12 +8,14 @@ test_dir = tempfile.TemporaryDirectory()
 os.environ["DATABASE_URL"] = f"sqlite:///{Path(test_dir.name) / 'test.db'}"
 os.environ["JWT_SECRET"] = "test-secret-test-secret-test-secret-1234"
 os.environ["LLM_API_KEY"] = "test-key"
+os.environ["ALLOWED_HOSTS"] = '["testserver"]'
 
 import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import app
 from backend.database import Base, engine
+from backend.guards import reset_limits
 from backend.llm import get_llm
 
 
@@ -79,5 +81,8 @@ def llm():
 @pytest.fixture
 def client(llm):
     Base.metadata.drop_all(engine)
+    reset_limits()
     with TestClient(app) as test_client:
+        # Tests sign in with the Bearer token; the session cookie has its own tests in test_auth.py.
+        test_client.event_hooks = {"response": [lambda _: test_client.cookies.clear()]}
         yield test_client
