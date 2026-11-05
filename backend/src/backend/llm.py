@@ -37,8 +37,9 @@ EXTRACT_PROMPT = (
     "record them anywhere."
 )
 INTRO_PROMPT = (
-    "Write one or two short, warm sentences that introduce a plan of next steps to the user. Name the topics "
-    "of the plan briefly. Do not repeat the steps. Never write phone numbers, email addresses, web addresses, "
+    "Write one short, warm sentence of at most 12 words that introduces a plan of next steps to the user. "
+    "Do not name the topics or the steps: they are shown right below. No filler such as \"Gerne\" or "
+    "\"So sehen Sie rasch\". Never write phone numbers, email addresses, web addresses, "
     "dates, amounts or names, and say nothing medical. Never say that someone is entitled to something "
     '("Anspruch"); say what may apply. Reply with the text only. Language: {language}.'
 )

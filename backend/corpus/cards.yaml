@@ -3,21 +3,19 @@
 boundary:
   title: Medizinische Fragen beantwortet der Lotse nicht
   text: >-
-    Bei Beschwerden, Diagnosen, Medikamenten oder gesundheitlichen Risiken wenden Sie sich bitte an Ihre Hausärztin
-    oder Ihren Hausarzt, an die telefonische Gesundheitsberatung oder im Notfall an die Rettung. Bei Pflegegeld,
-    Anträgen und Unterstützung im Alltag hilft der Lotse gerne weiter.
+    Bei Beschwerden, Diagnosen, Medikamenten oder Risiken fragen Sie bitte Ihre Hausärztin oder Ihren Hausarzt, die
+    Gesundheitsberatung oder im Notfall die Rettung.
   contacts: [health_hotline_1450, emergency_144]
 
 out_of_scope:
   title: Der Lotse kennt nur Angebote in Wien
   text: >-
-    Für Wohnorte außerhalb von Wien sind andere Stellen zuständig, die der Lotse noch nicht kennt. Wenn es doch um
-    Wien geht, ändern Sie den Bezirk oben bei „Verstanden“.
+    Außerhalb von Wien sind andere Stellen zuständig. Geht es doch um Wien, ändern Sie den Bezirk bei „Verstanden“.
   contacts: []
 
 general:
   title: Dazu hat der Lotse noch keinen passenden Plan
   text: >-
-    Der Lotse kennt bisher Pflege, die Schritte nach einem Spitalsaufenthalt, Vorsorge und Impfungen, Angebote für Kinder, Arzttermine und Mindestsicherung in Wien.
-    Bei anderen Fragen zur Krankenversicherung hilft das Kundenservice der ÖGK weiter.
+    Der Lotse kennt bisher Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen, Kinder, Arzttermine und
+    Mindestsicherung. Sonst hilft das Kundenservice der ÖGK.
   contacts: [oegk_vienna_customer_service]

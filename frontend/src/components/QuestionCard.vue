@@ -35,7 +35,6 @@ function pick(c: Chip, multi: boolean) {
         <button type="button" class="btn btn-primary" :aria-disabled="!picked.length" @click="picked.length && emit('many', picked)">Weiter</button>
         <span class="hint">Mehrere möglich</span>
       </div>
-      <p class="hint">Oder schreiben Sie Ihre Antwort unten ins Textfeld.</p>
     </template>
   </section>
 </template>

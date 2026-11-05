@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import type { Plan, StepUpdate } from '../chats'
 import StepCard from './StepCard.vue'
 
@@ -15,11 +15,15 @@ const groups = computed(() =>
   props.plan.services.map((svc) => ({ svc, steps: props.plan.steps.filter((s) => s.service === svc.id) })),
 )
 
-// Only the current step starts open, so a long plan is not a wall of cards.
+// Every card starts closed and shows its one action; details open on demand, so a plan is not a wall of text.
 const open = ref(new Set<string>())
-watch(nowId, (id) => id && open.value.add(id), { immediate: true })
 function toggle(id: string) {
   if (!open.value.delete(id)) open.value.add(id)
+}
+// "Mehr dazu" per service: summary, conditions, who decides, letter quotes, source.
+const more = ref(new Set<string>())
+function toggleMore(id: string) {
+  if (!more.value.delete(id)) more.value.add(id)
 }
 
 // Overview: one column per service, steps as stations; a click opens the step in the list.
@@ -36,7 +40,7 @@ function show(id: string) {
   <section id="plan" class="plan" aria-labelledby="plan-h">
     <div class="plan-h">
       <h2 id="plan-h" tabindex="-1">Ihr Plan</h2>
-      <p class="plan-n">{{ doneCount }} von {{ plan.steps.length }} Schritten erledigt</p>
+      <p class="plan-n">{{ doneCount }} von {{ plan.steps.length }} erledigt</p>
       <div class="seg-switch" role="group" aria-label="Ansicht">
         <button type="button" :aria-pressed="view === 'list'" @click="view = 'list'">Liste</button>
         <button type="button" :aria-pressed="view === 'overview'" @click="view = 'overview'">Übersicht</button>
@@ -63,11 +67,12 @@ function show(id: string) {
         <span class="pill" :data-tone="svc.eligibility === 'likely' ? 'ready' : 'wait'">
           {{ svc.eligibility === 'likely' ? 'Kommt in Frage' : 'Kommt vielleicht in Frage' }}
         </span>
+        <span v-if="svc.quotes.length" class="pill" data-tone="wait">Laut Ihrem Brief</span>
+        <button type="button" class="linkbtn svc-more-btn" :aria-expanded="more.has(svc.id)" :aria-controls="`more-${svc.id}`" @click="toggleMore(svc.id)">Mehr dazu</button>
       </div>
-      <p class="svc-sum">{{ svc.summary }}</p>
-      <blockquote v-for="qt in svc.quotes" :key="qt" class="quote">In Ihrem Brief steht: „{{ qt }}“</blockquote>
-      <details class="svc-more">
-        <summary>Voraussetzungen und Zuständigkeit</summary>
+      <div v-if="more.has(svc.id)" :id="`more-${svc.id}`" class="svc-more">
+        <p>{{ svc.summary }}</p>
+        <blockquote v-for="qt in svc.quotes" :key="qt" class="quote">In Ihrem Brief steht: „{{ qt }}“</blockquote>
         <ul v-if="svc.criteria.length" class="crit">
           <li v-for="c in svc.criteria" :key="c.text" :data-state="c.state">
             <svg class="i" aria-hidden="true"><use :href="c.state === 'met' ? '#i-check' : '#i-info'" /></svg>
@@ -81,7 +86,7 @@ function show(id: string) {
           <a v-if="svc.responsible_source" class="src-link" :href="svc.responsible_source" target="_blank" rel="noopener noreferrer">Quelle</a>
         </p>
         <p><a class="src-link" :href="svc.source_url" target="_blank" rel="noopener noreferrer">Mehr dazu bei der Quelle</a></p>
-      </details>
+      </div>
       <ol class="steps">
         <StepCard
           v-for="s in steps"
@@ -101,10 +106,10 @@ function show(id: string) {
       <p class="mini-h">Nicht im Plan</p>
       <p v-for="d in plan.dropped" :key="d.id">{{ d.title }}: {{ d.reason }}</p>
     </div>
-    <p class="plan-src">
-      <svg class="i" aria-hidden="true"><use href="#i-info" /></svg>
-      <span>„Kommt in Frage“ ist keine Zusage: Darüber entscheidet die zuständige Stelle. Telefonnummern, Zeiten und Adressen kommen aus dem geprüften Verzeichnis des Lotsen, nicht von der KI. Der Lotse bereitet vor, er bucht und sendet nichts selbst und stellt keine Diagnosen.</span>
-    </p>
+    <details class="more plan-src">
+      <summary>„Kommt in Frage“ ist keine Zusage</summary>
+      <p>Darüber entscheidet die zuständige Stelle. Telefonnummern, Zeiten und Adressen kommen aus dem geprüften Verzeichnis des Lotsen, nicht von der KI. Der Lotse bereitet vor, er bucht und sendet nichts selbst und stellt keine Diagnosen.</p>
+    </details>
   </section>
 </template>
 
@@ -136,16 +141,14 @@ function show(id: string) {
 .svc { display: grid; gap: .6rem; }
 .svc-h { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem; }
 .svc-h h3 { font-size: 1.25rem; }
-.svc-sum { color: var(--ink-2); max-width: 44rem; }
-.quote { max-width: 44rem; margin: 0; padding: .55rem .9rem; border-left: 3px solid var(--harbor); border-radius: 0 var(--r-s) var(--r-s) 0; background: var(--sunk); font-weight: 600; }
-.svc-more { max-width: 44rem; color: var(--ink-2); }
-.svc-more summary { width: fit-content; min-height: 2.75rem; display: flex; align-items: center; color: var(--harbor); font-weight: 600; cursor: pointer; }
-.svc-more > :not(summary) { margin-top: .5rem; }
+.svc-more-btn { min-height: 2.75rem; font-weight: 600; }
+.quote { margin: 0; padding: .55rem .9rem; border-left: 3px solid var(--harbor); border-radius: 0 var(--r-s) var(--r-s) 0; background: var(--sheet); font-weight: 600; }
+.svc-more { display: grid; gap: .5rem; max-width: 44rem; padding: .9rem 1rem; border-radius: var(--r-m); background: var(--sunk); color: var(--ink-2); }
 .crit { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
 .crit li { display: flex; gap: .5em; align-items: flex-start; }
 .crit .i { margin-top: .15em; color: var(--harbor); }
 .steps { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: 1rem; }
 .dropped { display: grid; gap: .3rem; color: var(--ink-2); }
-.plan-src { display: flex; gap: .5em; font-size: .9rem; color: var(--ink-3); max-width: 44rem; }
-.plan-src .i { margin-top: .15em; }
+.plan-src { font-size: .9rem; color: var(--ink-3); max-width: 44rem; }
+.plan-src > summary { color: var(--ink-3); font-weight: 400; }
 </style>

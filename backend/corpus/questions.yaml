@@ -6,7 +6,7 @@
   text:
     self: Wobei kann der Lotse Ihnen helfen?
     other: Wobei kann der Lotse Ihnen helfen?
-  why_we_ask: Der Lotse kennt bestimmte Angebote. Wählen Sie das passende, oder beschreiben Sie Ihr Anliegen genauer.
+  why_we_ask: Oder beschreiben Sie es in eigenen Worten.
   chips:
     - {value: apply_care_allowance}
     - {value: find_support_services}
@@ -27,13 +27,13 @@
   text:
     self: In welchem Wiener Bezirk wohnen Sie?
     other: In welchem Wiener Bezirk wohnt {subject.ihr}?
-  why_we_ask: Der Lotse kennt Angebote in Wien. Außerhalb von Wien sind andere Stellen zuständig.
+  why_we_ask: Der Lotse kennt nur Angebote in Wien.
 
 - fact_key: pension_payer
   text:
     self: Beziehen Sie eine Pension? Wenn ja, von welcher Stelle?
     other: Bezieht {subject.ihr} eine Pension? Wenn ja, von welcher Stelle?
-  why_we_ask: Beim Pflegegeld ist die Stelle zuständig, die die Pension auszahlt.
+  why_we_ask: Diese Stelle ist für das Pflegegeld zuständig.
 
 - fact_key: lives_alone
   text:
@@ -51,20 +51,20 @@
   text:
     self: Was interessiert Sie am meisten?
     other: Was interessiert Sie am meisten?
-  why_we_ask: Der Lotse zeigt nur Angebote zu dem, was Sie gewählt haben.
+  why_we_ask: Sie sehen nur Angebote zu Ihrer Wahl.
   multi: true
 
 - fact_key: appointment_reason
   text:
     self: Worum geht es beim Termin?
     other: Worum geht es beim Termin?
-  why_we_ask: Bei akuten Beschwerden ist ein anderer Weg schneller als ein normaler Termin.
+  why_we_ask: Bei akuten Beschwerden gibt es schnellere Wege.
 
 - fact_key: specialty
   text:
     self: Zu welcher Fachrichtung möchten Sie?
     other: Zu welcher Fachrichtung möchten Sie?
-  why_we_ask: Danach suchen Sie die Ordination. Der Lotse wählt keine Fachrichtung für Sie aus.
+  why_we_ask: Der Lotse wählt keine Fachrichtung für Sie aus.
 
 - fact_key: preferred_time
   text:
