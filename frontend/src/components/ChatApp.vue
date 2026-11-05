@@ -1,18 +1,26 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { ApiError, type User } from '../auth'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue'
+import { ApiError, UNREACHABLE, type User } from '../auth'
 import {
   createChat, deleteChat, listChats, listMessages, NOT_FOUND, renameChat, say, sendMessage, titleFrom, when,
   type Chat, type Message,
 } from '../chats'
+import { toHtml } from '../markdown'
 
-type Bubble = Message & { key?: number; state?: 'sending' | 'delivered' | 'failed'; error?: string }
+type Bubble = Message & {
+  key?: number
+  state?: 'sending' | 'delivered' | 'failed'
+  error?: string
+  html?: string // assistant only: sanitized Markdown
+  streaming?: boolean
+}
 
 defineProps<{ user: User }>()
 const emit = defineEmits<{ expired: [] }>()
 
 const LIST = 'gespraeche'
 const STATE = { sending: 'Wird gesendet …', delivered: 'Zugestellt', failed: 'Nicht zugestellt' }
+const NO_REPLY = 'Die Antwort konnte gerade nicht erstellt werden.'
 
 const hash = ref(location.hash.slice(1))
 const activeId = computed(() => (hash.value && hash.value !== LIST ? decodeURIComponent(hash.value) : null))
@@ -35,6 +43,9 @@ const rnInput = ref<HTMLInputElement>()
 const target = ref<Chat | null>(null)
 const newTitle = ref('')
 const dlgErr = ref('')
+const run = shallowRef<{ chat: string; ctrl: AbortController } | null>(null) // the reply being requested or written
+const writing = ref(false) // reply is streaming: Send becomes Stop
+const announce = ref('')
 let seq = 0
 let preset: string | null = null // a chat opened right after creating it: its messages are already local
 let pendingFocus = ''
@@ -47,7 +58,14 @@ function fail(e: unknown, invalid?: string) {
 
 const focus = (id: string) => nextTick(() => document.getElementById(id)?.focus())
 const scrollDown = () => nextTick(() => scroller.value?.scrollTo({ top: scroller.value.scrollHeight }))
+// Measured before an update: streaming text only scrolls along if the user has not scrolled up to read.
+const nearBottom = (el = scroller.value) => !!el && el.scrollHeight - el.scrollTop - el.clientHeight < 80
 const put = (c: Chat) => (chats.value = [c, ...chats.value.filter((x) => x.id !== c.id)])
+const drop = (b: Bubble) => {
+  const i = messages.value.indexOf(b)
+  if (i >= 0) messages.value.splice(i, 1)
+}
+const withHtml = (m: Message): Bubble => (m.role === 'assistant' ? { ...m, html: toHtml(m.text) } : m)
 
 function route() {
   hash.value = location.hash.slice(1)
@@ -62,7 +80,10 @@ function go(h: string, focusId = '', replace = false) {
   route()
 }
 onMounted(() => addEventListener('hashchange', route))
-onUnmounted(() => removeEventListener('hashchange', route))
+onUnmounted(() => {
+  removeEventListener('hashchange', route)
+  run.value?.ctrl.abort()
+})
 
 async function loadList() {
   listErr.value = ''
@@ -78,6 +99,8 @@ loadList()
 watch(activeId, async (id, _, onCleanup) => {
   let stale = false
   onCleanup(() => (stale = true))
+  // Leaving a chat stops its reply; the server keeps what was written so far.
+  if (run.value && run.value.chat !== id) run.value.ctrl.abort()
   loadErr.value = draftErr.value = ''
   loading.value = false
   if (id) notice.value = ''
@@ -88,7 +111,7 @@ watch(activeId, async (id, _, onCleanup) => {
   try {
     const list = await listMessages(id)
     if (stale) return
-    messages.value = list
+    messages.value = list.map(withHtml)
   } catch (e) {
     if (stale) return
     const msg = fail(e)
@@ -105,6 +128,7 @@ watch(activeId, async (id, _, onCleanup) => {
 }, { immediate: true })
 
 function submit() {
+  if (run.value) return // one reply at a time
   const text = draft.value.trim()
   draftErr.value = text ? '' : 'Bitte schreiben Sie zuerst Ihre Nachricht.'
   if (!text) return focus('q')
@@ -117,19 +141,19 @@ function submit() {
 async function start(text: string) {
   if (busy.value) return
   busy.value = true
+  let id = ''
   try {
     const c = await createChat(titleFrom(text))
     put(c)
     draft.value = ''
     messages.value = []
-    preset = String(c.id)
-    go(preset, 'q')
-    deliver(preset, text)
+    id = preset = String(c.id)
+    go(id, 'q')
   } catch (e) {
     draftErr.value = fail(e)
-  } finally {
-    busy.value = false
   }
+  busy.value = false
+  if (id) deliver(id, text)
 }
 
 function deliver(id: string, text: string) {
@@ -139,25 +163,72 @@ function deliver(id: string, text: string) {
   retry(id, m)
 }
 
+const stop = () => writing.value && run.value?.ctrl.abort()
+
 async function retry(id: string, m: Bubble) {
+  if (run.value) return
+  const ctrl = new AbortController()
+  run.value = { chat: id, ctrl }
   m.state = 'sending'
-  try {
-    const { message, reply } = await sendMessage(id, m.text)
-    Object.assign(m, message, { state: 'delivered' })
-    // Right after its question, and only if that question is still shown (the user may have switched chats).
-    const i = messages.value.indexOf(m)
-    if (i >= 0) {
-      messages.value.splice(i + 1, 0, reply)
-      if (i === messages.value.length - 2) scrollDown()
-    }
-    const c = chats.value.find((x) => String(x.id) === id)
-    if (c) put({ ...c, updated_at: message.created_at })
-  } catch (e) {
-    m.state = 'failed'
-    m.error = fail(e, 'Die Nachricht darf höchstens 4000 Zeichen lang sein.')
-    // The bubble grows by the retry button, which must not end up below the fold.
-    if (messages.value.at(-1) === m) scrollDown()
+  announce.value = ''
+  const r: Bubble = reactive({
+    key: ++seq, id: '', role: 'assistant' as const, text: '', created_at: new Date().toISOString(), html: '', streaming: true,
+  })
+  const births: number[] = [] // when each word first showed, for the fade-in
+  let frame = 0
+  let done = false
+  const paint = () => {
+    frame = 0
+    const stick = nearBottom()
+    r.html = toHtml(r.text, births, true)
+    if (stick) scrollDown()
   }
+  try {
+    await sendMessage(id, m.text, ctrl.signal, (e) => {
+      if (e.event === 'message') {
+        Object.assign(m, e.data, { state: 'delivered' })
+        writing.value = true
+        // Right after its question, and only if that question is still shown.
+        const i = messages.value.indexOf(m)
+        if (i >= 0) {
+          const stick = nearBottom()
+          messages.value.splice(i + 1, 0, r)
+          if (stick) scrollDown()
+        }
+        const c = chats.value.find((x) => String(x.id) === id)
+        if (c) put({ ...c, updated_at: e.data.created_at })
+      } else if (e.event === 'delta') {
+        r.text += e.data.text
+        frame ||= requestAnimationFrame(paint) // re-render Markdown at most once per frame
+      } else if (e.event === 'title') {
+        put(e.data)
+      } else if (e.event === 'done') {
+        Object.assign(r, e.data)
+        done = true
+      } else {
+        throw new Error(e.data.detail)
+      }
+    })
+    // A stream that ends without "done" lost its connection.
+    if (!done) throw new ApiError(0, UNREACHABLE)
+    announce.value = 'Antwort fertig'
+  } catch (e) {
+    // Stopped: keep the partial reply. Otherwise nothing was saved, so the question can be sent again.
+    if (!ctrl.signal.aborted) {
+      r.text = ''
+      m.state = 'failed'
+      m.error = e instanceof ApiError ? fail(e, 'Die Nachricht darf höchstens 4000 Zeichen lang sein.') : NO_REPLY
+    }
+  } finally {
+    cancelAnimationFrame(frame)
+    r.streaming = false
+    r.html = toHtml(r.text, births) // no caret; words still fading in finish
+    if (!r.text) drop(r)
+    run.value = null
+    writing.value = false
+  }
+  // The bubble grows by the retry button, which must not end up below the fold.
+  if (m.state === 'failed' && messages.value.at(-1) === m) scrollDown()
 }
 
 const toggle = (id: string) => (optsOpen.value = optsOpen.value === id ? null : id)
@@ -260,14 +331,16 @@ async function confirmDelete() {
         <ol v-else class="msgs" aria-label="Nachrichten">
           <li v-for="m in messages" :key="m.key ?? m.id" class="msg" :class="m.role">
             <div class="bubble" :class="m.state">
-              <p class="text">{{ m.text }}</p>
-              <p class="meta">
+              <p v-if="m.streaming && !m.html" class="dots"><i></i><i></i><i></i><span class="sr">Antwort wird geschrieben …</span></p>
+              <div v-else-if="m.role === 'assistant'" class="md" v-html="m.html"></div>
+              <p v-else class="text">{{ m.text }}</p>
+              <p v-if="!m.streaming" class="meta">
                 <time :datetime="m.created_at">{{ when(m.created_at) }}</time>
                 <span v-if="m.state" class="state" aria-live="polite">{{ STATE[m.state] }}</span>
               </p>
               <template v-if="m.state === 'failed'">
                 <p class="err">{{ m.error }}</p>
-                <button type="button" class="btn btn-secondary" @click="retry(activeId!, m)">Nochmal senden</button>
+                <button type="button" class="btn btn-secondary" @click="retry(activeId!, m)">Nochmal versuchen</button>
               </template>
             </div>
           </li>
@@ -279,7 +352,8 @@ async function confirmDelete() {
         <p v-if="notice" class="notice" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ notice }}</span></p>
       </div>
 
-      <form class="composer" novalidate @submit.prevent="submit">
+      <p class="sr" aria-live="polite">{{ announce }}</p>
+      <form class="composer" novalidate @submit.prevent="submit" @keydown.esc="stop">
         <label class="q-label" :class="{ sr: activeId }" for="q">{{ activeId ? 'Ihre Nachricht' : 'Worum geht es?' }}</label>
         <div class="cbox">
           <textarea
@@ -295,9 +369,18 @@ async function confirmDelete() {
             @keydown.enter.meta.prevent="submit"
           ></textarea>
           <div class="cbox-row">
-            <span id="q-hint" class="hint">Senden mit Strg + Enter (Mac: ⌘ + Enter)</span>
-            <button type="submit" class="btn btn-primary send" :aria-disabled="busy">
-              {{ busy ? 'Einen Moment …' : 'Senden' }}<svg class="i" aria-hidden="true"><use href="#i-arrow" /></svg>
+            <span id="q-hint" class="hint">{{ writing ? 'Stoppen mit Esc' : 'Senden mit Strg + Enter (Mac: ⌘ + Enter)' }}</span>
+            <!-- One button that changes role, so focus stays on it when it turns into Stop. -->
+            <button
+              :type="writing ? 'button' : 'submit'"
+              class="btn btn-primary send"
+              :aria-disabled="busy || (!!run && !writing)"
+              @click="stop"
+            >
+              <template v-if="writing">Stoppen<svg class="i" aria-hidden="true"><use href="#i-stop" /></svg></template>
+              <template v-else>
+                {{ busy || run ? 'Einen Moment …' : 'Senden' }}<svg class="i" aria-hidden="true"><use href="#i-arrow" /></svg>
+              </template>
             </button>
           </div>
         </div>
@@ -398,6 +481,36 @@ async function confirmDelete() {
 .assistant .bubble { border-radius: var(--r-l) var(--r-l) var(--r-l) .35rem; background: var(--sheet); box-shadow: 0 0 0 1px var(--rule); }
 .bubble.failed { box-shadow: inset 0 0 0 2px var(--danger); }
 .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.assistant .bubble { max-width: min(40rem, 92%); }
+
+/* Assistant Markdown (v-html, so styled through :deep). */
+.md { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.md > :deep(* + *) { margin-top: .65em; }
+.md :deep(:is(ul, ol)) { margin-block: 0; padding-left: 1.4em; }
+.md :deep(li + li), .md :deep(li > :is(ul, ol)) { margin-top: .25em; }
+.md :deep(:is(h1, h2, h3, h4, h5, h6)) { margin-bottom: 0; font-size: 1.05rem; line-height: 1.3; }
+.md :deep(a) { color: var(--harbor); }
+.md :deep(code) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; padding: .1em .3em; border-radius: 5px; background: var(--sunk); }
+.md :deep(pre) { margin-bottom: 0; overflow-x: auto; padding: .6rem .8rem; border-radius: var(--r-s); background: var(--sunk); }
+.md :deep(pre code) { padding: 0; background: none; }
+.md :deep(blockquote) { margin-inline: 0; padding-left: .8rem; border-left: 3px solid var(--rule-2); color: var(--ink-2); }
+.md :deep(table) { display: block; overflow-x: auto; border-collapse: collapse; }
+.md :deep(:is(th, td)) { padding: .3rem .6rem; border: 1px solid var(--rule-2); text-align: left; }
+.md :deep(hr) { border: 0; border-top: 1px solid var(--rule-2); }
+
+/* Streaming: typing dots, then words fade in (duration = FADE_MS in markdown.ts) behind a blinking caret. */
+.dots { display: flex; gap: .3rem; padding-block: .55rem; }
+.dots i { width: .5rem; height: .5rem; border-radius: 50%; background: var(--ink-3); animation: dot 1.2s ease-in-out infinite; }
+.dots i:nth-child(2) { animation-delay: .15s; }
+.dots i:nth-child(3) { animation-delay: .3s; }
+.md :deep(.w) { animation: word-in 400ms ease-out both; }
+.md :deep(.caret) { display: inline-block; width: 2px; height: 1.1em; margin-left: 2px; vertical-align: text-bottom; background: var(--harbor); animation: blink 1s steps(1) infinite; }
+@keyframes dot { 0%, 70%, 100% { opacity: .35; transform: none; } 35% { opacity: 1; transform: translateY(-3px); } }
+@keyframes word-in { from { opacity: 0; } }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .dots i, .md :deep(.w), .md :deep(.caret) { animation: none; }
+}
 .meta { display: flex; flex-wrap: wrap; gap: .1rem .75rem; font-size: .85rem; color: var(--ink-3); }
 .state { font-weight: 700; }
 .delivered .state { color: var(--ready-ink); }
