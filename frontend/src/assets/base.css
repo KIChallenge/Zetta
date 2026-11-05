@@ -1,86 +1,49 @@
-/* color palette from <https://github.com/vuejs/theme> */
+/* SV KI-Lotse: Tokens und Grundelemente (aus demos/lotse.css) */
 :root {
-  --vt-c-white: #ffffff;
-  --vt-c-white-soft: #f8f8f8;
-  --vt-c-white-mute: #f2f2f2;
-
-  --vt-c-black: #181818;
-  --vt-c-black-soft: #222222;
-  --vt-c-black-mute: #282828;
-
-  --vt-c-indigo: #2c3e50;
-
-  --vt-c-divider-light-1: rgba(60, 60, 60, 0.29);
-  --vt-c-divider-light-2: rgba(60, 60, 60, 0.12);
-  --vt-c-divider-dark-1: rgba(84, 84, 84, 0.65);
-  --vt-c-divider-dark-2: rgba(84, 84, 84, 0.48);
-
-  --vt-c-text-light-1: var(--vt-c-indigo);
-  --vt-c-text-light-2: rgba(60, 60, 60, 0.66);
-  --vt-c-text-dark-1: var(--vt-c-white);
-  --vt-c-text-dark-2: rgba(235, 235, 235, 0.64);
+  color-scheme: light;
+  --paper: #F3F5F2;
+  --sheet: #FFFFFF;
+  --sunk: #ECEFEB;
+  --ink: #11212A;
+  --ink-2: #32444E;
+  --ink-3: #52646E;
+  --rule: rgba(17, 33, 42, .12);
+  --rule-2: rgba(17, 33, 42, .28);
+  --harbor: #0A5A6E;
+  --harbor-hi: #08495A;
+  --on-harbor: #FFFFFF;
+  --harbor-tint: #DFEDF0;
+  --danger: #B3261E;
+  --ready-ink: #1B5532;
+  --focus: #1D4ED8;
+  --lift: 0 0 0 1px rgba(17, 33, 42, .07), 0 1px 2px rgba(17, 33, 42, .06), 0 6px 16px -8px rgba(17, 33, 42, .16);
+  --r-s: 10px; --r-m: 14px; --r-l: 20px;
+  --font: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --lh: 1.55;
 }
-
-/* semantic color variables for this project */
-:root {
-  --color-background: var(--vt-c-white);
-  --color-background-soft: var(--vt-c-white-soft);
-  --color-background-mute: var(--vt-c-white-mute);
-
-  --color-border: var(--vt-c-divider-light-2);
-  --color-border-hover: var(--vt-c-divider-light-1);
-
-  --color-heading: var(--vt-c-text-light-1);
-  --color-text: var(--vt-c-text-light-1);
-
-  --section-gap: 160px;
-}
-
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-background: var(--vt-c-black);
-    --color-background-soft: var(--vt-c-black-soft);
-    --color-background-mute: var(--vt-c-black-mute);
-
-    --color-border: var(--vt-c-divider-dark-2);
-    --color-border-hover: var(--vt-c-divider-dark-1);
-
-    --color-heading: var(--vt-c-text-dark-1);
-    --color-text: var(--vt-c-text-dark-2);
+    color-scheme: dark;
+    --paper: #0E171B; --sheet: #152227; --sunk: #0B1316;
+    --ink: #E8EEF0; --ink-2: #C3CFD4; --ink-3: #97A8AF;
+    --rule: rgba(255, 255, 255, .10); --rule-2: rgba(255, 255, 255, .26);
+    --harbor: #5CC4D9; --harbor-hi: #82D4E5; --on-harbor: #06232B; --harbor-tint: #163640;
+    --danger: #FF8A80;
+    --ready-ink: #A3E2B8;
+    --focus: #9DC2FF;
+    --lift: 0 0 0 1px rgba(255, 255, 255, .08);
   }
 }
+html { font-size: 112.5%; } /* 18px Grundschrift */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  font-weight: normal;
-}
-
+*, *::before, *::after { box-sizing: border-box; }
 body {
-  min-height: 100vh;
-  color: var(--color-text);
-  background: var(--color-background);
-  transition:
-    color 0.5s,
-    background-color 0.5s;
-  line-height: 1.6;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Fira Sans',
-    'Droid Sans',
-    'Helvetica Neue',
-    sans-serif;
-  font-size: 15px;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 400 1rem/var(--lh) var(--font);
+  -webkit-font-smoothing: antialiased; overflow-wrap: break-word;
 }
+h1, h2, h3 { margin: 0; line-height: 1.2; letter-spacing: -.01em; text-wrap: balance; hyphens: auto; }
+p { margin: 0; text-wrap: pretty; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+[tabindex="-1"]:focus:not(:focus-visible) { outline: none; }
+::placeholder { color: var(--ink-3); opacity: 1; }
