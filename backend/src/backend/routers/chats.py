@@ -79,7 +79,10 @@ def send_message(body: MessageRequest, chat: OwnedChat, db: DbSession) -> SendMe
     message = Message(chat_id=chat.id, role="user", text=body.text, created_at=now)
     db.add(message)
     db.flush()
-    db.add(Message(chat_id=chat.id, role="assistant", text=ASSISTANT_REPLY, created_at=now))
+    reply = Message(chat_id=chat.id, role="assistant", text=ASSISTANT_REPLY, created_at=now)
+    db.add(reply)
     chat.updated_at = now
     db.commit()
-    return SendMessageResponse(message=MessageResponse.model_validate(message))
+    return SendMessageResponse(
+        message=MessageResponse.model_validate(message), reply=MessageResponse.model_validate(reply)
+    )

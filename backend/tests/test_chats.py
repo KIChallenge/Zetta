@@ -150,19 +150,21 @@ def test_delete_chat_removes_it_and_its_messages(client, anna):
     assert len(client.get(f"/chats/{kept['id']}/messages", headers=anna).json()) == 2
 
 
-def test_send_message_returns_only_the_user_message(client, anna):
+def test_send_message_returns_the_user_message_and_reply(client, anna):
     chat = create_chat(client, anna)
 
     response = client.post(f"/chats/{chat['id']}/messages", json={"text": QUESTION}, headers=anna)
 
     assert response.status_code == 201
     body = response.json()
-    assert set(body) == {"status", "message"}
+    assert set(body) == {"status", "message", "reply"}
     assert body["status"] == "delivered"
     assert set(body["message"]) == {"id", "role", "text", "created_at"}
     assert body["message"]["role"] == "user"
     assert body["message"]["text"] == QUESTION
     assert TIMESTAMP.match(body["message"]["created_at"])
+    assert body["reply"]["role"] == "assistant"
+    assert body["reply"]["text"] == "TODO"
 
 
 def test_every_message_is_answered_with_todo_oldest_first(client, anna):
@@ -182,6 +184,8 @@ def test_every_message_is_answered_with_todo_oldest_first(client, anna):
     ]
     assert messages[0] == sent[0]["message"]
     assert messages[2] == sent[1]["message"]
+    assert messages[1] == sent[0]["reply"]
+    assert messages[3] == sent[1]["reply"]
 
 
 def test_messages_of_new_chat_are_empty(client, anna):

@@ -142,8 +142,14 @@ function deliver(id: string, text: string) {
 async function retry(id: string, m: Bubble) {
   m.state = 'sending'
   try {
-    const { message } = await sendMessage(id, m.text)
+    const { message, reply } = await sendMessage(id, m.text)
     Object.assign(m, message, { state: 'delivered' })
+    // Right after its question, and only if that question is still shown (the user may have switched chats).
+    const i = messages.value.indexOf(m)
+    if (i >= 0) {
+      messages.value.splice(i + 1, 0, reply)
+      if (i === messages.value.length - 2) scrollDown()
+    }
     const c = chats.value.find((x) => String(x.id) === id)
     if (c) put({ ...c, updated_at: message.created_at })
   } catch (e) {
@@ -252,7 +258,7 @@ async function confirmDelete() {
         <p v-else-if="loadErr" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ loadErr }}</span></p>
         <p v-else-if="!messages.length" class="muted">Noch keine Nachrichten in diesem Gespräch.</p>
         <ol v-else class="msgs" aria-label="Nachrichten">
-          <li v-for="m in messages" :key="m.key ?? m.id" class="msg">
+          <li v-for="m in messages" :key="m.key ?? m.id" class="msg" :class="m.role">
             <div class="bubble" :class="m.state">
               <p class="text">{{ m.text }}</p>
               <p class="meta">
@@ -387,7 +393,9 @@ async function confirmDelete() {
 .chat-h { font-size: 1.9rem; margin-bottom: 1.75rem; hyphens: auto; overflow-wrap: anywhere; }
 .msgs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; }
 .msg { display: flex; justify-content: flex-end; }
+.msg.assistant { justify-content: flex-start; }
 .bubble { max-width: min(34rem, 85%); display: grid; gap: .4rem; justify-items: start; padding: .7rem 1rem; border-radius: var(--r-l) var(--r-l) .35rem var(--r-l); background: var(--harbor-tint); }
+.assistant .bubble { border-radius: var(--r-l) var(--r-l) var(--r-l) .35rem; background: var(--sheet); box-shadow: 0 0 0 1px var(--rule); }
 .bubble.failed { box-shadow: inset 0 0 0 2px var(--danger); }
 .text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .meta { display: flex; flex-wrap: wrap; gap: .1rem .75rem; font-size: .85rem; color: var(--ink-3); }
