@@ -1,10 +1,31 @@
-# Application forms. `svbox_file` is the local copy in data/raw/svbox (not committed).
+# Application forms. `file` is the blank PDF in corpus/forms. `fields` say which PDF field gets which of the user's
+# details (src/backend/forms.py): {subject.*} only has values when the user asks for themselves, {user.*} always
+# comes from the profile. Never medical details, signatures, dates, consents or choices the user has to make.
 
 - id: care_allowance_form
   title: Antrag auf Pflegegeld (PAL 080)
   url: https://www.pv.at/cdscontent/load?contentid=10008.781956&version=1783516198
   online_url: https://www.sozialversicherung.gv.at/formgen/?contentid=10007.892452&portal=pvportal&LO=1&layout=withNav&svtcode=02
-  svbox_file: Anträge und Formulare/PAL080_0125_Mpfl_052026.pdf
+  file: PAL080_0125_Mpfl_052026.pdf
+  fields:
+    - {field: VSNR_1, value: "{subject.svnr}"}
+    - {field: Fam.Name, value: "{subject.last_name}"}
+    - {field: Vorname, value: "{subject.first_name}"}
+    - {field: Adresse Straße, value: "{subject.street}"}
+    - {field: "Hausnummer, Stiege, Tür", value: "{subject.house}"}
+    - {field: PLZ, value: "{subject.postal_code}"}
+    - {field: Ort, value: "{subject.city}"}
+    - {field: Telefon, value: "{subject.phone}"}
+    - {field: Email, value: "{subject.email}"}
+    # Section 2: the person filling in the form for someone else. Whether they are a representative stays open.
+    - {field: Familienname andere, value: "{user.last_name}", when: {subject: {not: [self]}}}
+    - {field: Vorname andere Person, value: "{user.first_name}", when: {subject: {not: [self]}}}
+    - {field: Adresse Straße 1, value: "{user.street}", when: {subject: {not: [self]}}}
+    - {field: "Hausnummer, Stiege, Tür2", value: "{user.house}", when: {subject: {not: [self]}}}
+    - {field: PLZ 1, value: "{user.postal_code}", when: {subject: {not: [self]}}}
+    - {field: Ort 1, value: "{user.city}", when: {subject: {not: [self]}}}
+    - {field: Telefon 1, value: "{user.phone}", when: {subject: {not: [self]}}}
+    - {field: Email2, value: "{user.email}", when: {subject: {not: [self]}}}
   submit_to: pva_vienna
   source_url: https://www.pv.at/web/pflegegeld
   verified_at: 2026-11-05
@@ -13,7 +34,19 @@
   title: Antrag auf Förderung von Leistungen (FSW)
   url: https://www.fsw.at/downloads/foerderwesen_anerkennung/foerderansuchen/subjektfoerderung/fsw-antrag-auf-foerderung-von-leistungen.pdf
   online_url: https://mein.fsw.at
-  svbox_file: Anträge und Formulare/fsw-antrag-auf-foerderung-von-leistungen.1779095804.pdf
+  file: fsw-antrag-auf-foerderung-von-leistungen.1779095804.pdf
+  fields:
+    # The service this form is used for in services.yaml (home_care_fsw).
+    - {field: Leistungen Pflege und Betreuung, value: /Ja}
+    - {field: Pflege und Betreuung zu Hause, value: /Ja}
+    - {field: Familienname Titel KundIn, value: "{subject.last_name}"}
+    - {field: Vorname KundIn, value: "{subject.first_name}"}
+    - {field: Telefonnummer KundIn, value: "{subject.phone}"}
+    - {field: E-Mail Adresse KundIn, value: "{subject.email}"}
+    - {field: Strassennamen Lebensmittelpunkt, value: "{subject.street}"}
+    - {field: Hausnr Lebensmittelpunkt, value: "{subject.house}"}
+    - {field: PLZ Lebensmittelpunkt, value: "{subject.postal_code}"}
+    - {field: Ort Lebensmittelpunkt, value: "{subject.city}"}
   submit_to: fsw_customer_service
   source_url: https://www.fsw.at/antrag
   verified_at: 2026-11-05
@@ -21,7 +54,14 @@
 - id: rehab_form
   title: Antrag auf Rehabilitations-, Kur- bzw. Erholungsaufenthalt
   url: https://www.sozialversicherung.at/cdscontent/load?contentid=10008.555945&version=1767088043
-  svbox_file: Anträge und Formulare/Antrag Kur und Reha.pdf
+  file: Antrag Kur und Reha.pdf
+  fields:
+    # The patient's rows only: who the insured person is and page 2 (the doctor's part) stay open.
+    - {field: Patient(in), value: "{subject.last_name} {subject.first_name}"}
+    - {field: VSNR_1, value: "{subject.svnr}"}
+    - {field: Anschrift Patient(in), value: "{subject.address}"}
+    - {field: Familienname, value: "{subject.last_name}"}
+    - {field: Vorname, value: "{subject.first_name}"}
   submit_to: pva_vienna
   source_url: https://www.pv.at/web/reha-und-praevention/vom-antrag-zu-reha-und-kur
   verified_at: 2026-11-05
@@ -29,7 +69,11 @@
 - id: transport_cost_form
   title: Antrag auf Zuschuss zu Fahrtkosten (ÖGK Wien)
   url: https://www.oegk.at/cdscontent/load?contentid=10008.777900&version=1785415038
-  svbox_file: Anträge und Formulare/Antrag-auf-Zuschuss-zu-Fahrtkosten_Wien.pdf
+  file: Antrag-auf-Zuschuss-zu-Fahrtkosten_Wien.pdf
+  fields:
+    - {field: Patient/in, value: "{subject.name}"}
+    - {field: Versicherungsnummer1, value: "{subject.svnr}"}
+    - {field: Adresse, value: "{subject.address}"}
   submit_to: oegk_vienna_customer_service
   source_url: https://www.oegk.at/cdscontent/load?contentid=10008.777900&version=1785415038
   verified_at: 2026-11-05

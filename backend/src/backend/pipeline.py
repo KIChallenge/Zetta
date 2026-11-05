@@ -9,7 +9,7 @@ from fastapi.sse import ServerSentEvent
 from sqlalchemy import literal_column, select
 from sqlalchemy.orm import Session
 
-from backend import scripts
+from backend import forms, scripts
 from backend.corpus import Corpus, Institution, get_corpus
 from backend.engine import DONE, ENTRY_FACT, evaluate, statuses, visible
 from backend.facts import FACTS, SENTINELS, VIENNA_POSTAL_CODE, merge, subject_words, value_label
@@ -195,6 +195,9 @@ def render_plan(plan: Plan, states: dict[str, StepState], profile: ProfileData, 
         view["outcomes"] = [{"id": k, "label": label} for k, (label, _) in labels.items()]
         if len(labels) == 1 and step.get("done_label"):
             view["outcomes"][0]["label"] = step["done_label"]
+        if (form := get_corpus().forms.get(step.get("form", {}).get("id"))) and form.file and form.fields:
+            # The PDF itself is filled in on download (GET /chats/{id}/steps/{step_id}/form).
+            view["form"] = {**step["form"], "prefill": forms.summary(form, profile, facts)}
         if "contact" in step:
             view["contact"] = contact_view(step["contact"], now)
         if "doctors" in step:

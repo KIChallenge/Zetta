@@ -121,7 +121,7 @@ def _step(service: Service, template: StepTemplate, institution_id: str | None, 
         step["documents"] = [corpus.documents[d].model_dump(mode="json") for d in service.documents]
     if template.form:
         form = corpus.forms[template.form]
-        step["form"] = {"title": form.title, "url": form.url, "online_url": form.online_url}
+        step["form"] = {"id": form.id, "title": form.title, "url": form.url, "online_url": form.online_url}
     if template.contact_label:
         # Someone the user knows, like their own doctor: a script, but never a number from the system.
         step["institution"] = {"id": None, "name": template.contact_label, "address": None}
