@@ -1,55 +1,61 @@
 <script setup lang="ts">
-import { nextTick, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref } from 'vue'
 import { ApiError, GENERIC, UNREACHABLE, type User } from '../auth'
+import { fmtDate, fmtPhone, fmtSvnr, joinSvnr, realDate, splitSvnr, svnrDigits, svnrOk, VIENNA } from '../fields'
 import { k, t } from '../i18n'
 import { view } from '../view'
-import {
-  changePassword, deleteAccount, fmtSvnr, getProfile, LANGS, LENGTHS, saveProfile, svnrDigits, svnrOk, type Profile,
-} from '../profile'
+import { changePassword, deleteAccount, getProfile, LANGS, LENGTHS, saveProfile, type Profile } from '../profile'
 
-type Field = 'full_name' | 'street' | 'postal_code' | 'city' | 'svnr' | 'phone' | 'contact_email'
-type Section = 'person' | 'answers' | 'password'
+type Field = 'full_name' | 'street' | 'postal_code' | 'city' | 'phone' | 'contact_email'
+type Key = Field | 'svnr'
 
 const props = defineProps<{ user: User }>()
 const emit = defineEmits<{ expired: []; saved: [profile: Profile]; deleted: [] }>()
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/ // as in AuthCard
-const FIELDS: { f: Field; label: string; hint: string; max: number; auto: string; type?: string; mode?: 'numeric'; w?: string }[] = [
-  { f: 'full_name', label: k('Vor- und Nachname'), hint: k('So, wie er auf Ihrer e-card steht.'), max: 100, auto: 'name' },
-  { f: 'street', label: k('Straße und Hausnummer'), hint: k('Zum Beispiel: Favoritenstraße 12/3'), max: 100, auto: 'street-address' },
-  { f: 'postal_code', label: k('PLZ'), hint: k('4 Ziffern'), max: 4, auto: 'postal-code', mode: 'numeric', w: 'plz' },
-  { f: 'city', label: k('Ort'), hint: k('Zum Beispiel: Wien'), max: 60, auto: 'address-level2', w: 'ort' },
-  { f: 'svnr', label: k('Sozialversicherungsnummer'), hint: k('10 Ziffern, steht auf Ihrer e-card. Zum Beispiel: 1237 010180'), max: 20, auto: 'off', mode: 'numeric' },
-  { f: 'phone', label: k('Telefonnummer'), hint: k('Für Rückrufe. Zum Beispiel: +43 660 1234567'), max: 30, auto: 'tel', type: 'tel' },
-  { f: 'contact_email', label: k('E-Mail-Adresse für Antworten'), hint: k('Hierher können Ämter und Versicherungen antworten.'), max: 254, auto: 'email', type: 'email' },
+const KEYS = ['full_name', 'street', 'postal_code', 'city', 'phone', 'contact_email'] as const
+const CONTACT: { f: Field; label: string; max: number; auto: string; type?: string; mode?: 'numeric'; w?: string }[] = [
+  { f: 'street', label: k('Straße und Hausnummer'), max: 100, auto: 'street-address' },
+  { f: 'postal_code', label: k('PLZ'), max: 4, auto: 'postal-code', mode: 'numeric', w: 'plz' },
+  { f: 'city', label: k('Ort'), max: 60, auto: 'address-level2', w: 'ort' },
+  { f: 'phone', label: k('Telefonnummer'), max: 30, auto: 'tel', type: 'tel' },
+  { f: 'contact_email', label: k('E-Mail-Adresse für Antworten'), max: 254, auto: 'email', type: 'email' },
 ]
-// Mirrors the backend's validation (schemas.py); every field may stay empty.
+// Mirrors the backend's validation (schemas.py); every field may stay empty. Fields with a rule get a ✓ once it passes.
 const RULES: Partial<Record<Field, (v: string) => string>> = {
   postal_code: (v) => (!v || /^\d{4}$/.test(v) ? '' : t('Die Postleitzahl hat 4 Ziffern, zum Beispiel 1100.')),
-  svnr: (v) =>
-    !v || svnrOk(v) ? ''
-    : /^\d{10}$/.test(svnrDigits(v)) ? t('Diese Nummer gibt es nicht. Bitte vergleichen Sie die Ziffern mit Ihrer e-card.')
-    : t('Die Nummer hat 10 Ziffern, zum Beispiel 1237 010180.'),
-  phone: (v) => (/^[\d +()-]*$/.test(v) ? '' : t('Bitte nur Ziffern, Leerzeichen und + ( ) - verwenden.')),
   contact_email: (v) => (!v || EMAIL.test(v) ? '' : t('Bitte prüfen Sie die E-Mail-Adresse. Sie sieht so aus: name@beispiel.at')),
 }
+const NO_SVNR = k('Diese Nummer gibt es nicht. Bitte vergleichen Sie die Ziffern mit Ihrer e-card.')
 const TEXT = [['m', k('Normal')], ['l', k('Groß')], ['xl', k('Sehr groß')]] as const
 const THEME = [['auto', k('Wie mein Gerät')], ['light', k('Hell')], ['dark', k('Dunkel')]] as const
 const CONTRAST = [['normal', k('Standard')], ['high', k('Stark')]] as const
 
 const saved = ref<Profile | null>(null)
 const loadErr = ref('')
-const person = reactive<Record<Field, string>>({ full_name: '', street: '', postal_code: '', city: '', svnr: '', phone: '', contact_email: '' })
-const errors = reactive<Record<Field, string>>({ full_name: '', street: '', postal_code: '', city: '', svnr: '', phone: '', contact_email: '' })
+const saveErr = ref('')
+const person = reactive<Record<Field, string>>({ full_name: '', street: '', postal_code: '', city: '', phone: '', contact_email: '' })
+// The SVNR is entered as on the e-card: 4 digits, then the birth date; "Nummer weicht ab?" switches to the whole number.
+const sv = reactive({ birth: '', serial: '', whole: '', own: false })
+const errors = reactive<Record<Key, string>>({ full_name: '', street: '', postal_code: '', city: '', svnr: '', phone: '', contact_email: '' })
 const answers = reactive<Pick<Profile, 'answer_language' | 'answer_length'>>({ answer_language: 'de', answer_length: 'short' })
-const msg = reactive<Record<Section, { ok: boolean; text: string } | null>>({ person: null, answers: null, password: null })
-const busy = reactive<Record<Section | 'delete', boolean>>({ person: false, answers: false, password: false, delete: false })
+const busy = reactive({ data: false, password: false, delete: false })
 const pw = reactive({ current: '', next: '' })
 const pwErr = reactive({ current: '', next: '' })
+const pwMsg = ref<{ ok: boolean; text: string } | null>(null)
 const showPw = ref(false)
+const svBox = ref<HTMLFieldSetElement>()
 const delDlg = ref<HTMLDialogElement>()
 const delPw = ref('')
 const delErr = ref('')
+
+const svnr = computed(() => (sv.own ? svnrDigits(sv.whole) : joinSvnr(sv.serial, sv.birth)))
+const draft = computed<Profile>(() => ({
+  ...(Object.fromEntries(KEYS.map((f) => [f, person[f].trim()])) as Record<Field, string>),
+  svnr: svnr.value,
+  ...answers,
+}))
+const dirty = computed(() => !!saved.value && (Object.keys(draft.value) as (keyof Profile)[]).some((f) => draft.value[f] !== saved.value![f]))
 
 const focus = (id: string) => nextTick(() => document.getElementById(id)?.focus())
 
@@ -62,8 +68,10 @@ function fail(e: unknown, byStatus: Record<number, string> = {}) {
 
 function fill(p: Profile) {
   saved.value = p
-  for (const { f } of FIELDS) person[f] = f === 'svnr' ? fmtSvnr(p.svnr) : p[f]
+  for (const f of KEYS) person[f] = p[f]
   person.contact_email ||= props.user.email
+  const parts = splitSvnr(p.svnr)
+  Object.assign(sv, { serial: parts?.serial ?? '', birth: parts?.birth ?? '', whole: fmtSvnr(p.svnr), own: !!p.svnr && !parts })
   answers.answer_language = p.answer_language
   answers.answer_length = p.answer_length
 }
@@ -78,40 +86,86 @@ async function load() {
 }
 load()
 
-const check = (f: Field) => !(errors[f] = RULES[f]?.(person[f].trim()) ?? '')
+function rule(f: Key) {
+  if (f !== 'svnr') return RULES[f]?.(person[f].trim()) ?? ''
+  const d = svnr.value
+  if (sv.own) return !d || svnrOk(d) ? '' : d.length === 10 ? t(NO_SVNR) : t('Die Nummer hat 10 Ziffern, zum Beispiel 1237 010180.')
+  if (!sv.serial && !sv.birth) return ''
+  if (sv.birth.length === 10 && !realDate(sv.birth)) return t('Bitte prüfen Sie das Geburtsdatum.')
+  return !d ? t('Bitte geben Sie das Geburtsdatum und alle 4 Ziffern ein.') : svnrOk(d) ? '' : t(NO_SVNR)
+}
+const check = (f: Key) => !(errors[f] = rule(f))
 // Live re-check only once a field has been flagged, as in AuthCard.
-const recheck = (f: Field) => errors[f] && check(f)
+const recheck = (f: Key) => errors[f] && check(f)
+const ok = (f: Field) => !!RULES[f] && !!person[f].trim() && !RULES[f]!(person[f].trim())
 
-async function save(section: 'person' | 'answers', changes: Partial<Profile>, ok: string) {
-  if (busy[section]) return
-  busy[section] = true
-  msg[section] = null
-  try {
-    // Only this section's changes: unsaved edits in the other section stay unsaved.
-    const p = await saveProfile({ ...saved.value!, ...changes })
-    saved.value = p
-    emit('saved', p)
-    msg[section] = { ok: true, text: ok }
-  } catch (e) {
-    msg[section] = { ok: false, text: fail(e, { 422: k('Bitte prüfen Sie Ihre Angaben.') }) }
+function onInput(f: Field) {
+  if (f === 'postal_code') {
+    person.postal_code = person.postal_code.replace(/\D/g, '')
+    if (VIENNA.test(person.postal_code) && !person.city.trim()) person.city = 'Wien'
   }
-  busy[section] = false
+  if (f === 'phone') person.phone = fmtPhone(person.phone)
+  recheck(f)
 }
 
-function savePerson() {
-  const bad = FIELDS.filter(({ f }) => !check(f))
-  if (bad.length) return focus(`p-${bad[0]!.f}`)
-  const changes = Object.fromEntries(FIELDS.map(({ f }) => [f, person[f].trim()])) as Record<Field, string>
-  changes.svnr = svnrDigits(changes.svnr)
-  person.svnr = fmtSvnr(changes.svnr)
-  save('person', changes, k('Gespeichert. Der Lotse nutzt die Daten ab Ihrer nächsten Nachricht.'))
+function onBirth() {
+  sv.birth = fmtDate(sv.birth)
+  recheck('svnr')
 }
 
-const saveAnswers = () => save('answers', { ...answers }, k('Gespeichert. Das gilt ab Ihrer nächsten Nachricht.'))
+function onSerial() {
+  const d = sv.serial.replace(/\D/g, '')
+  if (d.length < 10) {
+    sv.serial = d.slice(0, 4)
+    // 4 digits typed: on to the date, as on the e-card, but only while it is empty.
+    if (sv.serial.length === 4 && !sv.birth) focus('p-birth')
+  } else {
+    // A pasted whole number: split it, or keep it whole if its date part is no birth date.
+    const parts = splitSvnr(d.slice(0, 10))
+    if (parts) Object.assign(sv, parts)
+    else {
+      Object.assign(sv, { own: true, whole: fmtSvnr(d.slice(0, 10)) })
+      focus('p-svnr')
+    }
+  }
+  recheck('svnr')
+}
+
+function toggleOwn() {
+  const parts = splitSvnr(svnrDigits(sv.whole))
+  if (!sv.own) sv.whole = fmtSvnr(joinSvnr(sv.serial, sv.birth) || sv.serial)
+  else if (parts) Object.assign(sv, parts)
+  sv.own = !sv.own
+  errors.svnr = ''
+  focus(sv.own ? 'p-svnr' : 'p-serial')
+}
+
+// Check the SVNR once focus leaves its group, not when moving from the date to the digits.
+const leaveSvnr = (e: FocusEvent) => svBox.value?.contains(e.relatedTarget as Node) || check('svnr')
+// The boxes hide the real input, so typing always goes to the end. Deferred: browsers select all after a Tab focus.
+function caretToEnd(e: Event) {
+  const el = e.target as HTMLInputElement
+  setTimeout(() => el.setSelectionRange(99, 99))
+}
+
+async function save() {
+  if (busy.data || !dirty.value) return
+  const bad = (['full_name', 'svnr', ...KEYS] as Key[]).filter((f) => !check(f))
+  if (bad.length) return focus(bad[0] === 'svnr' ? (sv.own ? 'p-svnr' : 'p-serial') : `p-${bad[0]}`)
+  busy.data = true
+  saveErr.value = ''
+  try {
+    saved.value = await saveProfile(draft.value)
+    emit('saved', saved.value)
+  } catch (e) {
+    saveErr.value = fail(e, { 422: k('Bitte prüfen Sie Ihre Angaben.') })
+  }
+  busy.data = false
+}
 
 async function savePassword() {
   if (busy.password) return
-  msg.password = null
+  pwMsg.value = null
   pwErr.current = pw.current ? '' : t('Bitte geben Sie Ihr aktuelles Passwort ein.')
   pwErr.next = pw.next.length >= 10 ? '' : t('Das neue Passwort braucht mindestens 10 Zeichen.')
   if (pwErr.current || pwErr.next) return focus(pwErr.current ? 'pw-current' : 'pw-next')
@@ -119,12 +173,12 @@ async function savePassword() {
   try {
     await changePassword(pw.current, pw.next)
     pw.current = pw.next = ''
-    msg.password = { ok: true, text: k('Ihr Passwort ist geändert.') }
+    pwMsg.value = { ok: true, text: k('Ihr Passwort ist geändert.') }
   } catch (e) {
     if (e instanceof ApiError && e.status === 403) {
       pwErr.current = t('Das aktuelle Passwort stimmt nicht.')
       focus('pw-current')
-    } else msg.password = { ok: false, text: fail(e) }
+    } else pwMsg.value = { ok: false, text: fail(e) }
   }
   busy.password = false
 }
@@ -153,156 +207,225 @@ async function confirmDelete() {
 
 <template>
   <section class="settings" aria-labelledby="view-h">
-    <h1 id="view-h" tabindex="-1">{{ t('Einstellungen') }}</h1>
+    <header class="head">
+      <h1 id="view-h" tabindex="-1">{{ t('Einstellungen') }}</h1>
+      <p class="intro">{{ t('Der Lotse setzt Ihre Angaben in Anrufe und E-Mails ein. Alles ist freiwillig.') }}</p>
+    </header>
 
-    <form class="card" aria-labelledby="h-person" novalidate @submit.prevent="savePerson" @input="msg.person = null">
-      <h2 id="h-person">{{ t('Persönliche Daten') }}</h2>
-      <p class="intro">
-        {{ t('Diese Daten bekommt der Lotse in jedem Gespräch, damit er Anrufe und E-Mails für Sie vorbereiten kann. Alle Angaben sind freiwillig.') }}
-      </p>
-      <p v-if="loadErr" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ loadErr }}</span></p>
-      <button v-if="loadErr" type="button" class="btn btn-secondary" @click="load">{{ t('Nochmal laden') }}</button>
-      <p v-else-if="!saved" class="muted">{{ t('Ihre Daten werden geladen …') }}</p>
-      <template v-else>
+    <p v-if="loadErr" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ loadErr }}</span></p>
+    <button v-if="loadErr" type="button" class="btn btn-secondary again" @click="load">{{ t('Nochmal laden') }}</button>
+    <p v-else-if="!saved" class="muted">{{ t('Ihre Daten werden geladen …') }}</p>
+
+    <form v-else class="grid" novalidate @submit.prevent="save" @input="saveErr = ''">
+      <section class="card" aria-labelledby="h-person">
+        <h2 id="h-person">{{ t('Person') }}</h2>
+        <div class="field">
+          <label class="field-l" for="p-full_name">{{ t('Vor- und Nachname') }}</label>
+          <input id="p-full_name" v-model="person.full_name" class="input" maxlength="100" autocomplete="name" />
+        </div>
+        <fieldset ref="svBox" class="svnr" @focusout="leaveSvnr">
+          <legend class="field-l">{{ t('Sozialversicherungsnummer') }}</legend>
+          <div v-if="!sv.own" class="sv-row">
+            <div class="field">
+              <label class="sub-l" for="p-serial">{{ t('Erste 4 Ziffern') }}</label>
+              <div class="code">
+                <span v-for="i in 4" :key="i" class="cell" :class="{ at: i === Math.min(sv.serial.length + 1, 4) }" aria-hidden="true">{{ sv.serial[i - 1] }}</span>
+                <input
+                  id="p-serial"
+                  v-model="sv.serial"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  :aria-invalid="!!errors.svnr"
+                  aria-describedby="sv-out"
+                  @input="onSerial"
+                  @focus="caretToEnd"
+                  @click="caretToEnd"
+                />
+              </div>
+            </div>
+            <div class="field">
+              <label class="sub-l" for="p-birth">{{ t('Geburtsdatum') }}</label>
+              <input
+                id="p-birth"
+                v-model="sv.birth"
+                class="input date"
+                inputmode="numeric"
+                maxlength="10"
+                :placeholder="t('TT.MM.JJJJ')"
+                autocomplete="bday"
+                :aria-invalid="!!errors.svnr"
+                aria-describedby="sv-out"
+                @input="onBirth"
+              />
+            </div>
+          </div>
+          <input
+            v-else
+            id="p-svnr"
+            v-model="sv.whole"
+            class="input whole"
+            inputmode="numeric"
+            maxlength="11"
+            autocomplete="off"
+            :aria-label="t('Sozialversicherungsnummer')"
+            :aria-invalid="!!errors.svnr"
+            aria-describedby="sv-out"
+            @input="sv.whole = fmtSvnr(sv.whole.replace(/\D/g, '').slice(0, 10)); recheck('svnr')"
+          />
+          <div class="sv-foot">
+            <div id="sv-out" role="status">
+              <p v-if="errors.svnr" class="err"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ errors.svnr }}</span></p>
+              <p v-else-if="svnrOk(svnr)" class="good"><svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ fmtSvnr(svnr) }}</p>
+            </div>
+            <button type="button" class="linkbtn" @click="toggleOwn">{{ sv.own ? t('Mit Geburtsdatum eingeben') : t('Nummer weicht ab?') }}</button>
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="card" aria-labelledby="h-contact">
+        <h2 id="h-contact">{{ t('Kontakt') }}</h2>
         <div class="fields">
-          <div v-for="x in FIELDS" :key="x.f" class="field" :class="x.w">
+          <div v-for="x in CONTACT" :key="x.f" class="field" :class="x.w">
             <label class="field-l" :for="`p-${x.f}`">{{ t(x.label) }}</label>
-            <p :id="`p-${x.f}-hint`" class="hint">{{ t(x.hint) }}</p>
-            <input
-              :id="`p-${x.f}`"
-              v-model="person[x.f]"
-              class="input"
-              :type="x.type ?? 'text'"
-              :inputmode="x.mode"
-              :maxlength="x.max"
-              :autocomplete="x.auto"
-              :aria-invalid="!!errors[x.f]"
-              :aria-describedby="`p-${x.f}-hint p-${x.f}-err`"
-              @input="recheck(x.f)"
-              @blur="person[x.f].trim() && check(x.f)"
-            />
+            <div class="in">
+              <input
+                :id="`p-${x.f}`"
+                v-model="person[x.f]"
+                class="input"
+                :type="x.type ?? 'text'"
+                :inputmode="x.mode"
+                :maxlength="x.max"
+                :autocomplete="x.auto"
+                :aria-invalid="!!errors[x.f]"
+                :aria-describedby="`p-${x.f}-err`"
+                @input="onInput(x.f)"
+                @blur="person[x.f].trim() && check(x.f)"
+              />
+              <svg v-if="ok(x.f)" class="i good" aria-hidden="true"><use href="#i-check" /></svg>
+            </div>
             <p v-if="errors[x.f]" :id="`p-${x.f}-err`" class="err">
               <svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ errors[x.f] }}</span>
             </p>
           </div>
         </div>
-        <div class="foot">
-          <button type="submit" class="btn btn-primary" :aria-disabled="busy.person">{{ busy.person ? t('Einen Moment …') : t('Daten speichern') }}</button>
-          <p class="msg" :class="{ ok: msg.person?.ok }" role="status">
-            <template v-if="msg.person"><svg class="i" aria-hidden="true"><use :href="msg.person.ok ? '#i-check' : '#i-alert'" /></svg><span>{{ t(msg.person.text) }}</span></template>
-          </p>
-        </div>
-      </template>
-    </form>
+      </section>
 
-    <form v-if="saved" class="card" aria-labelledby="h-answers" @submit.prevent="saveAnswers" @change="msg.answers = null">
-      <h2 id="h-answers">{{ t('So antwortet der Lotse') }}</h2>
-      <div class="field">
-        <label class="field-l" for="a-lang">{{ t('Sprache') }}</label>
-        <select id="a-lang" v-model="answers.answer_language">
-          <option v-for="(name, code) in LANGS" :key="code" :value="code">{{ name }}</option>
-        </select>
-      </div>
-      <fieldset>
-        <legend>{{ t('Länge der Antworten') }}</legend>
-        <div class="seg">
-          <label v-for="(label, v) in LENGTHS" :key="v" class="opt">
-            <input v-model="answers.answer_length" type="radio" name="answer_length" :value="v" /><span>{{ t(label) }}</span>
-          </label>
+      <section class="card wide" aria-labelledby="h-answers">
+        <h2 id="h-answers">{{ t('So antwortet der Lotse') }}</h2>
+        <div class="row">
+          <div class="field">
+            <label class="field-l" for="a-lang">{{ t('Sprache') }}</label>
+            <select id="a-lang" v-model="answers.answer_language">
+              <option v-for="(name, code) in LANGS" :key="code" :value="code">{{ name }}</option>
+            </select>
+          </div>
+          <fieldset>
+            <legend class="field-l">{{ t('Länge der Antworten') }}</legend>
+            <div class="seg">
+              <label v-for="(label, v) in LENGTHS" :key="v" class="opt">
+                <input v-model="answers.answer_length" type="radio" name="answer_length" :value="v" /><span>{{ t(label) }}</span>
+              </label>
+            </div>
+          </fieldset>
         </div>
-      </fieldset>
-      <div class="foot">
-        <button type="submit" class="btn btn-primary" :aria-disabled="busy.answers">{{ busy.answers ? t('Einen Moment …') : t('Speichern') }}</button>
-        <p class="msg" :class="{ ok: msg.answers?.ok }" role="status">
-          <template v-if="msg.answers"><svg class="i" aria-hidden="true"><use :href="msg.answers.ok ? '#i-check' : '#i-alert'" /></svg><span>{{ t(msg.answers.text) }}</span></template>
-        </p>
+      </section>
+
+      <div class="savebar" :class="{ stick: dirty }">
+        <div role="status">
+          <p v-if="saveErr" class="err"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ saveErr }}</span></p>
+          <p v-else-if="dirty" class="pill" data-tone="turn">{{ t('Nicht gespeichert') }}</p>
+          <p v-else class="muted done"><svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ t('Alles gespeichert') }}</p>
+        </div>
+        <button type="submit" class="btn btn-primary" :disabled="!dirty" :aria-disabled="busy.data">{{ busy.data ? t('Einen Moment …') : t('Speichern') }}</button>
       </div>
     </form>
 
     <section class="card" aria-labelledby="h-view">
-      <h2 id="h-view">{{ t('Ansicht') }}</h2>
-      <p class="intro">{{ t('Änderungen gelten sofort und werden auf diesem Gerät gespeichert.') }}</p>
-      <fieldset>
-        <legend>{{ t('Schriftgröße') }}</legend>
-        <div class="seg">
-          <label v-for="[v, label] in TEXT" :key="v" class="opt">
-            <input v-model="view.text" type="radio" name="text" :value="v" /><span :class="`t-${v}`">{{ t(label) }}</span>
-          </label>
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend>{{ t('Farben') }}</legend>
-        <div class="seg">
-          <label v-for="[v, label] in THEME" :key="v" class="opt">
-            <input v-model="view.theme" type="radio" name="theme" :value="v" /><span>{{ t(label) }}</span>
-          </label>
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend>{{ t('Kontrast') }}</legend>
-        <div class="seg">
-          <label v-for="[v, label] in CONTRAST" :key="v" class="opt">
-            <input v-model="view.contrast" type="radio" name="contrast" :value="v" /><span>{{ t(label) }}</span>
-          </label>
-        </div>
-      </fieldset>
-      <label class="toggle">
-        <input v-model="view.motion" type="checkbox" /><span><b>{{ t('Weniger Bewegung') }}</b><small>{{ t('Schaltet Animationen aus.') }}</small></span>
-      </label>
+      <div class="card-h">
+        <h2 id="h-view">{{ t('Ansicht') }}</h2>
+        <p class="hint">{{ t('Gilt sofort auf diesem Gerät.') }}</p>
+      </div>
+      <div class="row view">
+        <fieldset>
+          <legend class="field-l">{{ t('Schriftgröße') }}</legend>
+          <div class="seg">
+            <label v-for="[v, label] in TEXT" :key="v" class="opt">
+              <input v-model="view.text" type="radio" name="text" :value="v" /><span :class="`t-${v}`">{{ t(label) }}</span>
+            </label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend class="field-l">{{ t('Kontrast') }}</legend>
+          <div class="seg">
+            <label v-for="[v, label] in CONTRAST" :key="v" class="opt">
+              <input v-model="view.contrast" type="radio" name="contrast" :value="v" /><span>{{ t(label) }}</span>
+            </label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend class="field-l">{{ t('Farben') }}</legend>
+          <div class="seg">
+            <label v-for="[v, label] in THEME" :key="v" class="opt">
+              <input v-model="view.theme" type="radio" name="theme" :value="v" /><span>{{ t(label) }}</span>
+            </label>
+          </div>
+        </fieldset>
+        <label class="toggle"><input v-model="view.motion" type="checkbox" /><b>{{ t('Weniger Bewegung') }}</b></label>
+      </div>
     </section>
 
-    <form class="card" aria-labelledby="h-pw" novalidate @submit.prevent="savePassword" @input="msg.password = null">
-      <h2 id="h-pw">{{ t('Passwort ändern') }}</h2>
-      <!-- For password managers: which account this password belongs to. -->
-      <input type="email" autocomplete="username" :value="user.email" hidden readonly />
-      <div class="field">
-        <label class="field-l" for="pw-current">{{ t('Aktuelles Passwort') }}</label>
-        <input
-          id="pw-current"
-          v-model="pw.current"
-          class="input"
-          :type="showPw ? 'text' : 'password'"
-          maxlength="128"
-          autocomplete="current-password"
-          :aria-invalid="!!pwErr.current"
-          aria-describedby="pw-current-err"
-          @input="pwErr.current = ''"
-        />
-        <p v-if="pwErr.current" id="pw-current-err" class="err"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ pwErr.current }}</span></p>
-      </div>
-      <div class="field">
-        <label class="field-l" for="pw-next">{{ t('Neues Passwort') }}</label>
-        <input
-          id="pw-next"
-          v-model="pw.next"
-          class="input"
-          :type="showPw ? 'text' : 'password'"
-          maxlength="128"
-          autocomplete="new-password"
-          :aria-invalid="!!pwErr.next"
-          aria-describedby="pw-rule pw-next-err"
-          @input="pwErr.next && pw.next.length >= 10 && (pwErr.next = '')"
-        />
-        <p id="pw-rule" class="hint pw-rule" :class="{ ok: pw.next.length >= 10 }">
-          <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ t('Mindestens 10 Zeichen') }}
-        </p>
-        <p v-if="pwErr.next" id="pw-next-err" class="err"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ pwErr.next }}</span></p>
-      </div>
-      <button type="button" class="btn btn-quiet show-pw" aria-controls="pw-current pw-next" :aria-pressed="showPw" @click="showPw = !showPw">
-        <svg class="i" aria-hidden="true"><use href="#i-eye" /></svg>{{ t('Passwörter anzeigen') }}
-      </button>
-      <div class="foot">
-        <button type="submit" class="btn btn-primary" :aria-disabled="busy.password">{{ busy.password ? t('Einen Moment …') : t('Passwort ändern') }}</button>
-        <p class="msg" :class="{ ok: msg.password?.ok }" role="status">
-          <template v-if="msg.password"><svg class="i" aria-hidden="true"><use :href="msg.password.ok ? '#i-check' : '#i-alert'" /></svg><span>{{ t(msg.password.text) }}</span></template>
-        </p>
-      </div>
-    </form>
-
-    <section class="card danger-zone" aria-labelledby="h-del">
-      <h2 id="h-del">{{ t('Konto löschen') }}</h2>
-      <p>{{ t('Ihr Konto, Ihre persönlichen Daten und alle Gespräche werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.') }}</p>
-      <button type="button" class="btn btn-secondary danger-btn" @click="openDelete">
+    <section class="card sec" aria-labelledby="h-sec">
+      <h2 id="h-sec">{{ t('Sicherheit') }}</h2>
+      <details class="more">
+        <summary>{{ t('Passwort ändern') }}</summary>
+        <form class="pw" novalidate @submit.prevent="savePassword" @input="pwMsg = null">
+          <!-- For password managers: which account this password belongs to. -->
+          <input type="email" autocomplete="username" :value="user.email" hidden readonly />
+          <div class="field">
+            <label class="field-l" for="pw-current">{{ t('Aktuelles Passwort') }}</label>
+            <input
+              id="pw-current"
+              v-model="pw.current"
+              class="input"
+              :type="showPw ? 'text' : 'password'"
+              maxlength="128"
+              autocomplete="current-password"
+              :aria-invalid="!!pwErr.current"
+              aria-describedby="pw-current-err"
+              @input="pwErr.current = ''"
+            />
+            <p v-if="pwErr.current" id="pw-current-err" class="err"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ pwErr.current }}</span></p>
+          </div>
+          <div class="field">
+            <label class="field-l" for="pw-next">{{ t('Neues Passwort') }}</label>
+            <input
+              id="pw-next"
+              v-model="pw.next"
+              class="input"
+              :type="showPw ? 'text' : 'password'"
+              maxlength="128"
+              autocomplete="new-password"
+              :aria-invalid="!!pwErr.next"
+              aria-describedby="pw-rule pw-next-err"
+              @input="pwErr.next && pw.next.length >= 10 && (pwErr.next = '')"
+            />
+            <p id="pw-rule" class="hint pw-rule" :class="{ ok: pw.next.length >= 10 }">
+              <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ t('Mindestens 10 Zeichen') }}
+            </p>
+            <p v-if="pwErr.next" id="pw-next-err" class="err"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ pwErr.next }}</span></p>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn-primary" :aria-disabled="busy.password">{{ busy.password ? t('Einen Moment …') : t('Passwort ändern') }}</button>
+            <button type="button" class="btn btn-quiet" aria-controls="pw-current pw-next" :aria-pressed="showPw" @click="showPw = !showPw">
+              <svg class="i" aria-hidden="true"><use href="#i-eye" /></svg>{{ t('Passwörter anzeigen') }}
+            </button>
+          </div>
+          <p class="msg" :class="{ ok: pwMsg?.ok }" role="status">
+            <template v-if="pwMsg"><svg class="i" aria-hidden="true"><use :href="pwMsg.ok ? '#i-check' : '#i-alert'" /></svg><span>{{ t(pwMsg.text) }}</span></template>
+          </p>
+        </form>
+      </details>
+      <button type="button" class="btn btn-quiet danger del" @click="openDelete">
         <svg class="i" aria-hidden="true"><use href="#i-trash" /></svg>{{ t('Konto löschen …') }}
       </button>
     </section>
@@ -347,35 +470,78 @@ async function confirmDelete() {
 </template>
 
 <style scoped>
-/* Scrolls inside the main pane; the window itself never scrolls. */
+/* Scrolls inside the main pane; the window itself never scrolls. Two columns once there is room (in rem, so text size counts). */
 .settings {
-  --gut: max(clamp(.75rem, 4vw, 1.25rem), calc((100% - 42rem) / 2));
+  container: settings / inline-size;
+  --gut: max(clamp(.75rem, 4vw, 1.25rem), calc((100% - 62rem) / 2));
   min-width: 0; min-height: 0; overflow-y: auto;
-  display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.5rem;
-  padding: clamp(1.5rem, 5vh, 2.75rem) var(--gut) 3rem;
+  display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.25rem;
+  padding: clamp(1.25rem, 4vh, 2.25rem) var(--gut) 2rem;
 }
-.settings > h1 { font-size: clamp(var(--fs-h2), 5cqi, var(--fs-h1)); }
-.card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; padding: 1.35rem clamp(.9rem, 4vw, 1.5rem) 1.5rem; border: var(--hair); border-radius: var(--r-m); background: var(--sheet); }
-.card h2 { font-size: var(--fs-h3); font-weight: 600; color: var(--head); }
+.head { display: grid; gap: .3rem; }
+.head h1 { font-size: clamp(var(--fs-h2), 5cqi, var(--fs-h1)); }
 .intro { color: var(--ink-2); }
-.fields { display: flex; flex-wrap: wrap; gap: 1.1rem 1rem; }
+.again { justify-self: start; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
+@container settings (min-width: 46rem) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wide, .savebar { grid-column: 1 / -1; }
+  /* Sicherheit: password on the left, deleting apart on the right */
+  .card.sec { grid-template-columns: minmax(0, 1fr) auto; }
+  .sec h2 { grid-column: 1 / -1; }
+  .card.sec .del { align-self: start; margin: 0; }
+}
+.card { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1rem; padding: 1.2rem clamp(.9rem, 4vw, 1.4rem) 1.4rem; border: var(--hair); border-radius: var(--r-m); background: var(--sheet); }
+.card h2 { font-size: var(--fs-h3); font-weight: 600; color: var(--head); }
+.card-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .2rem 1rem; }
+.fields { display: flex; flex-wrap: wrap; gap: 1rem; }
 .fields .field { flex: 1 1 100%; min-width: 0; }
 .fields .plz { flex: 1 1 6rem; }
-.fields .ort { flex: 3 1 12rem; }
-.field .hint { margin-top: -.2rem; }
-.foot { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1rem; }
-.msg { display: flex; gap: .4em; align-items: flex-start; font-weight: 600; color: var(--danger); }
-.msg.ok { color: var(--ready-ink); }
-.msg .i { margin-top: .15em; }
+.fields .ort { flex: 3 1 10rem; }
+.row { display: flex; flex-wrap: wrap; align-items: start; gap: 1rem 1.75rem; }
+.row > .field { flex: 1 1 13rem; }
+.row > fieldset { flex: 2 1 17rem; }
+.row.view { align-items: end; }
+.row.view > * { flex: 0 1 auto; }
+
+/* Live ✓ inside the field */
+.in { position: relative; }
+.in .good { position: absolute; right: 1rem; top: 50%; translate: 0 -50%; pointer-events: none; }
+.in:has(.good) .input { padding-right: 2.75rem; }
+.good { display: flex; gap: .4em; align-items: center; color: var(--ready-ink); font-weight: 600; }
+
+/* SVNR: the 4 digits as code boxes, then the birth date. One real input sits on top of the boxes. */
+.svnr { display: grid; gap: .5rem; }
+.sv-row { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem 1rem; }
+.sub-l { font-size: var(--fs-small); color: var(--ink-2); }
+.input.date { width: 8rem; }
+.input.whole { max-width: 14rem; letter-spacing: .04em; }
+.code { position: relative; display: flex; gap: .35rem; width: fit-content; }
+.code input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; font: inherit; caret-color: transparent; cursor: text; }
+.cell { display: grid; place-items: center; width: 2.4rem; height: 3rem; border: 1px solid var(--rule-2); border-radius: var(--r-s); background: var(--sheet); font-size: var(--fs-lead); font-weight: 600; transition: border-color .15s; }
+.code:hover .cell { border-color: var(--action); }
+.code:has(input:focus) .cell.at { border-color: var(--action); outline: 3px solid var(--focus); outline-offset: 2px; }
+.code:has(input[aria-invalid="true"]) .cell { border-color: var(--danger); }
+[data-contrast="high"] .cell { border-width: 2px; }
+.sv-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .25rem 1rem; }
+.sv-foot .good { letter-spacing: .03em; }
+.sv-foot .linkbtn { font-size: var(--fs-small); min-height: 2rem; }
+
+/* One save for Person, Kontakt and Lotse; with unsaved changes it stays in view while the page scrolls. */
+.savebar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem 1rem; padding: .55rem clamp(.9rem, 4vw, 1.4rem); border: var(--hair); border-radius: var(--r-m); background: var(--sheet); }
+.savebar.stick { position: sticky; bottom: 0; z-index: 1; }
+.done { display: flex; gap: .4em; align-items: center; }
+.savebar .btn:disabled { background: var(--sunk); color: var(--ink-3); border-color: var(--rule); cursor: default; transform: none; }
+[data-contrast="high"] .savebar .btn:disabled { border-style: dashed; }
 
 select { width: 100%; max-width: 24rem; min-height: 3rem; padding: .4rem 1.1rem; font: inherit; color: var(--ink); background: var(--sheet); border: 1px solid var(--rule-2); border-radius: var(--r-pill); }
 select:hover { border-color: var(--action); }
 select:focus-visible { border-color: var(--action); outline-offset: 2px; }
 [data-contrast="high"] select { border-width: 2px; }
 fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
-legend { padding: 0; margin-bottom: .5rem; font-weight: 600; }
+legend { padding: 0; margin-bottom: .4rem; }
 .seg { display: flex; flex-wrap: wrap; gap: .5rem; }
-.opt { display: inline-flex; align-items: center; gap: .6rem; min-height: 2.9rem; padding: .45rem 1.2rem .45rem 1rem; border-radius: var(--r-pill); border: 1px solid var(--rule-2); cursor: pointer; font-weight: 600; transition: background-color .15s, border-color .15s; }
+.opt { display: inline-flex; align-items: center; gap: .6rem; min-height: 2.75rem; padding: .4rem 1.1rem .4rem .9rem; border-radius: var(--r-pill); border: 1px solid var(--rule-2); cursor: pointer; font-weight: 600; transition: background-color .15s, border-color .15s; }
 .opt:hover { border-color: var(--action); }
 .opt:has(input:checked) { border-color: var(--action); background: var(--band); color: var(--head); }
 .opt:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
@@ -384,19 +550,15 @@ legend { padding: 0; margin-bottom: .5rem; font-weight: 600; }
 .opt input, .toggle input { width: 1.25rem; height: 1.25rem; margin: 0; flex: none; accent-color: var(--action); }
 .t-l { font-size: 1.15rem; }
 .t-xl { font-size: 1.3rem; }
-.toggle { display: flex; align-items: flex-start; gap: .85rem; cursor: pointer; }
-.toggle input { margin-top: .15rem; }
-.toggle b { display: block; }
-.toggle small { display: block; font-size: var(--fs-small); color: var(--ink-3); }
+.toggle { display: flex; align-items: center; gap: .85rem; min-height: 2.75rem; width: fit-content; cursor: pointer; }
 
-.show-pw { justify-self: start; }
+.pw { display: grid; gap: 1rem; padding-top: .5rem; }
 .pw-rule { display: flex; gap: .4em; align-items: center; }
 .pw-rule.ok { color: var(--ready-ink); }
 .pw-rule .i { width: 1.05em; height: 1.05em; }
-
-.danger-zone { border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
-[data-contrast="high"] .danger-zone { border-color: var(--danger); }
-.danger-zone h2 { color: var(--danger); }
-.danger-btn { justify-self: start; color: var(--danger); }
-.danger-btn:hover { background: color-mix(in srgb, var(--danger) 10%, var(--sheet)); }
+.msg { display: flex; gap: .4em; align-items: flex-start; font-weight: 600; color: var(--danger); }
+.msg:empty { display: none; }
+.msg.ok { color: var(--ready-ink); }
+.msg .i { margin-top: .15em; }
+.del { justify-self: start; margin-left: -.8rem; }
 </style>
