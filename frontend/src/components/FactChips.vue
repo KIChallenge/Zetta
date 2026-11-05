@@ -22,7 +22,7 @@ function pick(f: Fact, c: Chip) {
 <template>
   <section class="facts" aria-labelledby="facts-h">
     <p class="facts-line">
-      <span id="facts-h">Verstanden:</span>
+      <span id="facts-h" class="facts-ok"><svg class="i" aria-hidden="true"><use href="#i-check" /></svg>Verstanden:</span>
       <template v-for="(f, i) in facts" :key="f.key">
         <span v-if="i" class="sep" aria-hidden="true">·</span>
         <span><span class="fact-k">{{ f.label }}: </span><b>{{ shown(f) }}</b></span>
@@ -73,14 +73,17 @@ function pick(f: Fact, c: Chip) {
 .facts { display: grid; gap: .6rem; max-width: 44rem; }
 .facts-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: .15rem .5rem; color: var(--ink-2); }
 .facts-line b { color: var(--ink); font-weight: 600; }
+.facts-ok { display: inline-flex; align-items: center; gap: .3em; align-self: center; color: var(--accent); font-weight: 700; }
 .sep, .fact-k { color: var(--ink-3); }
 .facts-line .linkbtn { display: inline-flex; align-items: center; gap: .3em; min-height: 2.75rem; font-weight: 600; }
 .facts-line .linkbtn:disabled { cursor: progress; opacity: .7; }
 .facts-line .linkbtn .i { width: 1em; height: 1em; }
 .facts-edit { display: grid; gap: .6rem; }
-.fact-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .45rem; }
-.fact { display: inline-flex; align-items: center; gap: .45em; min-height: 2.75rem; padding: .3rem .8rem; border: 1px solid var(--rule-2); border-radius: 999px; background: var(--sheet); color: var(--ink); font: inherit; font-size: .95rem; cursor: pointer; }
-.fact:hover, .fact[aria-expanded="true"] { border-color: var(--harbor); color: var(--harbor); }
+.fact-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem; }
+.fact { display: inline-flex; align-items: center; gap: .45em; min-height: 2.75rem; padding: .3rem 1rem; border: 1px solid var(--rule-2); border-radius: var(--r-pill); background: var(--sheet); color: var(--ink); font: inherit; cursor: pointer; transition: border-color .15s, background-color .15s; }
+.fact:hover, .fact[aria-expanded="true"] { border-color: var(--action); background: var(--band); }
+.fact:focus-visible { outline-offset: 2px; }
 .fact:disabled { cursor: progress; opacity: .7; }
-.fact-edit { display: grid; gap: .6rem; padding: .9rem 1rem; border-radius: var(--r-m); background: var(--sunk); }
+.fact-edit { display: grid; gap: .6rem; padding: 1rem 1.1rem; border-radius: var(--r-m); background: var(--sunk); }
+[data-contrast="high"] .fact-edit { box-shadow: inset 0 0 0 1px var(--ink); }
 </style>

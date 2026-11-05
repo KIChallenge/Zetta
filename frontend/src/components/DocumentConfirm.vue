@@ -36,10 +36,10 @@ function confirm() {
 </template>
 
 <style scoped>
-.confirm { display: grid; gap: .8rem; max-width: 40rem; padding: 1.15rem 1.25rem; border-radius: var(--r-l); background: var(--sheet); box-shadow: var(--lift); }
-.confirm-h { font-size: 1.15rem; }
-.confirm.done { gap: .4rem; padding: .7rem 1rem; box-shadow: 0 0 0 1px var(--rule); }
-.confirm.done .confirm-h { font-size: 1rem; font-weight: 600; }
+.confirm { display: grid; gap: .85rem; max-width: 40rem; padding: 1.25rem 1.4rem 1.4rem; border: var(--hair); border-radius: var(--r-m); background: var(--sheet); }
+.confirm-h { font-size: var(--fs-h3); font-weight: 600; color: var(--head); }
+.confirm.done { gap: .4rem; padding: 0; border: 0; background: none; }
+.confirm.done .confirm-h { font-size: 1rem; color: var(--ink-2); }
+.confirm .btn:focus-visible { outline-offset: 2px; }
 .found { margin: 0; padding-left: 1.2rem; color: var(--ink-2); }
-@media (forced-colors: active) { .confirm { border: 1px solid CanvasText; } }
 </style>

@@ -157,15 +157,15 @@ async function copy() {
             <p v-else class="hint">Telefonzeiten: {{ s.contact.hours ?? 'in der Quelle nicht angegeben' }}</p>
             <div v-if="s.script" class="script">
               <ol class="script-steps">
-                <li><span class="lab">Sagen Sie</span><p class="say">„<template v-for="(p, i) in parts(s.script.opening)" :key="i"><mark v-if="p.gap" class="gap">{{ p.t }}</mark><template v-else>{{ p.t }}</template></template>“</p></li>
+                <li><span class="lab caps">Sagen Sie</span><p class="say">„<template v-for="(p, i) in parts(s.script.opening)" :key="i"><mark v-if="p.gap" class="gap">{{ p.t }}</mark><template v-else>{{ p.t }}</template></template>“</p></li>
                 <li v-if="s.script.have_ready.length">
-                  <span class="lab">Halten Sie bereit</span>
+                  <span class="lab caps">Halten Sie bereit</span>
                   <dl class="kv">
                     <div v-for="h in s.script.have_ready" :key="h.label"><dt>{{ h.label }}</dt><dd>{{ h.value ?? 'bitte bereithalten' }}</dd></div>
                   </dl>
                 </li>
                 <li>
-                  <span class="lab">Fragen Sie nach</span>
+                  <span class="lab caps">Fragen Sie nach</span>
                   <ul class="checks">
                     <li v-for="p in s.script.points" :key="p.covers">
                       <label class="check">
@@ -175,7 +175,7 @@ async function copy() {
                     </li>
                   </ul>
                 </li>
-                <li><span class="lab">Zum Schluss</span><p class="say">„<template v-for="(p, i) in parts(s.script.closing)" :key="i"><mark v-if="p.gap" class="gap">{{ p.t }}</mark><template v-else>{{ p.t }}</template></template>“</p></li>
+                <li><span class="lab caps">Zum Schluss</span><p class="say">„<template v-for="(p, i) in parts(s.script.closing)" :key="i"><mark v-if="p.gap" class="gap">{{ p.t }}</mark><template v-else>{{ p.t }}</template></template>“</p></li>
               </ol>
               <p v-if="hasGap" class="hint">Markierte Stellen fehlen noch. <a href="#einstellungen">In den Einstellungen ergänzen</a></p>
             </div>
@@ -258,26 +258,27 @@ async function copy() {
 </template>
 
 <style scoped>
-/* Plan as a line of stations (from the demo). */
+/* The plan reads as a wayfinding line: stations on a rail, the current one marked "you are here". */
 .step { position: relative; padding-left: 2.75rem; }
-.step::before { content: ""; position: absolute; left: calc(1rem - 1.5px); top: 2.2rem; bottom: -2.2rem; width: 3px; border-radius: 2px; background: var(--rule-2); }
+.step::before { content: ""; position: absolute; left: calc(1rem - 1px); top: 2.2rem; bottom: -2.2rem; width: 2px; background: var(--rule-2); }
 .step:last-child::before { display: none; }
-.step.done::before { background: var(--harbor); }
-.st-dot { position: absolute; z-index: 1; left: .45rem; top: 1.05rem; width: 1.1rem; height: 1.1rem; display: grid; place-items: center; border-radius: 50%; border: 3px solid var(--rule-2); background: var(--paper); }
-.step.done .st-dot { left: .3rem; top: .9rem; width: 1.4rem; height: 1.4rem; background: var(--harbor); border-color: var(--harbor); color: var(--on-harbor); }
+.step.done::before { background: var(--ready-mark); }
+.st-dot { position: absolute; z-index: 1; left: .5rem; top: 1.15rem; width: 1rem; height: 1rem; display: grid; place-items: center; border-radius: 50%; border: 2px solid var(--rule-2); background: var(--paper); }
+.step.done .st-dot { left: .3rem; top: .95rem; width: 1.4rem; height: 1.4rem; background: var(--ready-mark); border-color: var(--ready-mark); color: var(--paper); }
 .step.done .st-dot .i { width: .8rem; height: .8rem; stroke-width: 3.5; }
-.step.now .st-dot { left: .15rem; top: .75rem; width: 1.7rem; height: 1.7rem; border: 5px solid var(--turn-mark); }
-.card { --in: calc(1.25rem + 1.2em + .65rem); background: var(--sheet); border-radius: var(--r-l); box-shadow: var(--lift); }
-.step.now .card { box-shadow: 0 0 0 3px var(--turn-mark), var(--lift); }
-.step.later .card, .step.done .card { box-shadow: 0 0 0 1px var(--rule); }
+.step.now .st-dot { left: .2rem; top: .85rem; width: 1.6rem; height: 1.6rem; border: 3px solid var(--turn-mark); background: var(--turn-mark); box-shadow: inset 0 0 0 4px var(--paper); }
+.card { --in: calc(1.25rem + 1.2em + .75rem); background: var(--sheet); border: var(--hair); border-radius: var(--r-m); }
+.step.now .card { border: 2px solid var(--turn-mark); }
+[data-contrast="high"] .step.now .card { border-width: 3px; }
 .card-h { margin: 0; font-size: inherit; }
-.card-toggle { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: .65rem; width: 100%; padding: .9rem 1.25rem; border: 0; border-radius: var(--r-l); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.kind { color: var(--harbor); }
-.card-title { font-size: 1.15rem; font-weight: 700; line-height: 1.25; hyphens: auto; }
-.card-toggle:hover .card-title { color: var(--harbor); }
-.step.later .card-title { color: var(--ink-2); font-weight: 600; }
-.state { display: inline-flex; align-items: center; gap: .35em; font-size: .85rem; font-weight: 700; color: var(--ink-3); }
-.step.now .state { padding: .1rem .6rem; border-radius: 999px; background: var(--turn-bg); color: var(--turn-ink); }
+.card-toggle { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: .75rem; width: 100%; padding: 1rem 1.25rem; border: 0; border-radius: var(--r-m); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.card-toggle:focus-visible { outline-offset: -3px; }
+.kind { color: var(--head); }
+.card-title { font-size: var(--fs-h3); font-weight: 600; line-height: 1.25; color: var(--head); hyphens: auto; }
+.card-toggle:hover .card-title { text-decoration: underline; text-underline-offset: .15em; text-decoration-thickness: 1px; }
+.step.later .card-title, .step.done .card-title { color: var(--ink-2); }
+.state { display: inline-flex; align-items: center; gap: .35em; font-size: var(--fs-small); font-weight: 700; color: var(--ink-3); }
+.step.now .state { padding: .1rem .7rem; border-radius: var(--r-pill); background: var(--todo-bg); color: var(--todo-ink); }
 .step.done .state { color: var(--ready-ink); }
 .chev { color: var(--ink-3); transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
 .card-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
@@ -289,43 +290,42 @@ async function copy() {
   .card-toggle .state { grid-column: 2; grid-row: 2; justify-self: start; }
   .card-toggle .chev { grid-column: 3; grid-row: 1; }
 }
-.card-sub { display: grid; gap: .6rem; margin-top: -.55rem; padding: 0 1.25rem 1rem var(--in); }
-.card-line { display: flex; flex-wrap: wrap; gap: .1rem 1rem; color: var(--ink-2); font-size: .95rem; overflow-wrap: anywhere; }
-.card-line .avail { font-size: .95rem; }
-.btn.call { font-size: 1.1rem; }
+.card-sub { display: grid; gap: .75rem; margin-top: -.5rem; padding: 0 1.25rem 1.1rem var(--in); }
+.card-line { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem 1rem; color: var(--ink-2); overflow-wrap: anywhere; }
+.btn.call { font-size: var(--fs-lead); }
 .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.card-body { display: grid; gap: 1.1rem; padding: 1rem 1.25rem 1.25rem; border-top: 1px solid var(--rule); hyphens: auto; }
+.card-body { display: grid; gap: 1.1rem; padding: 1.1rem 1.25rem 1.25rem; border-top: var(--hair); hyphens: auto; }
 
-.attempt { display: flex; gap: .5em; align-items: flex-start; padding: .6rem .9rem; border-radius: var(--r-m); background: var(--turn-bg); color: var(--turn-ink); font-weight: 600; }
+.attempt { display: flex; gap: .5em; align-items: flex-start; padding: .6rem 1rem; border-radius: var(--r-m); background: var(--turn-bg); color: var(--turn-ink); font-weight: 600; }
 .attempt .i { margin-top: .15em; }
 .script { display: grid; gap: .8rem; }
-.script-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; counter-reset: sc; }
-.script-steps > li { counter-increment: sc; display: grid; grid-template-columns: 1.9rem minmax(0, 1fr); column-gap: .8rem; row-gap: .25rem; }
-.script-steps > li::before { content: counter(sc); grid-column: 1; grid-row: 1 / span 2; width: 1.9rem; height: 1.9rem; display: grid; place-items: center; border-radius: 50%; background: var(--harbor-tint); color: var(--harbor); font-weight: 700; font-size: .9rem; }
+/* A real sequence (what to say, in order), so the steps are numbered. */
+.script-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; counter-reset: sc; }
+.script-steps > li { counter-increment: sc; display: grid; grid-template-columns: 1.75rem minmax(0, 1fr); column-gap: .85rem; row-gap: .3rem; }
+.script-steps > li::before { content: counter(sc); grid-column: 1; grid-row: 1 / span 2; width: 1.75rem; height: 1.75rem; display: grid; place-items: center; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent); font-weight: 700; font-size: var(--fs-small); }
 .script-steps > li > * { grid-column: 2; }
-.lab { font-size: .85rem; font-weight: 700; color: var(--ink-3); }
-.say { font-size: 1.1rem; line-height: 1.5; }
-.gap { padding: 0 .2em; border-radius: 4px; background: var(--turn-bg); color: var(--turn-ink); }
+.lab { align-self: center; }
+.say { font-size: var(--fs-lead); line-height: 1.5; }
+/* Still to fill in: tinted and underlined, so it does not read as "done". */
+.gap { padding: 0 .2em; border-radius: 4px; background: var(--turn-bg); color: var(--turn-ink); box-shadow: inset 0 -2px 0 var(--turn-mark); }
 .kv { margin: 0; display: grid; gap: .25rem; }
 .kv div { display: flex; flex-wrap: wrap; column-gap: 1rem; }
 .kv dt { flex: 0 1 13rem; min-width: 0; color: var(--ink-3); }
-.kv dd { min-width: 0; margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
-.outcome { display: grid; gap: .9rem; justify-items: start; padding-top: 1rem; border-top: 1px solid var(--rule); }
-.outcome-form { width: 100%; display: grid; gap: 1rem; padding: 1rem; border-radius: var(--r-m); background: var(--sunk); }
+.kv dd { min-width: 0; margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.outcome { display: grid; gap: .9rem; justify-items: start; padding-top: 1.1rem; border-top: var(--hair); }
+.outcome-form { width: 100%; display: grid; gap: 1rem; padding: 1rem 1.1rem; border-radius: var(--r-m); background: var(--sunk); }
 .outcome-form fieldset { margin: 0; padding: 0; border: 0; display: grid; gap: .5rem; }
-.outcome-form textarea { background: var(--sheet); }
 .seg { display: flex; flex-wrap: wrap; gap: .5rem; }
-.opt { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.75rem; padding: .4rem .9rem; border-radius: var(--r-s); background: var(--sheet); box-shadow: inset 0 0 0 1px var(--rule-2); cursor: pointer; }
-.opt:has(input:checked) { box-shadow: inset 0 0 0 2px var(--harbor); color: var(--harbor); font-weight: 600; }
-.opt input { accent-color: var(--harbor); }
+.opt { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.75rem; padding: .4rem 1.1rem .4rem .9rem; border: 1px solid var(--rule-2); border-radius: var(--r-pill); background: var(--sheet); cursor: pointer; }
+.opt:hover { border-color: var(--action); }
+.opt:has(input:checked) { border-color: var(--action); background: var(--band); color: var(--head); font-weight: 600; }
+.opt:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+.opt input { accent-color: var(--action); }
 .contact { display: flex; gap: .5em; align-items: flex-start; color: var(--ink-2); }
-.contact .i { margin-top: .15em; }
-.contact a { color: var(--harbor); }
-.mail-meta { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .3rem 1rem; padding: .85rem 1rem; border-radius: var(--r-m); background: var(--sunk); }
+.contact .i { margin-top: .15em; color: var(--head); }
+.mail-meta { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .3rem 1rem; padding: .85rem 1.1rem; border-radius: var(--r-m); background: var(--sunk); }
 .mail-meta dt { color: var(--ink-3); }
 .mail-meta dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-.mail-meta a { color: var(--harbor); }
-textarea.mail { min-height: 14rem; max-height: 32rem; field-sizing: content; background: var(--sheet); line-height: 1.6; }
-[data-contrast="high"] .mail-meta { box-shadow: inset 0 0 0 1px var(--ink); }
-@media (forced-colors: active) { .card { border: 1px solid CanvasText; } }
+textarea.mail { min-height: 14rem; max-height: 32rem; field-sizing: content; line-height: 1.6; }
+[data-contrast="high"] .mail-meta, [data-contrast="high"] .outcome-form { box-shadow: inset 0 0 0 1px var(--ink); }
 </style>

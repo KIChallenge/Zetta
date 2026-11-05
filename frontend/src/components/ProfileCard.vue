@@ -28,12 +28,14 @@ const known = computed(() => (props.profile ? facts(props.profile) : []))
 </template>
 
 <style scoped>
-.known { display: grid; grid-template-columns: minmax(0, 1fr); gap: .6rem; padding: 1rem 1.15rem; border-radius: var(--r-l); background: var(--sheet); box-shadow: var(--lift); }
-.known-h { display: flex; gap: .5em; align-items: flex-start; font-size: 1rem; line-height: var(--lh); }
-.known-h .i { margin-top: .15em; color: var(--harbor); }
-.compact { padding: 0 1rem; box-shadow: 0 0 0 1px var(--rule); }
-.compact[open] { padding-bottom: 1rem; }
+/* On the start view a grey ground block; in a chat one hairline row that opens on demand. */
+.known { display: grid; grid-template-columns: minmax(0, 1fr); gap: .6rem; padding: 1.1rem 1.25rem; border-radius: var(--r-m); background: var(--sunk); }
+.known-h { display: flex; gap: .5em; align-items: flex-start; font-size: 1rem; font-weight: 700; line-height: var(--lh); }
+.known-h .i { margin-top: .15em; color: var(--head); }
+.compact { padding: 0 1.1rem; border: var(--hair); background: var(--sheet); }
+.compact[open] { padding-bottom: 1.1rem; }
 .compact .known-h { align-items: center; min-height: 2.75rem; font-weight: 400; color: var(--ink-2); cursor: pointer; list-style: none; }
+.compact .known-h:focus-visible { outline-offset: 1px; border-radius: var(--r-s); }
 .compact .known-h::-webkit-details-marker { display: none; }
 .compact .known-h::after { content: ""; margin-left: auto; width: .45em; height: .45em; flex: none; border: solid var(--ink-3); border-width: 0 2px 2px 0; transform: translateY(-.15em) rotate(45deg); }
 .compact[open] .known-h::after { transform: translateY(.1em) rotate(-135deg); }
@@ -42,7 +44,7 @@ const known = computed(() => (props.profile ? facts(props.profile) : []))
 .kv div { display: flex; flex-wrap: wrap; gap: 0 1rem; }
 .kv dt { flex: 0 0 6.5rem; color: var(--ink-3); }
 .kv dd { flex: 1 1 12rem; min-width: 0; margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-.known-foot { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .25rem 1rem; font-size: .95rem; }
-.known-foot a { color: var(--harbor); font-weight: 600; text-underline-offset: .2em; }
-@media (forced-colors: active) { .known { border: 1px solid CanvasText; } }
+.known-foot { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .25rem 1rem; font-size: var(--fs-small); }
+.known-foot a { font-weight: 600; }
+[data-contrast="high"] .known:not(.compact) { box-shadow: inset 0 0 0 1px var(--ink); }
 </style>

@@ -369,11 +369,11 @@ async function confirmDelete() {
   --gut: max(clamp(.75rem, 4vw, 1.25rem), calc((100% - 42rem) / 2));
   min-width: 0; min-height: 0; overflow-y: auto;
   display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1.5rem;
-  padding: clamp(1.25rem, 5vh, 2.5rem) var(--gut) 3rem;
+  padding: clamp(1.5rem, 5vh, 2.75rem) var(--gut) 3rem;
 }
-.settings > h1 { font-size: clamp(1.75rem, 4vw, 2.1rem); }
-.card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; padding: 1.25rem clamp(.85rem, 4vw, 1.35rem) 1.4rem; border-radius: var(--r-l); background: var(--sheet); box-shadow: var(--lift); }
-.card h2 { font-size: 1.35rem; }
+.settings > h1 { font-size: clamp(var(--fs-h2), 5cqi, var(--fs-h1)); }
+.card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.1rem; padding: 1.35rem clamp(.9rem, 4vw, 1.5rem) 1.5rem; border: var(--hair); border-radius: var(--r-m); background: var(--sheet); }
+.card h2 { font-size: var(--fs-h3); font-weight: 600; color: var(--head); }
 .intro { color: var(--ink-2); }
 .fields { display: flex; flex-wrap: wrap; gap: 1.1rem 1rem; }
 .fields .field { flex: 1 1 100%; min-width: 0; }
@@ -385,31 +385,35 @@ async function confirmDelete() {
 .msg.ok { color: var(--ready-ink); }
 .msg .i { margin-top: .15em; }
 
-select { width: 100%; max-width: 24rem; min-height: 2.9rem; padding: .4rem .75rem; font: inherit; color: var(--ink); background: var(--sunk); border: 2px solid var(--rule-2); border-radius: var(--r-s); }
-select:focus-visible { border-color: var(--harbor); }
+select { width: 100%; max-width: 24rem; min-height: 3rem; padding: .4rem 1.1rem; font: inherit; color: var(--ink); background: var(--sheet); border: 1px solid var(--rule-2); border-radius: var(--r-pill); }
+select:hover { border-color: var(--action); }
+select:focus-visible { border-color: var(--action); outline-offset: 2px; }
+[data-contrast="high"] select { border-width: 2px; }
 fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 legend { padding: 0; margin-bottom: .5rem; font-weight: 600; }
 .seg { display: flex; flex-wrap: wrap; gap: .5rem; }
-.opt { display: inline-flex; align-items: center; gap: .6rem; min-height: 2.9rem; padding: .45rem 1rem; border-radius: var(--r-s); border: 2px solid var(--rule-2); cursor: pointer; font-weight: 600; transition: background-color .15s, border-color .15s; }
-.opt:hover { border-color: var(--harbor); }
-.opt:has(input:checked) { border-color: var(--harbor); background: var(--harbor-tint); color: var(--harbor); }
-.opt input, .toggle input { width: 1.25rem; height: 1.25rem; margin: 0; flex: none; accent-color: var(--harbor); }
+.opt { display: inline-flex; align-items: center; gap: .6rem; min-height: 2.9rem; padding: .45rem 1.2rem .45rem 1rem; border-radius: var(--r-pill); border: 1px solid var(--rule-2); cursor: pointer; font-weight: 600; transition: background-color .15s, border-color .15s; }
+.opt:hover { border-color: var(--action); }
+.opt:has(input:checked) { border-color: var(--action); background: var(--band); color: var(--head); }
+.opt:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+.opt input:focus-visible { outline: none; }
+[data-contrast="high"] .opt { border-width: 2px; }
+.opt input, .toggle input { width: 1.25rem; height: 1.25rem; margin: 0; flex: none; accent-color: var(--action); }
 .t-l { font-size: 1.15rem; }
 .t-xl { font-size: 1.3rem; }
 .toggle { display: flex; align-items: flex-start; gap: .85rem; cursor: pointer; }
 .toggle input { margin-top: .15rem; }
 .toggle b { display: block; }
-.toggle small { display: block; font-size: .95rem; color: var(--ink-3); }
+.toggle small { display: block; font-size: var(--fs-small); color: var(--ink-3); }
 
 .show-pw { justify-self: start; }
 .pw-rule { display: flex; gap: .4em; align-items: center; }
 .pw-rule.ok { color: var(--ready-ink); }
 .pw-rule .i { width: 1.05em; height: 1.05em; }
 
-.danger-zone { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--danger) 45%, transparent); }
+.danger-zone { border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
+[data-contrast="high"] .danger-zone { border-color: var(--danger); }
 .danger-zone h2 { color: var(--danger); }
 .danger-btn { justify-self: start; color: var(--danger); }
-.danger-btn:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
-
-@media (forced-colors: active) { .card, .opt { border: 1px solid CanvasText; } }
+.danger-btn:hover { background: color-mix(in srgb, var(--danger) 10%, var(--sheet)); }
 </style>

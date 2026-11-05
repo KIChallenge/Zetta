@@ -42,16 +42,17 @@ defineProps<{ card: CardPayload; text: string }>()
 </template>
 
 <style scoped>
-.notice-card { display: grid; gap: .75rem; max-width: 40rem; padding: 1.15rem 1.25rem; border-radius: var(--r-l); background: var(--sheet); box-shadow: var(--lift); }
-.notice-card[data-card="boundary"] { box-shadow: inset 4px 0 0 var(--turn-mark), var(--lift); }
-.nc-h { display: flex; gap: .5em; align-items: flex-start; font-size: 1.2rem; }
-.nc-h .i { margin-top: .1em; color: var(--harbor); }
-.nc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
-.nc-inst { display: grid; gap: .3rem; padding: .75rem 1rem; border-radius: var(--r-m); background: var(--sunk); }
-.nc-ch { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .9rem; }
-.nc-val { display: inline-flex; align-items: center; gap: .45em; font-size: 1.15rem; font-weight: 700; color: var(--ink); text-decoration: none; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-a.nc-val:hover { color: var(--harbor); }
-.nc-val .i { color: var(--harbor); }
-.nc-more { display: grid; gap: .2rem; margin-top: .6rem; font-size: .95rem; }
-@media (forced-colors: active) { .notice-card { border: 1px solid CanvasText; } }
+.notice-card { display: grid; gap: .8rem; max-width: 40rem; padding: 1.25rem 1.4rem; border: var(--hair); border-radius: var(--r-m); background: var(--sheet); }
+/* Boundary (not a medical answer): the "your turn" tone, since the next step is the user's. */
+.notice-card[data-card="boundary"] { border: 2px solid var(--turn-mark); }
+.notice-card[data-card="boundary"] .nc-h .i { color: var(--turn-mark); }
+.nc-h { display: flex; gap: .5em; align-items: flex-start; font-size: var(--fs-h3); font-weight: 600; color: var(--head); }
+.nc-h .i { margin-top: .1em; color: var(--head); }
+.nc-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.nc-inst { display: grid; gap: .35rem; padding-block: .85rem; border-top: var(--hair); }
+.nc-ch { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .9rem; }
+.nc-val { display: inline-flex; align-items: center; gap: .45em; font-size: var(--fs-lead); font-weight: 600; color: var(--head); text-decoration: none; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+a.nc-val:hover { text-decoration: underline; }
+.nc-val:focus-visible { outline-offset: 2px; }
+.nc-more { display: grid; gap: .2rem; margin-top: .6rem; font-size: var(--fs-small); }
 </style>
