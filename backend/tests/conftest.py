@@ -21,25 +21,46 @@ class FakeLlm:
     """Stands in for the real LLM: tests never call the API."""
 
     def __init__(self):
-        self.deltas = ["Hallo", " Anna", "!"]
+        self.facts = {}  # what extract() finds in every message
+        self.medical = False
+        self.intro_text = "Hier sind die nächsten Schritte für Sie."
+        self.script_text = None  # step input -> script dict; default: a valid script per step
         self.title_text = "Pflege für Mama"
-        self.fail = False
+        self.fail = False  # every call raises, like an LLM that is down
         self.hang = False
-        self.histories = []
+        self.calls = []  # (method, input) in call order
 
-    async def reply(self, history):
-        self.histories.append(history)
-        for delta in self.deltas:
-            yield delta
-        if self.fail:
-            raise RuntimeError("LLM down")
+    async def _call(self, method, value):
+        self.calls.append((method, value))
         if self.hang:
             await asyncio.Event().wait()
+        if self.fail:
+            raise RuntimeError("LLM down")
+
+    async def extract(self, text, question):
+        await self._call("extract", {"text": text, "question": question})
+        return {"medical_question": self.medical, **self.facts}
+
+    async def intro(self, plan, language):
+        await self._call("intro", {**plan, "language": language})
+        return self.intro_text
+
+    async def scripts(self, steps, detail):
+        await self._call("scripts", steps)
+        return {step["step_id"]: (self.script_text or valid_script)(step) for step in steps}
 
     async def title(self, text):
         if self.title_text is None:
             raise RuntimeError("LLM down")
         return self.title_text
+
+
+def valid_script(step):
+    if step["type"] == "call":
+        points = [{"covers": i["id"], "text": f"Wie ist das mit {i['id']}?"} for i in step["items"]]
+        return {"call": {"opening": "Guten Tag, hier spricht {user.name}.", "points": points, "closing": "Danke."}}
+    covers = [i["id"] for i in step["items"]]
+    return {"email": {"subject": "Anfrage", "body": "Sehr geehrte Damen und Herren, ... {user.name}", "covers": covers}}
 
 
 @pytest.fixture

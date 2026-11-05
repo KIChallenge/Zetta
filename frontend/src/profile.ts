@@ -35,7 +35,7 @@ export function svnrOk(v: string) {
 }
 export const fmtSvnr = (d: string) => (d.length === 10 ? `${d.slice(0, 4)} ${d.slice(4)}` : d)
 
-/** The filled fields as label/value pairs: what the Lotse gets in every chat (see build_messages in llm.py). */
+/** The filled fields as label/value pairs: what the Lotse fills into call scripts and emails (never sent to the LLM). */
 export function facts(p: Profile): [string, string][] {
   const place = `${p.postal_code} ${p.city}`.trim()
   const all: [string, string][] = [

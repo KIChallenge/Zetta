@@ -1,4 +1,9 @@
-from collections.abc import AsyncIterator
+"""The three narrow LLM calls (spec section 2): text -> facts, plan intro, scripts with placeholders.
+
+The LLM never searches or looks anything up and never gets personal values or contact data.
+"""
+
+import json
 from functools import cache
 from typing import Annotated
 
@@ -6,9 +11,8 @@ from fastapi import Depends
 from openai import AsyncOpenAI
 
 from backend.config import settings
-from backend.schemas import ProfileData
+from backend.facts import extraction_schema
 
-SYSTEM_PROMPT = "You are a helpful assistant. You may use Markdown."
 LANGUAGES = {
     "de": 'German (as used in Austria, addressing the user formally with "Sie")',
     "en": "English",
@@ -20,42 +24,93 @@ LANGUAGES = {
     "uk": "Ukrainian",
     "ar": "Arabic",
 }
-LENGTHS = {
-    "short": "Keep your answers short: a few sentences or a short list of next steps.",
-    "detailed": "Explain in detail and step by step, but without filler.",
-}
 TITLE_PROMPT = (
     "Write a short title, at most 6 words, for a conversation that starts with the "
     "user's message. Use the language of the message. Reply with the title only, "
     "without quotes."
 )
+EXTRACT_PROMPT = (
+    "You turn one message of a user into facts for a guide to social insurance and care services in Vienna, "
+    "Austria. The message may be in any language, colloquial, very short or long, with typos or irrelevant "
+    "details. Fill a field only if the message states it or clearly implies it; otherwise use null or an empty "
+    "list. Never guess. There are no fields for illnesses, diagnoses, symptoms or medication: do not try to "
+    "record them anywhere."
+)
+INTRO_PROMPT = (
+    "Write one or two short, warm sentences that introduce a plan of next steps to the user. Name the topics "
+    "of the plan briefly. Do not repeat the steps. Never write phone numbers, email addresses, web addresses, "
+    "dates, amounts or names, and say nothing medical. Never say that someone is entitled to something "
+    '("Anspruch"); say what may apply. Reply with the text only. Language: {language}.'
+)
+SCRIPTS_PROMPT = (
+    "You write short texts that a user in Vienna uses to contact an institution: speaking scripts for phone "
+    "calls and emails. Write in German as used in Austria, polite and plain, in the first person (the user "
+    "speaks or writes).\n"
+    "For each step you get the items the text must cover (with ids), the placeholders you may use and a few "
+    "facts.\n"
+    "- Call: an opening (greeting, who is calling, why), exactly one point per item with its id in `covers`, "
+    "and a closing. Points are what the user says on the phone: direct questions like \"Kann ich ...?\" or "
+    "\"Wie ...?\", not \"Ich möchte fragen, ob ...\".\n"
+    "- Email: a subject and a body that starts with \"Sehr geehrte Damen und Herren,\" and ends with "
+    "\"Mit freundlichen Grüßen\". `covers` lists the ids of all items the body covers.\n"
+    "- Personal data only as placeholders, exactly as given, e.g. {user.name}. {subject.relation} is the person "
+    'concerned in the accusative, e.g. "meine Mutter", "meinen Vater"; you may also write the relation '
+    "yourself from facts.subject, never a name.\n"
+    "- Never write phone numbers, email addresses, web addresses, dates, amounts or account numbers.\n"
+    "- Nothing medical: no illnesses, diagnoses, symptoms, medication or treatments.\n"
+    "- {detail}"
+)
+DETAIL = {
+    "short": "Keep it short: one sentence per point.",
+    "detailed": "Each point may have a second sentence that explains the question.",
+}
+SCRIPTS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "calls": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "step_id": {"type": "string"},
+                    "opening": {"type": "string"},
+                    "points": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {"covers": {"type": "string"}, "text": {"type": "string"}},
+                            "required": ["covers", "text"],
+                            "additionalProperties": False,
+                        },
+                    },
+                    "closing": {"type": "string"},
+                },
+                "required": ["step_id", "opening", "points", "closing"],
+                "additionalProperties": False,
+            },
+        },
+        "emails": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "step_id": {"type": "string"},
+                    "subject": {"type": "string"},
+                    "body": {"type": "string"},
+                    "covers": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["step_id", "subject", "body", "covers"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["calls", "emails"],
+    "additionalProperties": False,
+}
 
 
-def build_messages(profile: ProfileData, history: list[dict[str, str]]) -> list[dict[str, str]]:
-    """Instructions, the user's own details (only if any are filled in), then the chat history."""
-    system = (
-        f"{SYSTEM_PROMPT} Always answer in {LANGUAGES[profile.answer_language]}, unless the user "
-        f"explicitly asks for another language. {LENGTHS[profile.answer_length]}"
-    )
-    messages = [{"role": "system", "content": system}]
-    svnr = profile.svnr and f"{profile.svnr[:4]} {profile.svnr[4:]}"
-    place = f"{profile.postal_code} {profile.city}".strip()
-    facts = [
-        ("Name", profile.full_name),
-        ("Address", ", ".join(part for part in (profile.street, place) if part)),
-        ("Social security number", svnr),
-        ("Phone", profile.phone),
-        ("Email", profile.contact_email),
-    ]
-    if known := [f"- {label}: {value}" for label, value in facts if value]:
-        messages.append({
-            "role": "system",
-            "content": "Known details about the user, entered by the user themselves:\n"
-            + "\n".join(known)
-            + "\nUse them where they help (e.g. for call scripts or emails), do not ask for them "
-            "again and never invent other personal details.",
-        })
-    return [*messages, *history]
+def _format(name: str, schema: dict) -> dict:
+    return {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}}
 
 
 class Llm:
@@ -64,33 +119,39 @@ class Llm:
             base_url=settings.azure_openai_endpoint, api_key=settings.azure_openai_api_key
         )
 
-    async def reply(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
-        """Stream the assistant's answer to `build_messages` output, chunk by chunk."""
-        stream = await self.client.chat.completions.create(
-            model=settings.azure_openai_model,
-            messages=messages,
-            stream=True,
-            reasoning_effort="low",
-            max_completion_tokens=4000,
-        )
-        # Closing the stream (also on Stop) ends the request to the LLM.
-        async with stream:
-            async for chunk in stream:
-                # Azure sends chunks without choices, e.g. content filter results.
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
-
-    async def title(self, text: str) -> str:
+    async def _complete(self, system: str, user: str, response_format: dict | None = None) -> str:
         response = await self.client.chat.completions.create(
             model=settings.azure_openai_model,
-            messages=[
-                {"role": "system", "content": TITLE_PROMPT},
-                {"role": "user", "content": text},
-            ],
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
             reasoning_effort="low",
-            max_completion_tokens=1000,
+            max_completion_tokens=4000,
+            **({"response_format": response_format} if response_format else {}),
         )
         return response.choices[0].message.content or ""
+
+    async def extract(self, text: str, question: str | None) -> dict:
+        """Facts from one user message. `question`: the question the user is answering, if any."""
+        system = EXTRACT_PROMPT + (f"\nThe user is answering this question: {question}" if question else "")
+        return json.loads(await self._complete(system, text, _format("facts", extraction_schema())))
+
+    async def intro(self, plan: dict, language: str) -> str:
+        return await self._complete(
+            INTRO_PROMPT.format(language=LANGUAGES[language]), json.dumps(plan, ensure_ascii=False)
+        )
+
+    async def scripts(self, steps: list[dict], detail: str) -> dict[str, dict]:
+        """Step id -> {"call": {...}} or {"email": {...}}, with placeholders instead of personal data."""
+        data = json.loads(await self._complete(
+            SCRIPTS_PROMPT.replace("{detail}", DETAIL[detail]),
+            json.dumps(steps, ensure_ascii=False),
+            _format("scripts", SCRIPTS_SCHEMA),
+        ))  # fmt: skip
+        out = {c.pop("step_id"): {"call": c} for c in data["calls"]}
+        out |= {e.pop("step_id"): {"email": e} for e in data["emails"]}
+        return out
+
+    async def title(self, text: str) -> str:
+        return await self._complete(TITLE_PROMPT, text)
 
 
 @cache

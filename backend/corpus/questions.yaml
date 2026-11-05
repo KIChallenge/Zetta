@@ -1,0 +1,37 @@
+# One question per fact key, asked one at a time with chips (section 6.2). The order breaks ties.
+# `text.other` may use {subject.ihr} ("Ihre Mutter"). Chips default to all values of the fact,
+# plus "Weiß nicht" and "Möchte ich nicht sagen".
+
+- fact_key: goal
+  text:
+    self: Wobei kann der Lotse Ihnen helfen?
+    other: Wobei kann der Lotse Ihnen helfen?
+  why_we_ask: Der Lotse kennt bestimmte Angebote. Wählen Sie das passende, oder beschreiben Sie Ihr Anliegen genauer.
+  chips:
+    - {value: apply_care_allowance}
+    - {value: find_support_services}
+    - {value: unknown, label: Etwas anderes}
+
+- fact_key: subject
+  text:
+    self: Für wen suchen Sie Unterstützung?
+    other: Für wen suchen Sie Unterstützung?
+  why_we_ask: Damit Anrufe und E-Mails richtig formuliert sind.
+
+- fact_key: district
+  text:
+    self: In welchem Wiener Bezirk wohnen Sie?
+    other: In welchem Wiener Bezirk wohnt {subject.ihr}?
+  why_we_ask: Der Lotse kennt Angebote in Wien. Außerhalb von Wien sind andere Stellen zuständig.
+
+- fact_key: pension_payer
+  text:
+    self: Beziehen Sie eine Pension? Wenn ja, von welcher Stelle?
+    other: Bezieht {subject.ihr} eine Pension? Wenn ja, von welcher Stelle?
+  why_we_ask: Beim Pflegegeld ist die Stelle zuständig, die die Pension auszahlt.
+
+- fact_key: lives_alone
+  text:
+    self: Leben Sie allein?
+    other: Lebt {subject.ihr} allein?
+  why_we_ask: Das hilft beim Gespräch über Unterstützung zu Hause.

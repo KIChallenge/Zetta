@@ -1,0 +1,38 @@
+# Documents a service asks for. Shared ids are merged into one "Unterlagen sammeln" checklist.
+
+- id: photo_id
+  title: Amtlicher Lichtbildausweis
+  where_to_get: z. B. Führerschein, Reisepass oder Personalausweis
+  source_url: https://www.fsw.at/downloads/foerderwesen_anerkennung/foerderansuchen/subjektfoerderung/fsw-antrag-auf-foerderung-von-leistungen.pdf
+  verified_at: 2026-11-05
+
+- id: medical_reports
+  title: Vorhandene Befunde in Kopie
+  where_to_get: Von der Hausärztin, dem Hausarzt oder dem Krankenhaus
+  notes: Werden dem Pflegegeld-Antrag in Kopie beigelegt. Der Lotse liest oder bewertet sie nicht.
+  source_url: https://www.pv.at/cdscontent/load?contentid=10008.781956&version=1783516198
+  verified_at: 2026-11-05
+
+- id: citizenship_proof
+  title: Nachweis der Staatsbürgerschaft
+  where_to_get: z. B. Staatsbürgerschaftsnachweis, Reisepass oder Personalausweis
+  source_url: https://www.fsw.at/downloads/foerderwesen_anerkennung/foerderansuchen/subjektfoerderung/fsw-antrag-auf-foerderung-von-leistungen.pdf
+  verified_at: 2026-11-05
+
+- id: income_proof
+  title: Aktuelle Einkommensnachweise
+  where_to_get: z. B. Pensionsnachweis, Lohnzettel oder Nachweis über Geld vom AMS
+  source_url: https://www.fsw.at/downloads/foerderwesen_anerkennung/foerderansuchen/subjektfoerderung/fsw-antrag-auf-foerderung-von-leistungen.pdf
+  verified_at: 2026-11-05
+
+- id: rent_proof
+  title: Nachweis über Hauptmietzins und Betriebskosten
+  where_to_get: Aufgeschlüsselt, für die Wohnung oder das Haus
+  source_url: https://www.fsw.at/downloads/foerderwesen_anerkennung/foerderansuchen/subjektfoerderung/fsw-antrag-auf-foerderung-von-leistungen.pdf
+  verified_at: 2026-11-05
+
+- id: care_expenses_proof
+  title: Nachweise über pflegebezogene Ausgaben
+  where_to_get: z. B. Rechnungen für Pflegebett oder Notrufsystem
+  source_url: https://www.fsw.at/downloads/foerderwesen_anerkennung/foerderansuchen/subjektfoerderung/fsw-antrag-auf-foerderung-von-leistungen.pdf
+  verified_at: 2026-11-05

@@ -1,0 +1,238 @@
+# Services (Leistungen) with triggers, criteria and step templates. See docs/response-system.md, section 5.
+#
+# Conditions map fact keys to matchers: a list of values (the fact is, or contains, one of them)
+# or {not: [values]}. All keys of a condition must match. A service is a candidate if any trigger matches.
+# Scripts use placeholders only; contact data always comes from institutions.yaml.
+
+- id: care_allowance
+  title: Pflegegeld
+  summary: Monatliches Geld für Menschen, die ständig Betreuung und Pflege brauchen. Die Höhe hängt vom Pflegebedarf ab, nicht vom Einkommen.
+  priority: 1
+  triggers:
+    - {goal: [apply_care_allowance]}
+    - {needs_daily_help: [some, a_lot]}
+  requires: [subject, district, pension_payer]
+  responsible:
+    - {when: {pension_payer: [bvaeb]}, institution: bvaeb}
+    - {when: {pension_payer: [svs]}, institution: svs}
+    - {institution: pva_vienna}
+  responsible_note: Zuständig ist die Stelle, die die Pension auszahlt. Wer keine Pension bezieht, stellt den Antrag bei der Pensionsversicherung.
+  responsible_source: https://www.oesterreich.gv.at/de/themen/pflege/4/Seite.360515
+  criteria:
+    - id: residence
+      text: Gewöhnlicher Aufenthalt in Österreich
+      when: {district: {not: [outside_vienna]}}
+  checked_by:
+    - Ob der Pflegebedarf mehr als 65 Stunden im Monat beträgt und voraussichtlich mindestens 6 Monate dauert, wird bei einer Begutachtung festgestellt.
+  documents: [medical_reports]
+  forms: [care_allowance_form]
+  source_url: https://www.pv.at/web/pflegegeld
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Was ist Pflegegeld?
+      why: Damit Sie wissen, worum es beim Antrag geht.
+      text: >-
+        Pflegegeld ist eine monatliche Geldleistung für Menschen, die ständig Betreuung und Pflege brauchen.
+        Es deckt einen Teil der Mehrkosten durch die Pflege. Es gibt 7 Stufen; die Höhe hängt vom Pflegebedarf ab,
+        nicht vom Einkommen. Den Antrag dürfen auch Familienmitglieder, Haushaltsmitglieder und nahestehende Personen stellen.
+
+    - id: call
+      type: call
+      title: Bei der zuständigen Stelle anrufen
+      why: Dort bekommen Sie den Antrag und Antworten auf Ihre Fragen.
+      institution: responsible
+      channel: phone
+      script_facts: [subject, pension_payer]
+      have_ready: [subject.svnr]
+      slots: [user.name, user.phone, subject.relation, subject.name, subject.svnr]
+      must_ask:
+        - {id: get_form, text: "Den Antrag auf Pflegegeld anfordern oder fragen, ob er online gestellt werden kann"}
+        - {id: relative_applies, text: "Fragen, ob die anrufende Person den Antrag als Angehörige oder Angehöriger für die betroffene Person stellen kann", when: {subject: {not: [self]}}}
+        - {id: assessment, text: "Fragen, wie die Begutachtung abläuft und ob eine Vertrauensperson dabei sein kann"}
+        - {id: consultation, text: "Fragen, ob es Hilfe beim Ausfüllen oder einen Beratungstermin gibt"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe wegen eines Antrags auf Pflegegeld für {subject.relation} an.
+        points:
+          - {covers: get_form, text: "Können Sie mir das Antragsformular zuschicken, oder kann ich den Antrag auch online stellen?"}
+          - {covers: relative_applies, text: "Kann ich den Antrag als Angehörige oder Angehöriger stellen, und was muss ich dafür beilegen?"}
+          - {covers: assessment, text: "Wie läuft die Begutachtung ab, und kann eine Vertrauensperson dabei sein?"}
+          - {covers: consultation, text: "Gibt es Hilfe beim Ausfüllen, zum Beispiel einen Beratungstermin?"}
+        closing: Vielen Dank. Darf ich mir Ihren Namen notieren? Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+    - id: documents
+      type: documents
+      title: Unterlagen sammeln
+      why: Diese Unterlagen werden für die Anträge gebraucht.
+
+    - id: submit
+      type: form
+      title: Antrag ausfüllen und einreichen
+      why: Erst mit dem Antrag kann über das Pflegegeld entschieden werden.
+      institution: responsible
+      form: care_allowance_form
+      after: [call, documents]
+      text: >-
+        Füllen Sie den Antrag aus und legen Sie vorhandene Befunde in Kopie bei. Unter Punkt 9 können Sie eine kostenlose
+        Pflegeberatung zu Hause durch eine diplomierte Pflegefachkraft ankreuzen. Der Antrag kann auch online gestellt werden.
+        Gültig ist auch ein Antrag bei einem anderen Sozialversicherungsträger: Er wird an die zuständige Stelle weitergeleitet.
+
+    - id: assessment
+      type: wait
+      title: Begutachtung zu Hause
+      why: Bei der Begutachtung wird die Pflegestufe festgestellt.
+      after: [submit]
+      done_label: Begutachtung war
+      text: >-
+        Der Termin für den Hausbesuch wird vorher angekündigt. Eine Vertrauensperson, etwa eine pflegende Angehörige
+        oder ein pflegender Angehöriger, kann dabei sein und ergänzend beschreiben, welche Hilfe im Alltag nötig ist.
+
+    - id: decision
+      type: wait
+      title: Auf die Entscheidung warten
+      why: Danach wissen Sie, ob und in welcher Stufe Pflegegeld ausgezahlt wird.
+      after: [assessment]
+      done_label: Entscheidung erhalten
+      text: >-
+        Pflegegeld gebührt ab dem Monatsersten nach dem Antrag und wird monatlich im Nachhinein ausgezahlt.
+        Wird der Pflegeaufwand später größer, kann eine Erhöhung schriftlich beantragt werden.
+
+- id: home_care_fsw
+  title: Pflege und Betreuung zu Hause (FSW)
+  summary: Der Fonds Soziales Wien berät zu Heimhilfe, Hauskrankenpflege, Essen auf Rädern und Begleitdiensten und vermittelt geförderte Angebote.
+  priority: 2
+  triggers:
+    - {goal: [find_support_services]}
+    - {needs_daily_help: [some, a_lot]}
+  requires: [subject, district, lives_alone]
+  responsible:
+    - {institution: fsw_customer_service}
+  criteria:
+    - id: vienna
+      text: Wohnort in Wien
+      when: {district: {not: [outside_vienna]}}
+  checked_by:
+    - Den individuellen Bedarf stellt das FSW-Kund:innenservice fest.
+    - Der Kostenbeitrag hängt unter anderem von Einkommen, Miet- und Wohnkosten und Pflegegeld ab.
+  documents: [photo_id, citizenship_proof, income_proof, rent_proof, care_expenses_proof]
+  forms: [fsw_application_form]
+  source_url: https://www.fsw.at/p/pflege-betreuung-daheim
+  verified_at: 2026-11-05
+  steps:
+    - id: call
+      type: call
+      title: Beim FSW-Kund:innenservice anrufen
+      why: Der FSW berät, welche Unterstützung zu Hause passt, und vermittelt eine Partnerorganisation.
+      institution: responsible
+      channel: phone
+      script_facts: [subject, lives_alone, needs_daily_help]
+      slots: [user.name, user.phone, subject.relation]
+      must_ask:
+        - {id: home_help, text: "Nach Heimhilfe fragen, z. B. bei Körperpflege, Haushalt und kleinen Einkäufen"}
+        - {id: meals, text: "Nach Essen auf Rädern fragen"}
+        - {id: escort, text: "Nach einem Begleitdienst für Wege und Besorgungen fragen"}
+        - {id: assessment, text: "Fragen, wie der Bedarf festgestellt wird und wie der Antrag gestellt wird"}
+        - {id: costs, text: "Fragen, wovon der Kostenbeitrag abhängt"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe an, weil ich Unterstützung zu Hause für {subject.relation} suche.
+        points:
+          - {covers: home_help, text: "Welche Hilfe zu Hause gibt es, zum Beispiel Heimhilfe bei Körperpflege, Haushalt und Einkäufen?"}
+          - {covers: meals, text: "Ist Essen auf Rädern möglich?"}
+          - {covers: escort, text: "Gibt es eine Begleitung für Wege und Besorgungen?"}
+          - {covers: assessment, text: "Wie wird der Bedarf festgestellt, und wie stelle ich den Antrag?"}
+          - {covers: costs, text: "Wovon hängt der Kostenbeitrag ab?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+    - id: documents
+      type: documents
+      title: Unterlagen sammeln
+      why: Diese Unterlagen werden für die Anträge gebraucht.
+
+    - id: send_application
+      type: email
+      title: FSW-Antrag per E-Mail schicken
+      why: Mit dem Antrag kann der FSW die Unterstützung fördern.
+      institution: responsible
+      channel: applications_email
+      form: fsw_application_form
+      after: [call, documents]
+      script_facts: [subject]
+      slots: [user.name, user.phone, user.email, user.address, subject.relation]
+      must_include:
+        - {id: application, text: "Sagen, dass der ausgefüllte und unterschriebene Antrag auf Förderung von Leistungen (Pflege und Betreuung zu Hause) angehängt ist"}
+        - {id: attachments, text: "Sagen, dass die nötigen Beilagen angehängt sind"}
+        - {id: contact, text: "Telefonnummer oder E-Mail-Adresse für Rückfragen nennen"}
+      fallback_script:
+        subject: Antrag auf Förderung von Leistungen – Pflege und Betreuung zu Hause
+        body: |-
+          Sehr geehrte Damen und Herren,
+
+          im Anhang sende ich den ausgefüllten und unterschriebenen Antrag auf Förderung von Leistungen (Pflege und Betreuung zu Hause) für {subject.relation}.
+
+          Die nötigen Beilagen habe ich ebenfalls angehängt.
+
+          Für Rückfragen erreichen Sie mich unter {user.phone} oder {user.email}.
+
+          Mit freundlichen Grüßen
+          {user.name}
+          {user.address}
+        covers: [application, attachments, contact]
+
+    - id: assessment
+      type: wait
+      title: Bedarf wird festgestellt
+      why: Danach wissen Sie, welche Unterstützung gefördert wird.
+      after: [send_application]
+      done_label: Rückmeldung erhalten
+      text: >-
+        Das FSW-Kund:innenservice stellt den individuellen Bedarf fest, berät und vermittelt eine passende Partnerorganisation.
+
+- id: carer_support
+  title: Entlastung für pflegende Angehörige
+  summary: Kostenlose Gespräche mit Psychologinnen und Psychologen für Angehörige, die jemanden pflegen, und Hausbesuche durch Pflegefachkräfte.
+  priority: 3
+  triggers:
+    - {subject: [mother, father, partner, child, other_relative], needs_daily_help: [some, a_lot]}
+  requires: [subject, district]
+  responsible:
+    - {institution: carer_competence_centre}
+  checked_by:
+    - Hausbesuche durch Pflegefachkräfte gibt es für Menschen, die Pflegegeld beziehen, und ihre Angehörigen.
+  source_url: https://www.sozialministerium.gv.at/Themen/Pflege/Betreuende-und-Pflegende-Angehoerige.html
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Was ist das Angehörigengespräch?
+      why: Pflege kann sehr belasten. Dieses Angebot ist für Sie selbst.
+      text: >-
+        Das Angehörigengespräch ist kostenlos und wird von Psychologinnen und Psychologen geführt: zu Hause, an einem
+        anderen Ort, telefonisch oder online. Bei Bedarf sind bis zu zehn Termine möglich. Wer Pflegegeld bezieht, kann
+        außerdem kostenlos einen Hausbesuch durch eine diplomierte Pflegefachkraft anfordern, mit praktischen Pflegetipps
+        und Informationen zu Hilfsmitteln und sozialen Diensten.
+
+    - id: request_talk
+      type: email
+      title: Angehörigengespräch anfragen
+      why: Das Gespräch wird auf Wunsch vereinbart.
+      institution: responsible
+      channel: carer_talk_email
+      script_facts: [subject]
+      slots: [user.name, user.phone, user.email, subject.relation]
+      must_include:
+        - {id: request, text: "Um ein kostenloses Angehörigengespräch bitten"}
+        - {id: situation, text: "Kurz sagen, wen die Person zu Hause betreut"}
+        - {id: contact, text: "Telefonnummer oder E-Mail-Adresse für die Terminvereinbarung nennen"}
+      fallback_script:
+        subject: Anfrage Angehörigengespräch
+        body: |-
+          Sehr geehrte Damen und Herren,
+
+          ich betreue {subject.relation} zu Hause und möchte um ein kostenloses Angehörigengespräch bitten.
+
+          Für einen Termin erreichen Sie mich unter {user.phone} oder {user.email}.
+
+          Mit freundlichen Grüßen
+          {user.name}
+        covers: [request, situation, contact]

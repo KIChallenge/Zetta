@@ -1,0 +1,145 @@
+# Institutions and their contact channels. Only facts stated in the source pages.
+# Phone `hours`: structured windows, or `not_stated` when the source gives no call times.
+# A channel's own `source_url` is set where its data comes from another page than the institution's.
+
+- id: pva_vienna
+  name: Pensionsversicherung (PV), Landesstelle Wien
+  kind: insurer
+  address: Friedrich-Hillegeist-Straße 1, 1020 Wien
+  channels:
+    - id: phone
+      type: phone
+      value: +43 (0)5 03 03
+      label: Telefonischer Kundenservice
+      hours:
+        - {days: [mon, tue, wed], from: "07:00", to: "15:30"}
+        - {days: [thu], from: "07:00", to: "18:00"}
+        - {days: [fri], from: "07:00", to: "15:00"}
+      source_url: https://www.pv.at/cdscontent/load?contentid=10008.776966&version=1740571496
+    - id: appointments
+      type: phone
+      value: +43 (0)5 03 03-27 170
+      label: Terminvereinbarung für eine persönliche Beratung
+      hours: not_stated
+    - id: email
+      type: email
+      value: pva-lsw@pv.at
+    - id: customer_centre
+      type: visit
+      value: Ghegastraße 1, 1030 Wien
+      label: Zentrum für Kund*innen (Beratung nach Terminvereinbarung)
+      hours:
+        - {days: [mon, tue, wed], from: "07:00", to: "15:00"}
+        - {days: [thu], from: "07:00", to: "18:00"}
+        - {days: [fri], from: "07:00", to: "15:00"}
+  source_url: https://www.pv.at/web/service-und-kontakt/kontakt/wien/kontakt-wien
+  verified_at: 2026-11-05
+
+- id: bvaeb
+  name: Versicherungsanstalt öffentlich Bediensteter, Eisenbahnen und Bergbau (BVAEB)
+  kind: insurer
+  # No contact page in the local sources yet: steps to this institution show that the contact is missing.
+  channels: []
+  source_url: https://www.pv.at/web/pflegegeld
+  verified_at: 2026-11-05
+
+- id: svs
+  name: Sozialversicherungsanstalt der Selbständigen (SVS)
+  kind: insurer
+  channels: []
+  source_url: https://www.pv.at/web/pflegegeld
+  verified_at: 2026-11-05
+
+- id: fsw_customer_service
+  name: Fonds Soziales Wien (FSW), Kund:innenservice
+  kind: authority
+  # Address from the FSW application form (page 13, "Antrag auf Förderung von Leistungen", V8 03/2026).
+  address: Guglgasse 7–9, 1030 Wien
+  channels:
+    - id: phone
+      type: phone
+      value: 01/24 5 24
+      label: FSW-Kund:innenservice (kostenloses Rückrufservice möglich)
+      hours:
+        - {days: [mon, tue, wed, thu, fri, sat, sun], from: "08:00", to: "20:00"}
+    - id: email
+      type: email
+      value: post@fsw.at
+    - id: applications_email
+      type: email
+      value: kundinnenservice@fsw.at
+      label: Anträge mit Beilagen
+      source_url: https://www.fsw.at/antrag
+    - id: portal
+      type: web
+      value: https://mein.fsw.at
+      label: Kund:innenportal MeinFSW (Anträge online)
+      source_url: https://www.fsw.at/antrag
+  source_url: https://www.fsw.at/kontakt
+  verified_at: 2026-11-05
+
+- id: carer_competence_centre
+  name: Kompetenzzentrum „Qualitätssicherung in der häuslichen Pflege“ (SVS, im Auftrag des Sozialministeriums)
+  kind: counselling
+  channels:
+    - id: phone
+      type: phone
+      value: 050 808 2087
+      label: Information und Anmeldung
+      hours: not_stated
+    - id: carer_talk_email
+      type: email
+      value: angehoerigengespraech@svqspg.at
+      label: Angehörigengespräch
+    - id: home_visit_email
+      type: email
+      value: qualitaetssicherung@svqspg.at
+      label: Hausbesuch auf Wunsch
+  source_url: https://www.gesundheit.gv.at/leben/altern/wohnen-im-alter/pflegende-angehoerige-entlastungen-unterstuetzungen.html
+  verified_at: 2026-11-05
+
+- id: oegk_vienna_customer_service
+  name: Österreichische Gesundheitskasse (ÖGK), Kundenservice Wien Wienerberg
+  kind: insurer
+  address: Wienerbergstraße 15-19, EG, 1100 Wien
+  channels:
+    - id: phone
+      type: phone
+      value: +43 5 0766-11
+      hours: not_stated
+    - id: email
+      type: email
+      value: wienerberg@oegk.at
+    - id: visit
+      type: visit
+      value: Wienerbergstraße 15-19, EG, 1100 Wien
+      label: Kundenservice (persönliche Beratung mit Online-Termin)
+      hours:
+        - {days: [mon, tue, wed, thu, fri], from: "07:00", to: "16:00"}
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.870674&portal=oegkportal
+  verified_at: 2026-11-05
+
+- id: health_hotline_1450
+  name: Gesundheitsberatung 1450
+  kind: hotline
+  channels:
+    - id: phone
+      type: phone
+      value: "1450"
+      label: Telefonische Gesundheitsberatung, ohne Vorwahl aus allen Netzen
+      hours:
+        - {days: [mon, tue, wed, thu, fri, sat, sun], from: "00:00", to: "24:00"}
+  source_url: https://www.sozialministerium.gv.at/Themen/Gesundheit/eHealth/Gesundheitsberatung-1450.html
+  verified_at: 2026-11-05
+
+- id: emergency_144
+  name: Rettungsnotruf
+  kind: hotline
+  channels:
+    - id: phone
+      type: phone
+      value: "144"
+      label: In medizinischen Notfällen, z. B. bei schweren Unfällen, akuter Atemnot oder Bewusstlosigkeit
+      hours: not_stated
+  source_url: https://www.sozialministerium.gv.at/Themen/Gesundheit/eHealth/Gesundheitsberatung-1450.html
+  verified_at: 2026-11-05

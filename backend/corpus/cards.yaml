@@ -1,0 +1,23 @@
+# Fixed cards: no LLM text, contacts from institutions.yaml (sections 6.1 and 10).
+
+boundary:
+  title: Medizinische Fragen beantwortet der Lotse nicht
+  text: >-
+    Bei Beschwerden, Diagnosen, Medikamenten oder gesundheitlichen Risiken wenden Sie sich bitte an Ihre Hausärztin
+    oder Ihren Hausarzt, an die telefonische Gesundheitsberatung oder im Notfall an die Rettung. Bei Pflegegeld,
+    Anträgen und Unterstützung im Alltag hilft der Lotse gerne weiter.
+  contacts: [health_hotline_1450, emergency_144]
+
+out_of_scope:
+  title: Der Lotse kennt nur Angebote in Wien
+  text: >-
+    Für Wohnorte außerhalb von Wien sind andere Stellen zuständig, die der Lotse noch nicht kennt. Wenn es doch um
+    Wien geht, ändern Sie den Bezirk oben bei „Verstanden“.
+  contacts: []
+
+general:
+  title: Dazu hat der Lotse noch keinen passenden Plan
+  text: >-
+    Der Lotse kennt bisher Pflegegeld, Unterstützung zu Hause und Entlastung für pflegende Angehörige in Wien.
+    Bei anderen Fragen zur Krankenversicherung hilft das Kundenservice der ÖGK weiter.
+  contacts: [oegk_vienna_customer_service]

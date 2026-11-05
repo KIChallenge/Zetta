@@ -1,0 +1,19 @@
+# Application forms. `svbox_file` is the local copy in data/raw/svbox (not committed).
+
+- id: care_allowance_form
+  title: Antrag auf Pflegegeld (PAL 080)
+  url: https://www.pv.at/cdscontent/load?contentid=10008.781956&version=1783516198
+  online_url: https://www.sozialversicherung.gv.at/formgen/?contentid=10007.892452&portal=pvportal&LO=1&layout=withNav&svtcode=02
+  svbox_file: Anträge und Formulare/PAL080_0125_Mpfl_052026.pdf
+  submit_to: pva_vienna
+  source_url: https://www.pv.at/web/pflegegeld
+  verified_at: 2026-11-05
+
+- id: fsw_application_form
+  title: Antrag auf Förderung von Leistungen (FSW)
+  url: https://www.fsw.at/downloads/foerderwesen_anerkennung/foerderansuchen/subjektfoerderung/fsw-antrag-auf-foerderung-von-leistungen.pdf
+  online_url: https://mein.fsw.at
+  svbox_file: Anträge und Formulare/fsw-antrag-auf-foerderung-von-leistungen.1779095804.pdf
+  submit_to: fsw_customer_service
+  source_url: https://www.fsw.at/antrag
+  verified_at: 2026-11-05
