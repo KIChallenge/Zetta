@@ -247,9 +247,9 @@ async function upload(e: Event) {
   draftErr.value = ''
   uploading.value = true
   try {
-    // From the start view the letter is the first message: open a new chat for it, as start() does for text.
+    // From the start view the document is the first message: open a new chat for it, as start() does for text.
     if (!id) {
-      const c = await createChat(t('Entlassungsbrief'))
+      const c = await createChat(t('Dokument'))
       put(c)
       messages.value = []
       facts.value = []
@@ -518,7 +518,7 @@ async function confirmDelete() {
           <div class="cbox-row">
             <input ref="fileInput" type="file" accept="application/pdf" class="sr" tabindex="-1" @change="upload" />
             <button type="button" class="btn btn-quiet" :aria-disabled="uploading || busy || !!run" @click="!uploading && !busy && !run && fileInput?.click()">
-              <svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ uploading ? t('Brief wird gelesen …') : t('Entlassungsbrief (PDF)') }}
+              <svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ uploading ? t('Dokument wird gelesen …') : t('Dokument (PDF)') }}
             </button>
             <button type="submit" class="btn btn-primary send" :aria-disabled="busy || !!run">
               {{ busy || run ? t('Einen Moment …') : t('Senden') }}<svg class="i" aria-hidden="true"><use href="#i-arrow" /></svg>

@@ -70,12 +70,12 @@ function show(id: string) {
         <span class="pill" :data-tone="svc.eligibility === 'likely' ? 'ready' : 'wait'">
           {{ svc.eligibility === 'likely' ? t('Kommt in Frage') : t('Kommt vielleicht in Frage') }}
         </span>
-        <span v-if="svc.quotes.length" class="pill" data-tone="wait">{{ t('Laut Ihrem Brief') }}</span>
+        <span v-if="svc.quotes.length" class="pill" data-tone="wait">{{ t('Laut Ihrem Dokument') }}</span>
         <button type="button" class="linkbtn svc-more-btn" :aria-expanded="more.has(svc.id)" :aria-controls="`more-${svc.id}`" @click="toggleMore(svc.id)">{{ t('Mehr dazu') }}</button>
       </div>
       <div v-if="more.has(svc.id)" :id="`more-${svc.id}`" class="svc-more">
         <p>{{ t(svc.summary) }}</p>
-        <blockquote v-for="qt in svc.quotes" :key="qt" class="quote">{{ t('In Ihrem Brief steht:') }} „{{ qt }}“</blockquote>
+        <blockquote v-for="qt in svc.quotes" :key="qt" class="quote">{{ t('In Ihrem Dokument steht:') }} „{{ qt }}“</blockquote>
         <ul v-if="svc.criteria.length" class="crit">
           <li v-for="c in svc.criteria" :key="c.text" :data-state="c.state">
             <svg class="i" aria-hidden="true"><use :href="c.state === 'met' ? '#i-check' : '#i-info'" /></svg>

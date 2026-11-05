@@ -19,8 +19,8 @@ LOCALES_DIR = FRONTEND_SRC / "locales"
 # Texts from the backend's code. Those with variable parts are patterns in frontend/src/i18n.ts.
 FROM_CODE = (
     "Hier ist Ihr Plan.",
-    "Das steht in Ihrem Brief. Stimmt das?",
-    "In Ihrem Brief habe ich keine Empfehlung gefunden, zu der der Lotse helfen kann.",
+    "Das steht in Ihrem Dokument. Stimmt das?",
+    "In Ihrem Dokument habe ich keine Empfehlung gefunden, zu der der Lotse helfen kann.",
     "Erledigt",
     "Wartet auf Rückmeldung",
     "1 offener Schritt",

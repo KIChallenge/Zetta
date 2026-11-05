@@ -150,7 +150,7 @@ FACTS: dict[str, Fact] = {
         "When the user prefers appointments or calls.",
     ),
     "documented_recommendations": Fact(
-        "Laut Ihrem Brief",
+        "Laut Ihrem Dokument",
         {
             "outpatient_rehab": "Ambulante Reha",
             "inpatient_rehab": "Stationäre Reha",

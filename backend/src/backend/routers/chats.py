@@ -214,9 +214,9 @@ async def upload_document(
         chat_id=chat.id,
         role="assistant",
         kind="confirm",
-        text="Das steht in Ihrem Brief. Stimmt das?"
+        text="Das steht in Ihrem Dokument. Stimmt das?"
         if items
-        else "In Ihrem Brief habe ich keine Empfehlung gefunden, zu der der Lotse helfen kann.",
+        else "In Ihrem Dokument habe ich keine Empfehlung gefunden, zu der der Lotse helfen kann.",
         payload={"items": [{**i, "label": labels[i["recommendation"]]} for i in items]},
         created_at=now,
     )
