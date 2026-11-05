@@ -1,0 +1,5 @@
+# Expected result for data/raw/svbox/Befunde/Entlassungsbefund.pdf (spec 21.2), sections 6 and 7.
+# TODO(team): add at least two letters written by someone who does not write the prompts.
+file: svbox/Befunde/Entlassungsbefund.pdf
+expect: [follow_up_check, home_help, home_nursing, inpatient_rehab, nutrition_counselling, transport_to_treatment]
+# Medical tasks for doctors (blood values, blood pressure therapy, medication) map to no value by design.

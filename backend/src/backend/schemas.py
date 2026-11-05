@@ -10,7 +10,10 @@ from pydantic import (
     Field,
     PlainSerializer,
     StringConstraints,
+    model_validator,
 )
+
+from backend import facts
 
 Email = Annotated[EmailStr, AfterValidator(str.lower)]
 Password = Annotated[str, Field(min_length=8, max_length=128)]
@@ -54,6 +57,7 @@ class ChatResponse(BaseModel):
     title: str
     created_at: Timestamp
     updated_at: Timestamp
+    status: str | None = None  # computed: "3 offene Schritte", "Frage offen", ...
 
 
 class MessageRequest(BaseModel):
@@ -65,8 +69,34 @@ class MessageResponse(BaseModel):
 
     id: str
     role: Literal["user", "assistant"]
+    kind: Literal["text", "answer", "document", "question", "confirm", "plan", "card"]
     text: str
+    payload: dict | None
     created_at: Timestamp
+
+
+class AnswerRequest(BaseModel):
+    """A chip answer or a fact edit; the value is checked against the fact schema."""
+
+    fact_key: str
+    value: str | list[str]
+
+    @model_validator(mode="after")
+    def known(self):
+        # A single chip for a list fact (e.g. one goal) is a list of one.
+        fact = facts.FACTS.get(self.fact_key)
+        if fact and fact.multi and isinstance(self.value, str) and not facts.is_sentinel(self.value):
+            self.value = [self.value]
+        if not facts.valid(self.fact_key, self.value):
+            raise ValueError("unknown fact or value")
+        return self
+
+
+class StepUpdate(BaseModel):
+    status: Literal["done", "skipped", "open"] | None = None
+    outcome: str | None = Field(None, max_length=40)
+    note: str | None = Field(None, max_length=2000)
+    checks: list[Annotated[str, Field(max_length=100)]] | None = Field(None, max_length=50)
 
 
 # Weights of the Austrian check digit (the 4th digit, so its own weight is 0).

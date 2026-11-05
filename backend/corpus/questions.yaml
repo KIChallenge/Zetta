@@ -1,0 +1,73 @@
+# One question per fact key, asked one at a time with chips (section 6.2). The order breaks ties.
+# `text.other` may use {subject.ihr} ("Ihre Mutter"). Chips default to all values of the fact,
+# plus "Weiß nicht" and "Möchte ich nicht sagen".
+
+- fact_key: goal
+  text:
+    self: Wobei kann der Lotse Ihnen helfen?
+    other: Wobei kann der Lotse Ihnen helfen?
+  why_we_ask: Der Lotse kennt bestimmte Angebote. Wählen Sie das passende, oder beschreiben Sie Ihr Anliegen genauer.
+  chips:
+    - {value: apply_care_allowance}
+    - {value: find_support_services}
+    - {value: after_hospital}
+    - {value: health_promotion}
+    - {value: child_offers}
+    - {value: doctor_appointment}
+    - {value: financial_help}
+    - {value: unknown, label: Etwas anderes}
+
+- fact_key: subject
+  text:
+    self: Für wen suchen Sie Unterstützung?
+    other: Für wen suchen Sie Unterstützung?
+  why_we_ask: Damit Anrufe und E-Mails richtig formuliert sind.
+
+- fact_key: district
+  text:
+    self: In welchem Wiener Bezirk wohnen Sie?
+    other: In welchem Wiener Bezirk wohnt {subject.ihr}?
+  why_we_ask: Der Lotse kennt Angebote in Wien. Außerhalb von Wien sind andere Stellen zuständig.
+
+- fact_key: pension_payer
+  text:
+    self: Beziehen Sie eine Pension? Wenn ja, von welcher Stelle?
+    other: Bezieht {subject.ihr} eine Pension? Wenn ja, von welcher Stelle?
+  why_we_ask: Beim Pflegegeld ist die Stelle zuständig, die die Pension auszahlt.
+
+- fact_key: lives_alone
+  text:
+    self: Leben Sie allein?
+    other: Lebt {subject.ihr} allein?
+  why_we_ask: Das hilft beim Gespräch über Unterstützung zu Hause.
+
+- fact_key: subject_age_band
+  text:
+    self: Wie alt sind Sie?
+    other: Wie alt ist {subject.ihr}?
+  why_we_ask: Untersuchungen und Impfungen hängen vom Alter ab.
+
+- fact_key: interests
+  text:
+    self: Was interessiert Sie am meisten?
+    other: Was interessiert Sie am meisten?
+  why_we_ask: Der Lotse zeigt nur Angebote zu dem, was Sie gewählt haben.
+  multi: true
+
+- fact_key: appointment_reason
+  text:
+    self: Worum geht es beim Termin?
+    other: Worum geht es beim Termin?
+  why_we_ask: Bei akuten Beschwerden ist ein anderer Weg schneller als ein normaler Termin.
+
+- fact_key: specialty
+  text:
+    self: Zu welcher Fachrichtung möchten Sie?
+    other: Zu welcher Fachrichtung möchten Sie?
+  why_we_ask: Danach suchen Sie die Ordination. Der Lotse wählt keine Fachrichtung für Sie aus.
+
+- fact_key: preferred_time
+  text:
+    self: Wann passt Ihnen ein Termin am besten?
+    other: Wann passt ein Termin am besten?
+  why_we_ask: Damit Ihr Gesprächsleitfaden gleich danach fragt.

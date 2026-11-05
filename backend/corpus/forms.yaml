@@ -1,0 +1,49 @@
+# Application forms. `svbox_file` is the local copy in data/raw/svbox (not committed).
+
+- id: care_allowance_form
+  title: Antrag auf Pflegegeld (PAL 080)
+  url: https://www.pv.at/cdscontent/load?contentid=10008.781956&version=1783516198
+  online_url: https://www.sozialversicherung.gv.at/formgen/?contentid=10007.892452&portal=pvportal&LO=1&layout=withNav&svtcode=02
+  svbox_file: Anträge und Formulare/PAL080_0125_Mpfl_052026.pdf
+  submit_to: pva_vienna
+  source_url: https://www.pv.at/web/pflegegeld
+  verified_at: 2026-11-05
+
+- id: fsw_application_form
+  title: Antrag auf Förderung von Leistungen (FSW)
+  url: https://www.fsw.at/downloads/foerderwesen_anerkennung/foerderansuchen/subjektfoerderung/fsw-antrag-auf-foerderung-von-leistungen.pdf
+  online_url: https://mein.fsw.at
+  svbox_file: Anträge und Formulare/fsw-antrag-auf-foerderung-von-leistungen.1779095804.pdf
+  submit_to: fsw_customer_service
+  source_url: https://www.fsw.at/antrag
+  verified_at: 2026-11-05
+
+- id: rehab_form
+  title: Antrag auf Rehabilitations-, Kur- bzw. Erholungsaufenthalt
+  url: https://www.sozialversicherung.at/cdscontent/load?contentid=10008.555945&version=1767088043
+  svbox_file: Anträge und Formulare/Antrag Kur und Reha.pdf
+  submit_to: pva_vienna
+  source_url: https://www.pv.at/web/reha-und-praevention/vom-antrag-zu-reha-und-kur
+  verified_at: 2026-11-05
+
+- id: transport_cost_form
+  title: Antrag auf Zuschuss zu Fahrtkosten (ÖGK Wien)
+  url: https://www.oegk.at/cdscontent/load?contentid=10008.777900&version=1785415038
+  svbox_file: Anträge und Formulare/Antrag-auf-Zuschuss-zu-Fahrtkosten_Wien.pdf
+  submit_to: oegk_vienna_customer_service
+  source_url: https://www.oegk.at/cdscontent/load?contentid=10008.777900&version=1785415038
+  verified_at: 2026-11-05
+
+- id: family_allowance_form
+  title: Antrag auf Familienbeihilfe (Beih 3)
+  url: https://formulare.bmf.gv.at/service/formulare/inter-steuern/pdfs/9999/beih3.pdf
+  submit_to: tax_office
+  source_url: https://www.oesterreich.gv.at/de/themen/familie_und_partnerschaft/familienbeihilfe/Seite.450233
+  verified_at: 2026-11-05
+
+- id: minimum_income_form
+  title: Antrag auf Mindestsicherung (online, Stadt Wien)
+  url: https://mein.wien.gv.at/formularserver-mw/user/formular.aspx?path=(mw%2Fstandard)&pid=06a2e3ecbb6b4302b4f134a505de83
+  submit_to: ma40_service
+  source_url: https://www.wien.gv.at/amtswege/mindestsicherung-antrag
+  verified_at: 2026-11-05

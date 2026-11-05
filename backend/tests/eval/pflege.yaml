@@ -1,0 +1,182 @@
+# Scenario 12.1 (Pflege): extraction eval set (spec 14 and 16).
+#
+# Each case: a phrasing, the facts a correct extraction yields (`facts`, used by the offline engine test),
+# the answers the user would give to the chips (missing ones are answered "Weiß nicht"), and the
+# expected result. `services` must all be in the plan; the plan may contain more.
+#
+# Split: prompts are only tuned on `tuning`; `held_out` is only measured (scripts/eval.py).
+# TODO(team): part of the held-out set must be written by someone who did not write the prompts.
+
+cases:
+  - id: tuning-01
+    split: tuning
+    text: Meine Mutter ist chronisch krank und kommt allein nicht mehr zurecht. Was kann ich tun?
+    facts: {subject: mother, needs_daily_help: a_lot}
+    answers: {district: "1100", pension_payer: pv, lives_alone: "yes"}
+    expect: plan
+    services: [care_allowance, home_care_fsw, carer_support]
+
+  - id: tuning-02
+    split: tuning
+    text: Wie beantrage ich Pflegegeld für meinen Vater?
+    facts: {subject: father, goal: [apply_care_allowance]}
+    answers: {district: "1020", pension_payer: pv}
+    expect: plan
+    services: [care_allowance]
+
+  - id: tuning-03
+    split: tuning
+    text: Ich brauche Hilfe im Haushalt, ich schaffe das Einkaufen und Putzen nicht mehr.
+    facts: {subject: self, needs_daily_help: some, goal: [find_support_services]}
+    answers: {district: "1160", pension_payer: pv, lives_alone: "yes"}
+    expect: plan
+    services: [home_care_fsw]
+
+  - id: tuning-04
+    split: tuning
+    text: mama braucht pflege wer hilft
+    facts: {subject: mother, needs_daily_help: a_lot}
+    answers: {district: "1030", pension_payer: pv, lives_alone: "no"}
+    expect: plan
+    services: [care_allowance, home_care_fsw]
+
+  - id: tuning-05
+    split: tuning
+    text: My father lives alone in Vienna and can't manage on his own anymore. What support is there?
+    facts: {subject: father, lives_alone: "yes", needs_daily_help: a_lot, goal: [find_support_services]}
+    answers: {district: "1190", pension_payer: pv}
+    expect: plan
+    services: [care_allowance, home_care_fsw]
+
+  - id: tuning-06
+    split: tuning
+    text: Ich pflege meine Oma seit Monaten und bin völlig erschöpft.
+    facts: {subject: other_relative, needs_daily_help: a_lot}
+    answers: {district: "1150", pension_payer: unknown, lives_alone: "no"}
+    expect: plan
+    services: [carer_support]
+
+  - id: tuning-07
+    split: tuning
+    text: Pflegegeld
+    facts: {goal: [apply_care_allowance]}
+    answers: {subject: self, district: "1220", pension_payer: pv}
+    expect: plan
+    services: [care_allowance]
+
+  - id: tuning-08
+    split: tuning
+    text: Mein Mann hatte einen Schlaganfall, welche Medikamente braucht er jetzt?
+    facts: {subject: partner}
+    medical: true
+    expect: boundary
+
+  - id: held-out-01
+    split: held_out
+    text: Meine Mama (84) wohnt allein im 10. und schafft den Alltag nicht mehr, kann sie Essen auf Rädern bekommen?
+    facts: {subject: mother, district: "1100", lives_alone: "yes", needs_daily_help: a_lot, goal: [find_support_services]}
+    answers: {pension_payer: pv}
+    expect: plan
+    services: [care_allowance, home_care_fsw]
+
+  - id: held-out-02
+    split: held_out
+    text: Hallo, ich hab eine frage zum pfelgegeld fur meine mutter, die bekommt pension von der PVA
+    facts: {subject: mother, goal: [apply_care_allowance], pension_payer: pv}
+    answers: {district: "1120"}
+    expect: plan
+    services: [care_allowance]
+
+  - id: held-out-03
+    split: held_out
+    text: Mein Vater lebt in Graz und braucht Pflege.
+    facts: {subject: father, district: outside_vienna, needs_daily_help: a_lot}
+    expect: out_of_scope
+
+  - id: held-out-04
+    split: held_out
+    text: Meine Schwiegermutter war Beamtin, ist jetzt in Pension und braucht inzwischen sehr viel Hilfe.
+    facts: {subject: other_relative, pension_payer: bvaeb, needs_daily_help: a_lot}
+    answers: {district: "1180", lives_alone: "yes"}
+    expect: plan
+    services: [care_allowance, home_care_fsw, carer_support]
+
+  - id: held-out-05
+    split: held_out
+    text: Ich möchte nichts Persönliches sagen, ich brauche nur Infos zu Hilfe zu Hause.
+    facts: {goal: [find_support_services]}
+    answers: {subject: declined, district: declined, lives_alone: declined}
+    expect: plan
+    services: [home_care_fsw]
+
+  - id: held-out-06
+    split: held_out
+    text: My mum needs care at home. I have no idea which insurance she has.
+    facts: {subject: mother, needs_daily_help: a_lot, goal: [find_support_services]}
+    answers: {district: "1050", pension_payer: unknown, lives_alone: "no"}
+    expect: plan
+    services: [care_allowance, home_care_fsw]
+
+  - id: held-out-07
+    split: held_out
+    text: >-
+      Ich brauche Hilfe. Mein Mann kann seit seinem Sturz nicht mehr allein duschen, ich arbeite Vollzeit und unser
+      Hund muss auch noch versorgt werden.
+    facts: {subject: partner, needs_daily_help: a_lot}
+    answers: {district: "1140", pension_payer: pv, lives_alone: "no"}
+    expect: plan
+    services: [care_allowance, home_care_fsw, carer_support]
+
+  - id: held-out-08
+    split: held_out
+    text: Meine Mutter braucht Pflege. Welche Tabletten helfen bei Unruhe in der Nacht, und was muss ich beim Antrag beachten?
+    facts: {subject: mother, needs_daily_help: a_lot}
+    medical: true
+    expect: boundary
+
+  - id: held-out-09
+    split: held_out
+    text: Ich will für mich Pflegegeld beantragen. Ich war selbständig und bin jetzt in Pension.
+    facts: {subject: self, goal: [apply_care_allowance], pension_payer: svs}
+    answers: {district: "1230"}
+    expect: plan
+    services: [care_allowance]
+
+  - id: held-out-10
+    split: held_out
+    text: Mein Kind ist schwer behindert und braucht rund um die Uhr Betreuung.
+    facts: {subject: child, needs_daily_help: a_lot}
+    answers: {district: "1210", pension_payer: none, lives_alone: "no"}
+    expect: plan
+    services: [care_allowance, home_care_fsw, carer_support]
+
+  - id: held-out-11
+    split: held_out
+    text: Meine Mutter kann nicht mehr allein einkaufen und kochen. Sie wohnt in Wien-Floridsdorf.
+    facts: {subject: mother, district: "1210", needs_daily_help: some}
+    answers: {pension_payer: pv, lives_alone: "yes"}
+    expect: plan
+    services: [home_care_fsw]
+
+  - id: held-out-12
+    split: held_out
+    text: Mama alt. Allein. Braucht Hilfe. Was tun?
+    facts: {subject: mother, lives_alone: "yes", needs_daily_help: a_lot}
+    answers: {district: "1100", pension_payer: pv}
+    expect: plan
+    services: [care_allowance, home_care_fsw]
+
+  # Scenario 12.3: after a hospital stay the plan starts with uploading the letter.
+  - id: tuning-09
+    split: tuning
+    text: Ich habe einen Entlassungsbrief bekommen, was muss ich jetzt erledigen?
+    facts: {subject: self, goal: [after_hospital]}
+    expect: plan
+    services: [after_hospital]
+
+  - id: held-out-13
+    split: held_out
+    text: Mein Vater ist gestern aus dem Krankenhaus heimgekommen. Was müssen wir jetzt organisieren?
+    facts: {subject: father, goal: [after_hospital]}
+    expect: plan
+    services: [after_hospital]

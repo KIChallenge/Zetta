@@ -1,0 +1,9 @@
+# Scenario 12.4 (Kind).
+cases:
+  - {id: kind-tuning-01, split: tuning, text: "Ich habe ein Kind und möchte wissen, welche Angebote es gibt.", facts: {subject: child, goal: [child_offers]}, answers: {subject_age_band: "0-5", district: "1100"}, expect: plan, services: [parent_child_pass, vaccination, family_allowance, family_counselling]}
+  - {id: kind-tuning-02, split: tuning, text: "Meine Tochter ist 3 Monate alt. Welche Untersuchungen stehen an?", facts: {subject: child, subject_age_band: "0-5", goal: [child_offers]}, answers: {district: "1210"}, expect: plan, services: [parent_child_pass]}
+  - {id: kind-tuning-03, split: tuning, text: "Bekomme ich Familienbeihilfe für meinen Sohn?", facts: {subject: child, goal: [child_offers]}, answers: {subject_age_band: "6-14", district: "1030"}, expect: plan, services: [family_allowance]}
+  - {id: kind-held-01, split: held_out, text: "Welche Impfungen sind für mein Kind (8) gratis?", facts: {subject: child, subject_age_band: "6-14", interests: [vaccination]}, answers: {district: "1100"}, expect: plan, services: [vaccination]}
+  - {id: kind-held-02, split: held_out, text: "We just had a baby in Vienna, what do we need to do?", facts: {subject: child, subject_age_band: "0-5", goal: [child_offers]}, answers: {district: "1070"}, expect: plan, services: [parent_child_pass, family_allowance]}
+  - {id: kind-held-03, split: held_out, text: "Wir haben Stress in der Familie mit unserem Teenager, wo gibt es Beratung?", facts: {subject: child, subject_age_band: "15-17", goal: [child_offers]}, answers: {district: "1160"}, expect: plan, services: [family_counselling]}
+  - {id: kind-held-04, split: held_out, text: "kind 2 jahre was gibts", facts: {subject: child, subject_age_band: "0-5", goal: [child_offers]}, answers: {district: unknown}, expect: plan, services: [parent_child_pass, family_allowance]}

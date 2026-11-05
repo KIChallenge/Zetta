@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
+from backend.corpus import get_corpus
 from backend.database import Base, engine
 from backend.errors import register_exception_handlers
 from backend.routers import auth, chats, users
@@ -13,6 +14,7 @@ from backend.routers import auth, chats, users
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     Base.metadata.create_all(engine)
+    get_corpus()  # a broken corpus fails at startup, not mid-chat
     yield
 
 

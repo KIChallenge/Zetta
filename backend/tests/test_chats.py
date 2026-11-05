@@ -5,6 +5,7 @@ import re
 import pytest
 from sqlalchemy import func, select
 
+from backend import pipeline
 from backend.app import app
 from backend.database import SessionLocal
 from backend.models import Message
@@ -58,11 +59,6 @@ def history(client, headers, chat_id):
     return [(m["role"], m["text"]) for m in messages]
 
 
-def chat_part(sent):
-    """The chat history the LLM got, without the system messages."""
-    return [m for m in sent if m["role"] != "system"]
-
-
 def assert_error(response, status, detail=None):
     assert response.status_code == status
     body = response.json()
@@ -77,7 +73,8 @@ def test_create_chat(client, anna):
 
     assert response.status_code == 201
     body = response.json()
-    assert set(body) == {"id", "title", "created_at", "updated_at"}
+    assert set(body) == {"id", "title", "created_at", "updated_at", "status"}
+    assert body["status"] is None
     assert body["title"] == "Hilfe für meine Mutter"
     assert TIMESTAMP.match(body["created_at"])
     assert body["updated_at"] == body["created_at"]
@@ -177,27 +174,68 @@ def test_delete_chat_removes_it_and_its_messages(client, anna):
     assert len(client.get(f"/chats/{kept['id']}/messages", headers=anna).json()) == 2
 
 
-def test_send_message_streams_the_reply(client, anna, llm):
+MOTHER = {"subject": "mother", "needs_daily_help": "a_lot"}
+PROFILE = {
+    "full_name": "Anna Berger",
+    "street": "Favoritenstraße 1",
+    "postal_code": "1100",
+    "city": "Wien",
+    "svnr": "1237 010180",
+    "phone": "0660 1234567",
+    "contact_email": "anna@example.at",
+}
+
+
+def answer(client, headers, chat_id, key, value):
+    response = client.post(f"/chats/{chat_id}/answers", json={"fact_key": key, "value": value}, headers=headers)
+    assert response.status_code == 200
+    return parse_events(response)
+
+
+def reply(events):
+    assert events[-1][0] == "done", events
+    return events[-1][1]
+
+
+def to_plan(client, headers, llm, chat_id):
+    """First message about the mother, then chip answers until the plan."""
+    llm.facts = MOTHER
+    assert reply(send(client, headers, chat_id))["payload"]["fact_key"] == "district"
+    assert reply(answer(client, headers, chat_id, "district", "1100"))["payload"]["fact_key"] == "pension_payer"
+    assert reply(answer(client, headers, chat_id, "pension_payer", "pv"))["payload"]["fact_key"] == "lives_alone"
+    return answer(client, headers, chat_id, "lives_alone", "yes")
+
+
+def steps_of(plan):
+    return {s["id"]: s for s in plan["steps"]}
+
+
+def test_first_message_streams_facts_and_one_question(client, anna, llm):
+    llm.facts = MOTHER
     chat = create_chat(client, anna)
 
     response = client.post(f"/chats/{chat['id']}/messages", json={"text": QUESTION}, headers=anna)
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
-    assert response.headers["cache-control"] == "no-cache"
-    assert response.headers["x-accel-buffering"] == "no"
     events = parse_events(response)
-    assert [name for name, _ in events] == ["message", "delta", "delta", "delta", "title", "done"]
-    message, reply = events[0][1], events[-1][1]
-    assert set(message) == {"id", "role", "text", "created_at"}
-    assert message["role"] == "user"
-    assert message["text"] == QUESTION
+    assert [name for name, _ in events] == ["message", "facts", "title", "done"]
+    message, facts, question = events[0][1], events[1][1], events[-1][1]
+    assert set(message) == {"id", "role", "kind", "text", "payload", "created_at"}
+    assert (message["role"], message["kind"], message["text"]) == ("user", "text", QUESTION)
     assert TIMESTAMP.match(message["created_at"])
-    assert [data["text"] for name, data in events if name == "delta"] == llm.deltas
-    assert set(reply) == {"id", "role", "text", "created_at"}
-    assert reply["role"] == "assistant"
-    assert reply["text"] == "Hallo Anna!"
-    assert client.get(f"/chats/{chat['id']}/messages", headers=anna).json() == [message, reply]
+    assert [(f["key"], f["value"], f["source"]) for f in facts] == [
+        ("subject", "mother", "user_text"),
+        ("needs_daily_help", "a_lot", "user_text"),
+    ]
+    assert (question["role"], question["kind"]) == ("assistant", "question")
+    assert question["text"] == "In welchem Wiener Bezirk wohnt Ihre Mutter?"
+    assert question["payload"]["fact_key"] == "district"
+    assert {"value": "1100", "label": "10., Favoriten"} in question["payload"]["chips"]
+    assert {"value": "unknown", "label": "Weiß nicht"} in question["payload"]["chips"]
+    assert llm.calls[0] == ("extract", {"text": QUESTION, "question": None})
+    assert client.get(f"/chats/{chat['id']}/messages", headers=anna).json() == [message, question]
+    assert client.get("/chats", headers=anna).json()[0]["status"] == "Frage offen"
 
 
 def test_first_message_sets_a_generated_title(client, anna):
@@ -224,53 +262,252 @@ def test_failed_title_keeps_the_chat_title(client, anna, llm):
     assert client.get("/chats", headers=anna).json()[0]["title"] == chat["title"]
 
 
-def test_history_is_sent_oldest_first(client, anna, llm):
+def test_a_chip_answer_sets_the_fact_without_the_llm(client, anna, llm):
+    llm.facts = MOTHER
     chat = create_chat(client, anna)
-    send(client, anna, chat["id"], "eins")
-    send(client, anna, chat["id"], "zwei")
+    send(client, anna, chat["id"])
+    calls = len(llm.calls)
 
-    assert chat_part(llm.histories[-1]) == [
-        {"role": "user", "content": "eins"},
-        {"role": "assistant", "content": "Hallo Anna!"},
-        {"role": "user", "content": "zwei"},
-    ]
-    assert history(client, anna, chat["id"]) == [
-        ("user", "eins"),
-        ("assistant", "Hallo Anna!"),
-        ("user", "zwei"),
-        ("assistant", "Hallo Anna!"),
-    ]
+    events = answer(client, anna, chat["id"], "district", "1100")
+
+    assert [name for name, _ in events] == ["message", "facts", "done"]
+    message = events[0][1]
+    assert (message["kind"], message["text"]) == ("answer", "10., Favoriten")
+    assert message["payload"] == {"fact_key": "district", "value": "1100"}
+    district = next(f for f in events[1][1] if f["key"] == "district")
+    assert (district["value"], district["source"]) == ("1100", "chip")
+    assert reply(events)["text"] == "Bezieht Ihre Mutter eine Pension? Wenn ja, von welcher Stelle?"
+    assert len(llm.calls) == calls
 
 
-def test_history_is_capped_at_the_last_40_messages(client, anna, llm):
+def test_a_typed_answer_is_extracted_with_the_question_as_context(client, anna, llm):
+    llm.facts = MOTHER
     chat = create_chat(client, anna)
-    for i in range(21):
-        send(client, anna, chat["id"], str(i))
+    send(client, anna, chat["id"])
 
-    sent = chat_part(llm.histories[-1])
-    assert len(sent) == 40
-    assert sent[0] == {"role": "assistant", "content": "Hallo Anna!"}
-    assert sent[-1] == {"role": "user", "content": "20"}
+    send(client, anna, chat["id"], "Favoriten")
+
+    assert llm.calls[-1] == ("extract", {"text": "Favoriten", "question": "In welchem Wiener Bezirk wohnt Ihre Mutter?"})
+
+
+def test_chip_answers_win_over_a_later_extraction(client, anna, llm):
+    llm.facts = MOTHER
+    chat = create_chat(client, anna)
+    send(client, anna, chat["id"])
+    answer(client, anna, chat["id"], "district", "1100")
+
+    llm.facts = {"district": "1030"}
+    facts = dict(send(client, anna, chat["id"], "Mein Bruder wohnt im 3. Bezirk"))["facts"]
+
+    assert next(f for f in facts if f["key"] == "district")["value"] == "1100"
+
+
+def test_plan_has_filled_scripts_and_no_personal_data_goes_to_the_llm(client, anna, llm):
+    client.put("/me/profile", json=PROFILE, headers=anna)
+    chat = create_chat(client, anna)
+
+    events = to_plan(client, anna, llm, chat["id"])
+
+    assert [name for name, _ in events] == ["message", "facts", "plan", "done"]
+    plan, done = events[2][1], reply(events)
+    assert (done["kind"], done["text"], done["payload"]) == ("plan", llm.intro_text, {"version": 1})
+    assert [s["id"] for s in plan["services"]] == ["care_allowance", "home_care_fsw", "carer_support"]
+    steps = steps_of(plan)
+    call = steps["care_allowance.call"]
+    assert call["status"] == "available"
+    assert call["contact"]["value"] == "+43 (0)5 03 03"
+    assert call["contact"]["href"] == "tel:+4350303"
+    assert call["contact"]["hours"] == "Mo–Mi 7:00–15:30, Do 7:00–18:00, Fr 7:00–15:00"
+    assert call["script"]["opening"] == "Guten Tag, hier spricht Anna Berger."
+    assert call["script"]["source"] == "llm"
+    assert call["script"]["have_ready"] == [{"label": "SV-Nummer Ihrer Mutter", "value": None}]
+    assert [o["id"] for o in call["outcomes"]] == ["reached", "callback", "not_reached"]
+    mail = steps["home_care_fsw.send_application"]
+    assert mail["status"] == "blocked"
+    assert mail["contact"]["href"] == "mailto:kundinnenservice@fsw.at"
+    assert mail["script"]["body"].endswith("Anna Berger")
+    sent = json.dumps(llm.calls, ensure_ascii=False)
+    for value in ("Anna", "Berger", "1234567", "anna@example.at", "1237", "Favoritenstraße"):
+        assert value not in sent
+    assert client.get(f"/chats/{chat['id']}/state", headers=anna).json()["plan"] == plan
+    assert client.get("/chats", headers=anna).json()[0]["status"] == "11 offene Schritte"
+
+
+def test_profile_changes_show_up_in_the_scripts_right_away(client, anna, llm):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+
+    client.put("/me/profile", json={**PROFILE, "full_name": "Anna Huber"}, headers=anna)
+
+    plan = client.get(f"/chats/{chat['id']}/state", headers=anna).json()["plan"]
+    assert steps_of(plan)["care_allowance.call"]["script"]["opening"] == "Guten Tag, hier spricht Anna Huber."
+
+
+def test_step_states_survive_a_reload(client, anna, llm):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+    url = f"/chats/{chat['id']}/steps"
+
+    client.patch(f"{url}/care_allowance.call", json={"outcome": "reached", "note": "Antrag kommt per Post"}, headers=anna)
+    client.patch(f"{url}/documents", json={"checks": ["photo_id", "income_proof"]}, headers=anna)
+    plan = client.patch(f"{url}/documents", json={"status": "done"}, headers=anna).json()
+
+    assert plan == client.get(f"/chats/{chat['id']}/state", headers=anna).json()["plan"]
+    steps = steps_of(plan)
+    assert (steps["care_allowance.call"]["status"], steps["care_allowance.call"]["outcome"]) == ("done", "reached")
+    assert steps["care_allowance.call"]["note"] == "Antrag kommt per Post"
+    assert steps["documents"]["checks"] == ["photo_id", "income_proof"]
+    assert steps["care_allowance.submit"]["status"] == "available"
+    assert plan["status"] == "9 offene Schritte"
+
+
+def test_not_reached_keeps_the_call_open(client, anna, llm):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+
+    plan = client.patch(
+        f"/chats/{chat['id']}/steps/care_allowance.call", json={"outcome": "not_reached"}, headers=anna
+    ).json()
+
+    call = steps_of(plan)["care_allowance.call"]
+    assert (call["status"], call["outcome"]) == ("available", "not_reached")
+    assert TIMESTAMP.match(call["updated_at"])
+
+
+def test_a_done_step_can_be_reopened(client, anna, llm):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+    url = f"/chats/{chat['id']}/steps/care_allowance.info"
+    client.patch(url, json={"outcome": "read"}, headers=anna)
+
+    plan = client.patch(url, json={"status": "open"}, headers=anna).json()
+
+    info = steps_of(plan)["care_allowance.info"]
+    assert (info["status"], info["outcome"]) == ("available", None)
 
 
 @pytest.mark.parametrize(
-    ("deltas", "fail"), [([], True), (["Hal"], True), ([], False)], ids=["early", "mid", "empty"]
+    ("step", "body", "status"),
+    [
+        ("nope", {"status": "done"}, 404),
+        ("care_allowance.call", {"outcome": "granted"}, 422),
+        ("documents", {"checks": ["passport_of_the_cat"]}, 422),
+        ("documents", {"status": "finished"}, 422),
+    ],
 )
-def test_llm_error_sends_an_error_event_and_drops_the_message(client, anna, llm, deltas, fail):
-    llm.deltas, llm.fail = deltas, fail
+def test_invalid_step_updates_are_rejected(client, anna, llm, step, body, status):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+
+    assert_error(client.patch(f"/chats/{chat['id']}/steps/{step}", json=body, headers=anna), status)
+
+
+def test_step_update_without_a_plan_is_404(client, anna):
+    chat = create_chat(client, anna)
+
+    assert_error(client.patch(f"/chats/{chat['id']}/steps/documents", json={"status": "done"}, headers=anna), 404)
+
+
+def test_replan_keeps_step_states_and_unchanged_scripts(client, anna, llm):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+    client.patch(f"/chats/{chat['id']}/steps/care_allowance.call", json={"outcome": "reached"}, headers=anna)
+    scripted = sum(1 for method, _ in llm.calls if method == "scripts")
+
+    events = answer(client, anna, chat["id"], "lives_alone", "no")
+
+    plan = dict(events)["plan"]
+    assert reply(events)["payload"] == {"version": 2}
+    assert reply(events)["text"] == llm.intro_text
+    assert events[0][1]["text"] == "Lebt allein: Nein"
+    assert steps_of(plan)["care_allowance.call"]["status"] == "done"
+    # Only the FSW call uses lives_alone, so only its script is written again.
+    rewritten = [method_input for method, method_input in llm.calls if method == "scripts"][scripted:]
+    assert [[s["step_id"] for s in batch] for batch in rewritten] == [["home_care_fsw.call"]]
+
+
+def test_without_the_llm_the_chips_and_fallback_scripts_still_lead_to_a_plan(client, anna, llm):
+    llm.fail, llm.title_text = True, None
+    chat = create_chat(client, anna)
+
+    first = reply(send(client, anna, chat["id"]))
+    assert (first["kind"], first["payload"]["fact_key"]) == ("question", "goal")
+    assert {"value": "unknown", "label": "Etwas anderes"} in first["payload"]["chips"]
+    for key, value in [("goal", ["apply_care_allowance"]), ("subject", "mother"), ("district", "1100")]:
+        assert reply(answer(client, anna, chat["id"], key, value))["kind"] == "question"
+    events = answer(client, anna, chat["id"], "pension_payer", "pv")
+
+    plan = dict(events)["plan"]
+    assert reply(events)["text"] == "Hier ist Ihr Plan mit den nächsten Schritten: Pflegegeld."
+    call = steps_of(plan)["care_allowance.call"]
+    assert call["script"]["source"] == "fallback"
+    assert call["script"]["opening"] == "Guten Tag, mein Name ist [Ihr Name]. Ich rufe wegen eines Antrags auf Pflegegeld für meine Mutter an."
+
+
+def test_medical_question_gets_the_boundary_card(client, anna, llm):
+    llm.medical = True
+    chat = create_chat(client, anna)
+
+    card = reply(send(client, anna, chat["id"], "Welche Tabletten helfen gegen Schwindel?"))
+
+    assert (card["kind"], card["payload"]["card"]) == ("card", "boundary")
+    hotline = card["payload"]["contacts"][0]
+    assert hotline["name"] == "Gesundheitsberatung 1450"
+    assert hotline["channels"][0]["href"] == "tel:1450"
+    assert hotline["channels"][0]["reachable"]["open"] is True
+    assert client.get(f"/chats/{chat['id']}/messages", headers=anna).json()[-1] == card
+
+
+def test_outside_vienna_gets_the_out_of_scope_card(client, anna, llm):
+    llm.facts = MOTHER
+    chat = create_chat(client, anna)
+    send(client, anna, chat["id"])
+
+    card = reply(answer(client, anna, chat["id"], "district", "outside_vienna"))
+
+    assert card["payload"]["card"] == "out_of_scope"
+
+
+def test_the_question_loop_stops_at_the_cap(client, anna, llm):
+    chat = create_chat(client, anna)
+    for _ in range(4):
+        assert reply(send(client, anna, chat["id"], "Hallo"))["payload"]["fact_key"] == "goal"
+
+    card = reply(send(client, anna, chat["id"], "Hallo"))
+
+    assert card["payload"]["card"] == "general"
+    assert card["payload"]["contacts"][0]["channels"][0]["href"] == "tel:+435076611"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{"fact_key": "favourite_colour", "value": "blue"}, {"fact_key": "district", "value": "9999"},
+     {"fact_key": "goal", "value": "no_such_goal"}, {"fact_key": "goal", "value": []}],
+)  # fmt: skip
+def test_answers_reject_unknown_facts_and_values(client, anna, body):
+    chat = create_chat(client, anna)
+
+    assert_error(client.post(f"/chats/{chat['id']}/answers", json=body, headers=anna), 422)
+    assert client.get(f"/chats/{chat['id']}/messages", headers=anna).json() == []
+
+
+def test_an_unexpected_error_sends_an_error_event_and_drops_the_message(client, anna, monkeypatch):
+    def broken(*args, **kwargs):
+        raise RuntimeError("bug")
+
+    monkeypatch.setattr(pipeline, "evaluate", broken)
     chat = create_chat(client, anna)
 
     events = send(client, anna, chat["id"])
 
     assert events[0][0] == "message"
-    assert events[-1] == ("error", {"status": 502, "detail": "LLM reply failed"})
-    assert "done" not in dict(events)
+    assert events[-1] == ("error", {"status": 502, "detail": "Reply failed"})
     assert history(client, anna, chat["id"]) == []
 
 
-async def stop_after_first_delta(path, headers):
-    """Drive the app like a browser whose user presses Stop once the first delta arrived."""
-    got_delta = asyncio.Event()
+async def stop_after_message(path, headers):
+    """Drive the app like a browser whose user leaves the chat once the message was saved."""
+    saved = asyncio.Event()
     request = {"type": "http.request", "body": json.dumps({"text": QUESTION}).encode()}
 
     async def receive():
@@ -278,12 +515,12 @@ async def stop_after_first_delta(path, headers):
         if request:
             first, request = request, None
             return first
-        await got_delta.wait()
+        await saved.wait()
         return {"type": "http.disconnect"}
 
     async def send_(message):
-        if b"event: delta" in message.get("body", b""):
-            got_delta.set()
+        if b"event: message" in message.get("body", b""):
+            saved.set()
 
     scope = {
         "type": "http",
@@ -305,13 +542,13 @@ async def stop_after_first_delta(path, headers):
     await asyncio.wait_for(app(scope, receive, send_), timeout=5)
 
 
-def test_stop_keeps_the_partial_reply(client, anna, llm):
-    llm.deltas, llm.hang = ["Hallo"], True
+def test_leaving_during_the_extraction_keeps_the_message(client, anna, llm):
+    llm.hang = True
     chat = create_chat(client, anna)
 
-    asyncio.run(stop_after_first_delta(f"/chats/{chat['id']}/messages", anna))
+    asyncio.run(stop_after_message(f"/chats/{chat['id']}/messages", anna))
 
-    assert history(client, anna, chat["id"]) == [("user", QUESTION), ("assistant", "Hallo")]
+    assert history(client, anna, chat["id"]) == [("user", QUESTION)]
 
 
 def test_messages_of_new_chat_are_empty(client, anna):
@@ -336,6 +573,9 @@ def chat_requests(chat_id):
         ("DELETE", f"/chats/{chat_id}", None),
         ("GET", f"/chats/{chat_id}/messages", None),
         ("POST", f"/chats/{chat_id}/messages", {"text": "x"}),
+        ("POST", f"/chats/{chat_id}/answers", {"fact_key": "district", "value": "1100"}),
+        ("GET", f"/chats/{chat_id}/state", None),
+        ("PATCH", f"/chats/{chat_id}/steps/documents", {"status": "done"}),
     ]
 
 
@@ -360,3 +600,18 @@ def test_chat_endpoints_require_a_token(client):
     requests = [("GET", "/chats", None), ("POST", "/chats", {"title": "x"})]
     for method, url, body in requests + chat_requests("any"):
         assert_error(client.request(method, url, json=body), 401)
+
+
+def test_an_outcome_opens_its_branch(client, anna, llm):
+    chat = create_chat(client, anna)
+    plan = dict(to_plan(client, anna, llm, chat["id"]))["plan"]
+    assert "care_allowance.clarify" not in steps_of(plan)
+    url = f"/chats/{chat['id']}/steps/care_allowance.decision"
+    assert [o["id"] for o in steps_of(plan)["care_allowance.decision"]["outcomes"]] == ["granted", "rejected"]
+
+    plan = client.patch(url, json={"outcome": "rejected"}, headers=anna).json()
+
+    clarify = steps_of(plan)["care_allowance.clarify"]
+    assert (clarify["status"], clarify["contact"]["href"]) == ("available", "tel:+4350303")
+    assert clarify["script"]["opening"]  # written with the plan, shown once the branch opens
+    assert "care_allowance.clarify" not in steps_of(client.patch(url, json={"outcome": "granted"}, headers=anna).json())

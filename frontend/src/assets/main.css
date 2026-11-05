@@ -52,3 +52,37 @@ dialog::backdrop { background: rgba(8, 18, 22, .6); }
 .dlg-foot { justify-content: flex-end; flex-wrap: wrap; border-top: 1px solid var(--rule); }
 .dlg-body { display: grid; gap: 1rem; padding: 1.25rem 1.5rem 1.5rem; }
 @media (forced-colors: active) { dialog { border: 1px solid CanvasText; } }
+
+/* Lotse: Chips, Status, Checklisten (shared by the question, fact and step cards) */
+.chips { display: flex; flex-wrap: wrap; gap: .45rem; }
+.chip { min-height: 2.75rem; padding: .35rem .95rem; border: 0; border-radius: 999px; background: var(--harbor-tint); color: var(--harbor); font: inherit; font-weight: 600; cursor: pointer; transition: transform .12s cubic-bezier(.23, 1, .32, 1), background-color .15s; }
+.chip:hover { background: color-mix(in srgb, var(--harbor) 18%, var(--sheet)); }
+.chip:active { transform: scale(.97); }
+.chip.quiet { background: var(--sunk); color: var(--ink-2); }
+.chip[aria-pressed="true"] { background: var(--harbor); color: var(--on-harbor); }
+[data-contrast="high"] .chip { box-shadow: inset 0 0 0 2px currentColor; }
+[data-tone="turn"] { --tone-bg: var(--turn-bg); --tone-ink: var(--turn-ink); }
+[data-tone="ready"] { --tone-bg: var(--ready-bg); --tone-ink: var(--ready-ink); }
+[data-tone="wait"] { --tone-bg: var(--wait-bg); --tone-ink: var(--wait-ink); }
+.pill { display: inline-flex; align-items: center; gap: .4em; width: fit-content; padding: .2rem .75rem; border-radius: 999px; font-weight: 700; font-size: .9rem; line-height: 1.3; background: var(--tone-bg); color: var(--tone-ink); }
+[data-contrast="high"] .pill { box-shadow: inset 0 0 0 2px currentColor; }
+.why { display: flex; gap: .5em; align-items: flex-start; color: var(--ink-2); font-size: .95rem; }
+.why .i { margin-top: .15em; color: var(--harbor); }
+.mini-h { display: flex; flex-wrap: wrap; align-items: center; gap: .45em .8em; font-weight: 700; }
+.mini-h .i { color: var(--harbor); }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: .45rem; }
+.check { display: flex; align-items: center; gap: .8rem; min-height: 2.9rem; padding: .55rem .9rem; border-radius: var(--r-s); background: var(--sunk); cursor: pointer; }
+.check input { width: 1.4rem; height: 1.4rem; margin: 0; flex: none; accent-color: var(--harbor); }
+.check:has(input:checked) { background: var(--ready-bg); color: var(--ready-ink); }
+.check small { display: block; font-size: .9rem; color: var(--ink-3); }
+.check > span { min-width: 0; }
+[data-contrast="high"] .check { box-shadow: inset 0 0 0 1px var(--ink); }
+.actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--harbor); text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
+.src-link { font-size: .9rem; color: var(--ink-3); text-underline-offset: .2em; }
+.src-link:hover { color: var(--harbor); }
+.avail { display: flex; align-items: center; gap: .5rem; font-weight: 700; color: var(--ink-2); }
+.avail::before { content: ""; width: .7rem; height: .7rem; flex: none; border-radius: 50%; background: var(--done-mark); }
+.avail[data-open="true"] { color: var(--ready-ink); }
+.avail[data-open="true"]::before { background: var(--ready-mark); box-shadow: 0 0 0 4px var(--ready-bg); }
+textarea.input { display: block; line-height: var(--lh); resize: vertical; }

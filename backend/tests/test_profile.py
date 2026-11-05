@@ -2,9 +2,7 @@ import pytest
 from sqlalchemy import func, select
 
 from backend.database import SessionLocal
-from backend.llm import build_messages
 from backend.models import Chat, Message, Profile, User
-from backend.schemas import ProfileData
 from test_chats import assert_error, create_chat, register, send
 
 PASSWORD = "secret-password-123"
@@ -29,7 +27,6 @@ ANNA = {
     "phone": "+43 (660) 123-4567",
     "contact_email": "anna.huber@example.at",
 }
-HISTORY = [{"role": "user", "content": "Wie ist meine Adresse?"}]
 
 
 @pytest.fixture
@@ -115,54 +112,37 @@ def test_put_profile_rejects_invalid_values(client, anna, field, value):
     assert client.get("/me/profile", headers=anna).json() == ANNA
 
 
-def test_build_messages_without_data_has_no_profile_message():
-    messages = build_messages(ProfileData(), HISTORY)
-
-    assert [m["role"] for m in messages] == ["system", "user"]
-    assert "German" in messages[0]["content"]
-    assert "short" in messages[0]["content"]
-    assert messages[1:] == HISTORY
-
-
-def test_build_messages_lists_the_filled_fields():
-    messages = build_messages(ProfileData(**ANNA), HISTORY)
-
-    assert [m["role"] for m in messages] == ["system", "system", "user"]
-    assert messages[1]["content"].splitlines()[1:6] == [
-        "- Name: Anna Huber",
-        "- Address: Favoritenstraße 12/3, 1100 Wien",
-        "- Social security number: 1237 010180",
-        "- Phone: +43 (660) 123-4567",
-        "- Email: anna.huber@example.at",
-    ]
-
-
-def test_build_messages_leaves_out_empty_fields():
-    content = build_messages(ProfileData(city="Wien", phone="0660 1234567"), HISTORY)[1]["content"]
-
-    assert "- Address: Wien" in content
-    assert "- Phone: 0660 1234567" in content
-    assert "Name" not in content and "Email" not in content and "Social security" not in content
-
-
-def test_build_messages_follows_language_and_length():
-    system = build_messages(ProfileData(answer_language="en", answer_length="detailed"), HISTORY)[0]["content"]
-
-    assert "Always answer in English" in system
-    assert "in detail" in system
-
-
-def test_reply_gets_the_current_profile(client, anna, llm):
+def test_own_postal_code_answers_the_district_question(client, anna, llm):
+    put(client, anna, ANNA)
+    llm.facts = {"subject": "self", "goal": ["apply_care_allowance"]}
     chat = create_chat(client, anna)
-    send(client, anna, chat["id"])
-    assert [m["role"] for m in llm.histories[-1]] == ["system", "user"]
 
+    events = dict(send(client, anna, chat["id"], "Ich möchte Pflegegeld beantragen"))
+
+    district = next(f for f in events["facts"] if f["key"] == "district")
+    assert (district["value"], district["source"]) == ("1100", "profile")
+    assert events["done"]["payload"]["fact_key"] == "pension_payer"
+
+
+def test_a_relatives_district_is_not_taken_from_the_profile(client, anna, llm):
+    put(client, anna, ANNA)
+    llm.facts = {"subject": "mother", "goal": ["apply_care_allowance"]}
+    chat = create_chat(client, anna)
+
+    events = dict(send(client, anna, chat["id"]))
+
+    assert "district" not in [f["key"] for f in events["facts"]]
+    assert events["done"]["payload"]["fact_key"] == "district"
+
+
+def test_the_plan_intro_follows_the_answer_language(client, anna, llm):
     put(client, anna, {**ANNA, "answer_language": "en"})
-    send(client, anna, chat["id"], "Wie ist meine Adresse?")
+    llm.facts = {"subject": "self", "goal": ["apply_care_allowance"], "pension_payer": "pv"}
+    chat = create_chat(client, anna)
 
-    system, profile = llm.histories[-1][:2]
-    assert "Always answer in English" in system["content"]
-    assert "Favoritenstraße 12/3, 1100 Wien" in profile["content"]
+    send(client, anna, chat["id"])
+
+    assert next(value for method, value in llm.calls if method == "intro")["language"] == "en"
 
 
 def test_change_password(client, anna):

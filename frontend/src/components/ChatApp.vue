@@ -2,20 +2,28 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, watch } from 'vue'
 import { ApiError, UNREACHABLE, type User } from '../auth'
 import {
-  createChat, deleteChat, listChats, listMessages, NOT_FOUND, renameChat, say, sendMessage, titleFrom, when,
-  type Chat, type Message,
+  createChat, deleteChat, getState, listChats, listMessages, NOT_FOUND, renameChat, say, sendMessage, titleFrom,
+  updateStep, uploadDocument, when,
+  type AnswerPayload, type CardPayload, type Chat, type Chip, type ConfirmPayload, type Fact, type Message, type Plan,
+  type PlanPayload,
+  type QuestionPayload, type StepUpdate,
 } from '../chats'
 import { toHtml } from '../markdown'
 import { getProfile, type Profile } from '../profile'
+import DocumentConfirm from './DocumentConfirm.vue'
+import FactChips from './FactChips.vue'
+import NoticeCard from './NoticeCard.vue'
+import PlanView from './PlanView.vue'
 import ProfileCard from './ProfileCard.vue'
+import QuestionCard from './QuestionCard.vue'
 import SettingsPage from './SettingsPage.vue'
 
 type Bubble = Message & {
   key?: number
   state?: 'sending' | 'delivered' | 'failed'
   error?: string
-  html?: string // assistant only: sanitized Markdown
-  streaming?: boolean
+  html?: string // older free-text replies: sanitized Markdown
+  pending?: boolean // assistant only: the reply is being prepared
 }
 
 defineProps<{ user: User }>()
@@ -47,9 +55,11 @@ const rnInput = ref<HTMLInputElement>()
 const target = ref<Chat | null>(null)
 const newTitle = ref('')
 const dlgErr = ref('')
-const run = shallowRef<{ chat: string; ctrl: AbortController } | null>(null) // the reply being requested or written
-const writing = ref(false) // reply is streaming: Send becomes Stop
+const run = shallowRef<{ chat: string; ctrl: AbortController } | null>(null) // the reply being requested
 const announce = ref('')
+const facts = ref<Fact[]>([]) // the "Verstanden" chips of the open chat
+const plan = ref<Plan | null>(null) // its latest plan, with current step states
+const planErr = ref('')
 const profile = ref<Profile | null>(null) // for the "Das weiß der Lotse" card; SettingsPage reports saves
 const profileFailed = ref(false)
 let seq = 0
@@ -64,14 +74,25 @@ function fail(e: unknown, invalid?: string) {
 
 const focus = (id: string) => nextTick(() => document.getElementById(id)?.focus())
 const scrollDown = () => nextTick(() => scroller.value?.scrollTo({ top: scroller.value.scrollHeight }))
-// Measured before an update: streaming text only scrolls along if the user has not scrolled up to read.
+// Measured before an update: a new reply only scrolls along if the user has not scrolled up to read.
 const nearBottom = (el = scroller.value) => !!el && el.scrollHeight - el.scrollTop - el.clientHeight < 80
 const put = (c: Chat) => (chats.value = [c, ...chats.value.filter((x) => x.id !== c.id)])
 const drop = (b: Bubble) => {
   const i = messages.value.indexOf(b)
   if (i >= 0) messages.value.splice(i, 1)
 }
-const withHtml = (m: Message): Bubble => (m.role === 'assistant' ? { ...m, html: toHtml(m.text) } : m)
+const withHtml = (m: Message): Bubble => (m.role === 'assistant' && m.kind === 'text' ? { ...m, html: toHtml(m.text) } : m)
+const q = (m: Message) => m.payload as QuestionPayload
+const card = (m: Message) => m.payload as CardPayload
+// Only the plan of the latest version is interactive; older plan messages say they were replaced.
+const isCurrent = (m: Message) => !!plan.value && (m.payload as PlanPayload).version === plan.value.version
+// The facts sit above the latest assistant reply, so a wrong fact can be fixed where the user is looking.
+const anchor = computed(() => [...messages.value].reverse().find((m) => m.role === 'assistant' && !m.pending))
+const lastMsg = computed(() => messages.value.at(-1))
+function setStatus(id: string, status: string | null) {
+  const c = chats.value.find((x) => String(x.id) === id)
+  if (c) c.status = status
+}
 
 function route() {
   hash.value = location.hash.slice(1)
@@ -118,17 +139,21 @@ watch(activeId, async (id, _, onCleanup) => {
   onCleanup(() => (stale = true))
   // Leaving a chat stops its reply; the server keeps what was written so far.
   if (run.value && run.value.chat !== id) run.value.ctrl.abort()
-  loadErr.value = draftErr.value = ''
+  loadErr.value = draftErr.value = planErr.value = ''
   loading.value = false
   if (id) notice.value = ''
   if (id && id === preset) return void (preset = null)
   messages.value = []
+  facts.value = []
+  plan.value = null
   if (!id) return
   loading.value = true
   try {
-    const list = await listMessages(id)
+    const [list, state] = await Promise.all([listMessages(id), getState(id)])
     if (stale) return
     messages.value = list.map(withHtml)
+    facts.value = state.facts
+    plan.value = state.plan
   } catch (e) {
     if (stale) return
     const msg = fail(e)
@@ -165,6 +190,8 @@ async function start(text: string) {
     draft.value = ''
     messages.value = []
     id = preset = String(c.id)
+    facts.value = []
+    plan.value = null
     go(id, 'q')
   } catch (e) {
     draftErr.value = fail(e)
@@ -173,14 +200,58 @@ async function start(text: string) {
   if (id) deliver(id, text)
 }
 
-function deliver(id: string, text: string) {
-  const m: Bubble = reactive({ key: ++seq, id: '', role: 'user' as const, text, created_at: new Date().toISOString() })
+function deliver(id: string, text: string, answer?: AnswerPayload) {
+  const m: Bubble = reactive({
+    key: ++seq, id: '', role: 'user' as const, kind: answer ? ('answer' as const) : ('text' as const), text,
+    payload: answer ?? null, created_at: new Date().toISOString(),
+  })
   messages.value.push(m)
   scrollDown()
   retry(id, m)
 }
 
-const stop = () => writing.value && run.value?.ctrl.abort()
+// A chip answer, or an edited fact: set directly, without the LLM.
+function answer(key: string, chip: Chip, label = chip.label) {
+  if (run.value || !activeId.value) return
+  notice.value = ''
+  deliver(activeId.value, label, { fact_key: key, value: chip.value })
+}
+const editFact = (f: Fact, chip: Chip) => answer(f.key, chip, `${f.label}: ${chip.label}`)
+function answerMany(key: string, chips: Chip[]) {
+  if (run.value || !activeId.value || !chips.length) return
+  deliver(activeId.value, chips.map((c) => c.label).join(', '), { fact_key: key, value: chips.map((c) => c.value) })
+}
+function confirmLetter(values: string[], labels: string[]) {
+  if (run.value || !activeId.value) return
+  const label = labels.length ? `Laut Ihrem Brief: ${labels.join(', ')}` : 'Keine der Empfehlungen stimmt'
+  deliver(activeId.value, label, { fact_key: 'documented_recommendations', value: values.length ? values : 'unknown' })
+}
+
+// A discharge letter (PDF with text). Photos are not supported yet.
+const fileInput = ref<HTMLInputElement>()
+const uploading = ref(false)
+async function upload(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  const id = activeId.value
+  if (!file || !id || run.value) return
+  draftErr.value = ''
+  uploading.value = true
+  try {
+    const added = await uploadDocument(id, file)
+    if (activeId.value === id) messages.value.push(...added)
+    scrollDown()
+  } catch (err) {
+    const status = err instanceof ApiError ? err.status : 0
+    draftErr.value =
+      status === 415 ? 'Bitte laden Sie eine PDF-Datei hoch.'
+      : status === 413 ? 'Die Datei ist zu groß (höchstens 10 MB).'
+      : status === 422 ? 'In dieser PDF ist kein Text lesbar. Fotos und Scans gehen noch nicht.'
+      : fail(err)
+  }
+  uploading.value = false
+}
 
 async function retry(id: string, m: Bubble) {
   if (run.value) return
@@ -189,22 +260,14 @@ async function retry(id: string, m: Bubble) {
   m.state = 'sending'
   announce.value = ''
   const r: Bubble = reactive({
-    key: ++seq, id: '', role: 'assistant' as const, text: '', created_at: new Date().toISOString(), html: '', streaming: true,
+    key: ++seq, id: '', role: 'assistant' as const, kind: 'text' as const, text: '', payload: null,
+    created_at: new Date().toISOString(), pending: true,
   })
-  const births: number[] = [] // when each word first showed, for the fade-in
-  let frame = 0
   let done = false
-  const paint = () => {
-    frame = 0
-    const stick = nearBottom()
-    r.html = toHtml(r.text, births, true)
-    if (stick) scrollDown()
-  }
   try {
-    await sendMessage(id, m.text, ctrl.signal, (e) => {
+    const onEvent = (e: Parameters<Parameters<typeof sendMessage>[3]>[0]) => {
       if (e.event === 'message') {
         Object.assign(m, e.data, { state: 'delivered' })
-        writing.value = true
         // Right after its question, and only if that question is still shown.
         const i = messages.value.indexOf(m)
         if (i >= 0) {
@@ -214,39 +277,55 @@ async function retry(id: string, m: Bubble) {
         }
         const c = chats.value.find((x) => String(x.id) === id)
         if (c) put({ ...c, updated_at: e.data.created_at })
-      } else if (e.event === 'delta') {
-        r.text += e.data.text
-        frame ||= requestAnimationFrame(paint) // re-render Markdown at most once per frame
+      } else if (e.event === 'facts') {
+        if (activeId.value === id) facts.value = e.data
+      } else if (e.event === 'plan') {
+        if (activeId.value === id) plan.value = e.data
+        planErr.value = ''
       } else if (e.event === 'title') {
         put(e.data)
       } else if (e.event === 'done') {
-        Object.assign(r, e.data)
+        Object.assign(r, e.data, { pending: false })
         done = true
+        setStatus(id, plan.value?.status ?? (e.data.kind === 'question' ? 'Frage offen' : null))
       } else {
         throw new Error(e.data.detail)
       }
-    })
+    }
+    await sendMessage(id, m.text, ctrl.signal, onEvent, m.kind === 'answer' ? (m.payload as AnswerPayload) : undefined)
     // A stream that ends without "done" lost its connection.
     if (!done) throw new ApiError(0, UNREACHABLE)
-    announce.value = 'Antwort fertig'
+    announce.value = r.kind === 'question' ? `Frage: ${r.text}` : 'Antwort fertig'
   } catch (e) {
-    // Stopped: keep the partial reply. Otherwise nothing was saved, so the question can be sent again.
+    // Left the chat: the server keeps what it saved. Otherwise nothing was saved, so it can be sent again.
     if (!ctrl.signal.aborted) {
-      r.text = ''
       m.state = 'failed'
       m.error = e instanceof ApiError ? fail(e, 'Die Nachricht darf höchstens 4000 Zeichen lang sein.') : NO_REPLY
     }
   } finally {
-    cancelAnimationFrame(frame)
-    r.streaming = false
-    r.html = toHtml(r.text, births) // no caret; words still fading in finish
-    if (!r.text) drop(r)
+    if (r.pending) drop(r)
     run.value = null
-    writing.value = false
   }
-  // The bubble grows by the retry button, which must not end up below the fold.
-  if (m.state === 'failed' && messages.value.at(-1) === m) scrollDown()
+  // The user just asked or answered, so the reply is shown (after `run` is cleared: that brings the chips):
+  // a plan from its start, anything else whole. A failed message grows by the retry button.
+  if (done && r.kind === 'plan') nextTick(() => document.getElementById(`m-${r.key}`)?.scrollIntoView({ block: 'start' }))
+  else if (done || (m.state === 'failed' && messages.value.at(-1) === m)) scrollDown()
 }
+
+async function patchStep(step: string, body: StepUpdate) {
+  const id = activeId.value
+  if (!id) return
+  planErr.value = ''
+  try {
+    const next = await updateStep(id, step, body)
+    if (activeId.value !== id) return
+    plan.value = next
+    setStatus(id, next.status)
+  } catch (e) {
+    planErr.value = fail(e)
+  }
+}
+const toPlan = () => document.getElementById('plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
 const toggle = (id: string) => (optsOpen.value = optsOpen.value === id ? null : id)
 
@@ -313,6 +392,7 @@ async function confirmDelete() {
         <li v-for="c in chats" :key="c.id" class="ci" :class="{ on: String(c.id) === activeId }">
           <a class="ci-link" :href="`#${c.id}`" :aria-current="String(c.id) === activeId ? 'page' : undefined">
             <span class="ci-title">{{ c.title }}</span>
+            <span v-if="c.status" class="pill ci-status" :data-tone="c.status === 'Erledigt' ? 'ready' : c.status.startsWith('Wartet') ? 'wait' : 'turn'">{{ c.status }}</span>
             <span class="ci-when"><span class="sr">Zuletzt geändert: </span>{{ when(c.updated_at) }}</span>
           </a>
           <button
@@ -342,18 +422,48 @@ async function confirmDelete() {
     <SettingsPage v-if="hash === SETTINGS" :user="user" @expired="emit('expired')" @saved="profileSaved" @deleted="emit('deleted')" />
     <section v-else class="pane" :class="activeId ? 'is-chat' : 'is-home'" aria-labelledby="view-h">
       <div v-if="activeId" ref="scroller" class="view">
+        <button v-if="plan" type="button" class="plan-pin" @click="toPlan">
+          <svg class="i" aria-hidden="true"><use href="#i-route" /></svg><span>Ihr Plan · {{ plan.status }}</span><span class="pin-go">Zum Plan</span>
+        </button>
         <h1 id="view-h" class="chat-h" tabindex="-1">{{ active?.title ?? 'Gespräch' }}</h1>
         <ProfileCard class="chat-known" :profile="profile" :failed="profileFailed" />
         <p v-if="loading" class="muted">Nachrichten werden geladen …</p>
         <p v-else-if="loadErr" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ loadErr }}</span></p>
         <p v-else-if="!messages.length" class="muted">Noch keine Nachrichten in diesem Gespräch.</p>
         <ol v-else class="msgs" aria-label="Nachrichten">
-          <li v-for="m in messages" :key="m.key ?? m.id" class="msg" :class="m.role">
-            <div class="bubble" :class="m.state">
-              <p v-if="m.streaming && !m.html" class="dots"><i></i><i></i><i></i><span class="sr">Antwort wird geschrieben …</span></p>
-              <div v-else-if="m.role === 'assistant'" class="md" v-html="m.html"></div>
+          <li v-for="m in messages" :id="`m-${m.key ?? m.id}`" :key="m.key ?? m.id" class="msg" :class="[m.role, m.kind]">
+            <FactChips v-if="m === anchor && facts.length" class="msg-facts" :facts="facts" :disabled="!!run" @answer="editFact" />
+            <p v-if="m.pending" class="typing" role="status">
+              Der Lotse sucht die passenden Stellen<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            </p>
+            <QuestionCard
+              v-else-if="m.kind === 'question'"
+              :text="m.text"
+              :why="q(m).why"
+              :chips="q(m).chips"
+              :active="m === lastMsg && !run"
+              :multi="!!q(m).multi"
+              @answer="(chip) => answer(q(m).fact_key, chip)"
+              @many="(chips) => answerMany(q(m).fact_key, chips)"
+            />
+            <NoticeCard v-else-if="m.kind === 'card'" :card="card(m)" :text="m.text" />
+            <DocumentConfirm
+              v-else-if="m.kind === 'confirm'"
+              :text="m.text"
+              :payload="m.payload as ConfirmPayload"
+              :active="m === lastMsg && !run"
+              @confirm="confirmLetter"
+            />
+            <div v-else-if="m.kind === 'plan'" class="plan-msg">
+              <div class="bubble"><p>{{ m.text }}</p></div>
+              <PlanView v-if="isCurrent(m)" :plan="plan!" :error="planErr" @update="patchStep" @upload="fileInput?.click()" />
+              <p v-else class="muted">Dieser Plan wurde später angepasst. Der aktuelle Plan steht weiter unten.</p>
+            </div>
+            <div v-else class="bubble" :class="m.state">
+              <div v-if="m.role === 'assistant'" class="md" v-html="m.html"></div>
+              <p v-else-if="m.kind === 'document'" class="text"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg> {{ m.text }}</p>
               <p v-else class="text">{{ m.text }}</p>
-              <p v-if="!m.streaming" class="meta">
+              <p class="meta">
                 <time :datetime="m.created_at">{{ when(m.created_at) }}</time>
                 <span v-if="m.state" class="state" aria-live="polite">{{ STATE[m.state] }}</span>
               </p>
@@ -372,7 +482,7 @@ async function confirmDelete() {
       </div>
 
       <p class="sr" aria-live="polite">{{ announce }}</p>
-      <form class="composer" novalidate @submit.prevent="submit" @keydown.esc="stop">
+      <form class="composer" novalidate @submit.prevent="submit">
         <label class="q-label" :class="{ sr: activeId }" for="q">{{ activeId ? 'Ihre Nachricht' : 'Worum geht es?' }}</label>
         <div class="cbox">
           <textarea
@@ -388,18 +498,15 @@ async function confirmDelete() {
             @keydown.enter.meta.prevent="submit"
           ></textarea>
           <div class="cbox-row">
-            <span id="q-hint" class="hint">{{ writing ? 'Stoppen mit Esc' : 'Senden mit Strg + Enter (Mac: ⌘ + Enter)' }}</span>
-            <!-- One button that changes role, so focus stays on it when it turns into Stop. -->
-            <button
-              :type="writing ? 'button' : 'submit'"
-              class="btn btn-primary send"
-              :aria-disabled="busy || (!!run && !writing)"
-              @click="stop"
-            >
-              <template v-if="writing">Stoppen<svg class="i" aria-hidden="true"><use href="#i-stop" /></svg></template>
-              <template v-else>
-                {{ busy || run ? 'Einen Moment …' : 'Senden' }}<svg class="i" aria-hidden="true"><use href="#i-arrow" /></svg>
-              </template>
+            <template v-if="activeId">
+              <input ref="fileInput" type="file" accept="application/pdf" class="sr" tabindex="-1" @change="upload" />
+              <button type="button" class="btn btn-quiet" :aria-disabled="uploading || !!run" @click="!uploading && !run && fileInput?.click()">
+                <svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ uploading ? 'Brief wird gelesen …' : 'Entlassungsbrief (PDF)' }}
+              </button>
+            </template>
+            <span id="q-hint" class="hint">Senden mit Strg + Enter (Mac: ⌘ + Enter)</span>
+            <button type="submit" class="btn btn-primary send" :aria-disabled="busy || !!run">
+              {{ busy || run ? 'Einen Moment …' : 'Senden' }}<svg class="i" aria-hidden="true"><use href="#i-arrow" /></svg>
             </button>
           </div>
         </div>
@@ -519,16 +626,22 @@ async function confirmDelete() {
 .md :deep(:is(th, td)) { padding: .3rem .6rem; border: 1px solid var(--rule-2); text-align: left; }
 .md :deep(hr) { border: 0; border-top: 1px solid var(--rule-2); }
 
-/* Streaming: typing dots, then words fade in (duration = FADE_MS in markdown.ts) behind a blinking caret. */
-.dots { display: flex; gap: .3rem; padding-block: .55rem; }
-.dots i { width: .5rem; height: .5rem; border-radius: 50%; background: var(--ink-3); animation: dot 1.2s ease-in-out infinite; }
+/* While the reply is prepared: a line with typing dots. */
+.typing { display: flex; align-items: center; gap: .6rem; color: var(--ink-2); }
+.dots { display: inline-flex; gap: .3rem; }
+.dots i { width: .45rem; height: .45rem; border-radius: 50%; background: var(--harbor); animation: dot 1.2s ease-in-out infinite; }
 .dots i:nth-child(2) { animation-delay: .15s; }
 .dots i:nth-child(3) { animation-delay: .3s; }
-.md :deep(.w) { animation: word-in 400ms ease-out both; }
-.md :deep(.caret) { display: inline-block; width: 2px; height: 1.1em; margin-left: 2px; vertical-align: text-bottom; background: var(--harbor); animation: blink 1s steps(1) infinite; }
-@keyframes dot { 0%, 70%, 100% { opacity: .35; transform: none; } 35% { opacity: 1; transform: translateY(-3px); } }
-@keyframes word-in { from { opacity: 0; } }
-@keyframes blink { 50% { opacity: 0; } }
+@keyframes dot { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+/* Question, fact, card and plan replies use the full width, not a bubble. */
+.msg.assistant:is(.question, .card, .plan, .confirm) { display: grid; gap: 1rem; justify-content: stretch; }
+.msg-facts { margin-top: .25rem; }
+.plan-msg { display: grid; gap: 1.25rem; }
+.plan-msg > .bubble { justify-self: start; }
+.plan-pin { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: .55rem; width: 100%; margin: -1rem 0 1rem; padding: .55rem .9rem; border: 0; border-radius: var(--r-m); background: var(--turn-bg); color: var(--turn-ink); font: inherit; font-weight: 700; text-align: left; cursor: pointer; box-shadow: var(--lift); }
+.plan-pin .pin-go { margin-left: auto; text-decoration: underline; text-underline-offset: .2em; }
+.ci-status { margin-top: .1rem; font-size: .85rem; }
 .meta { display: flex; flex-wrap: wrap; gap: .1rem .75rem; font-size: .85rem; color: var(--ink-3); }
 .state { font-weight: 700; }
 .delivered .state { color: var(--ready-ink); }

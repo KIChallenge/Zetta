@@ -1,0 +1,814 @@
+# Services (Leistungen) with triggers, criteria and step templates. See docs/response-system.md, section 5.
+#
+# Conditions map fact keys to matchers: a list of values (the fact is, or contains, one of them)
+# or {not: [values]}. All keys of a condition must match. A service is a candidate if any trigger matches.
+# Scripts use placeholders only; contact data always comes from institutions.yaml.
+
+- id: care_allowance
+  title: Pflegegeld
+  summary: Monatliches Geld für Menschen, die ständig Betreuung und Pflege brauchen. Die Höhe hängt vom Pflegebedarf ab, nicht vom Einkommen.
+  priority: 1
+  triggers:
+    - {goal: [apply_care_allowance]}
+    - {needs_daily_help: [some, a_lot]}
+  requires: [subject, district, pension_payer]
+  responsible:
+    - {when: {pension_payer: [bvaeb]}, institution: bvaeb}
+    - {when: {pension_payer: [svs]}, institution: svs}
+    - {institution: pva_vienna}
+  responsible_note: Zuständig ist die Stelle, die die Pension auszahlt. Wer keine Pension bezieht, stellt den Antrag bei der Pensionsversicherung.
+  responsible_source: https://www.oesterreich.gv.at/de/themen/pflege/4/Seite.360515
+  criteria:
+    - id: residence
+      text: Gewöhnlicher Aufenthalt in Österreich
+      when: {district: {not: [outside_vienna]}}
+  checked_by:
+    - Ob der Pflegebedarf mehr als 65 Stunden im Monat beträgt und voraussichtlich mindestens 6 Monate dauert, wird bei einer Begutachtung festgestellt.
+  documents: [medical_reports]
+  forms: [care_allowance_form]
+  source_url: https://www.pv.at/web/pflegegeld
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Was ist Pflegegeld?
+      why: Damit Sie wissen, worum es beim Antrag geht.
+      text: >-
+        Pflegegeld ist eine monatliche Geldleistung für Menschen, die ständig Betreuung und Pflege brauchen.
+        Es deckt einen Teil der Mehrkosten durch die Pflege. Es gibt 7 Stufen; die Höhe hängt vom Pflegebedarf ab,
+        nicht vom Einkommen. Den Antrag dürfen auch Familienmitglieder, Haushaltsmitglieder und nahestehende Personen stellen.
+
+    - id: call
+      type: call
+      title: Bei der zuständigen Stelle anrufen
+      why: Dort bekommen Sie den Antrag und Antworten auf Ihre Fragen.
+      institution: responsible
+      channel: phone
+      script_facts: [subject, pension_payer]
+      have_ready: [subject.svnr]
+      slots: [user.name, user.phone, subject.relation, subject.name, subject.svnr]
+      must_ask:
+        - {id: get_form, text: "Den Antrag auf Pflegegeld anfordern oder fragen, ob er online gestellt werden kann"}
+        - {id: relative_applies, text: "Fragen, ob die anrufende Person den Antrag als Angehörige oder Angehöriger für die betroffene Person stellen kann", when: {subject: {not: [self]}}}
+        - {id: assessment, text: "Fragen, wie die Begutachtung abläuft und ob eine Vertrauensperson dabei sein kann"}
+        - {id: consultation, text: "Fragen, ob es Hilfe beim Ausfüllen oder einen Beratungstermin gibt"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe wegen eines Antrags auf Pflegegeld für {subject.relation} an.
+        points:
+          - {covers: get_form, text: "Können Sie mir das Antragsformular zuschicken, oder kann ich den Antrag auch online stellen?"}
+          - {covers: relative_applies, text: "Kann ich den Antrag als Angehörige oder Angehöriger stellen, und was muss ich dafür beilegen?"}
+          - {covers: assessment, text: "Wie läuft die Begutachtung ab, und kann eine Vertrauensperson dabei sein?"}
+          - {covers: consultation, text: "Gibt es Hilfe beim Ausfüllen, zum Beispiel einen Beratungstermin?"}
+        closing: Vielen Dank. Darf ich mir Ihren Namen notieren? Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+    - id: documents
+      type: documents
+      title: Unterlagen sammeln
+      why: Diese Unterlagen werden für die Anträge gebraucht.
+
+    - id: submit
+      type: form
+      title: Antrag ausfüllen und einreichen
+      why: Erst mit dem Antrag kann über das Pflegegeld entschieden werden.
+      institution: responsible
+      form: care_allowance_form
+      after: [call, documents]
+      text: >-
+        Füllen Sie den Antrag aus und legen Sie vorhandene Befunde in Kopie bei. Unter Punkt 9 können Sie eine kostenlose
+        Pflegeberatung zu Hause durch eine diplomierte Pflegefachkraft ankreuzen. Der Antrag kann auch online gestellt werden.
+        Gültig ist auch ein Antrag bei einem anderen Sozialversicherungsträger: Er wird an die zuständige Stelle weitergeleitet.
+
+    - id: assessment
+      type: wait
+      title: Begutachtung zu Hause
+      why: Bei der Begutachtung wird die Pflegestufe festgestellt.
+      after: [submit]
+      done_label: Begutachtung war
+      text: >-
+        Der Termin für den Hausbesuch wird vorher angekündigt. Eine Vertrauensperson, etwa eine pflegende Angehörige
+        oder ein pflegender Angehöriger, kann dabei sein und ergänzend beschreiben, welche Hilfe im Alltag nötig ist.
+
+    - id: decision
+      type: wait
+      title: Auf die Entscheidung warten
+      why: Danach wissen Sie, ob und in welcher Stufe Pflegegeld ausgezahlt wird.
+      after: [assessment]
+      outcomes:
+        - {id: granted, label: Pflegegeld bewilligt, effect: done}
+        - {id: rejected, label: Abgelehnt, effect: done}
+      text: >-
+        Pflegegeld gebührt ab dem Monatsersten nach dem Antrag und wird monatlich im Nachhinein ausgezahlt.
+        Wird der Pflegeaufwand später größer, kann eine Erhöhung schriftlich beantragt werden.
+
+    - id: clarify
+      type: call
+      title: Die Entscheidung mit der zuständigen Stelle besprechen
+      why: Dort erfahren Sie, warum abgelehnt wurde und welche Möglichkeiten es gibt.
+      institution: responsible
+      channel: phone
+      after: [decision]
+      unlocked_by: "decision:rejected"
+      script_facts: [subject]
+      have_ready: [subject.svnr]
+      slots: [user.name, user.phone, subject.relation, subject.name, subject.svnr]
+      must_ask:
+        - {id: reason, text: "Fragen, warum der Antrag auf Pflegegeld abgelehnt wurde"}
+        - {id: options, text: "Fragen, welche Möglichkeiten es jetzt gibt und bis wann"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe wegen der Entscheidung über das Pflegegeld für {subject.relation} an.
+        points:
+          - {covers: reason, text: "Warum wurde der Antrag abgelehnt?"}
+          - {covers: options, text: "Welche Möglichkeiten gibt es jetzt, und bis wann muss ich etwas tun?"}
+        closing: Vielen Dank. Darf ich mir Ihren Namen notieren? Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+- id: home_care_fsw
+  title: Pflege und Betreuung zu Hause (FSW)
+  summary: Der Fonds Soziales Wien berät zu Heimhilfe, Hauskrankenpflege, Essen auf Rädern und Begleitdiensten und vermittelt geförderte Angebote.
+  priority: 2
+  triggers:
+    - {goal: [find_support_services]}
+    - {needs_daily_help: [some, a_lot]}
+    - {documented_recommendations: [home_nursing, home_help]}
+  quotes: [home_nursing, home_help]
+  requires: [subject, district, lives_alone]
+  responsible:
+    - {institution: fsw_customer_service}
+  criteria:
+    - id: vienna
+      text: Wohnort in Wien
+      when: {district: {not: [outside_vienna]}}
+  checked_by:
+    - Den individuellen Bedarf stellt das FSW-Kund:innenservice fest.
+    - Der Kostenbeitrag hängt unter anderem von Einkommen, Miet- und Wohnkosten und Pflegegeld ab.
+  documents: [photo_id, citizenship_proof, income_proof, rent_proof, care_expenses_proof]
+  forms: [fsw_application_form]
+  source_url: https://www.fsw.at/p/pflege-betreuung-daheim
+  verified_at: 2026-11-05
+  steps:
+    - id: call
+      type: call
+      title: Beim FSW-Kund:innenservice anrufen
+      why: Der FSW berät, welche Unterstützung zu Hause passt, und vermittelt eine Partnerorganisation.
+      institution: responsible
+      channel: phone
+      script_facts: [subject, lives_alone, needs_daily_help]
+      slots: [user.name, user.phone, subject.relation]
+      must_ask:
+        - {id: home_help, text: "Nach Heimhilfe fragen, z. B. bei Körperpflege, Haushalt und kleinen Einkäufen"}
+        - {id: meals, text: "Nach Essen auf Rädern fragen"}
+        - {id: escort, text: "Nach einem Begleitdienst für Wege und Besorgungen fragen"}
+        - {id: assessment, text: "Fragen, wie der Bedarf festgestellt wird und wie der Antrag gestellt wird"}
+        - {id: costs, text: "Fragen, wovon der Kostenbeitrag abhängt"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe an, weil ich Unterstützung zu Hause für {subject.relation} suche.
+        points:
+          - {covers: home_help, text: "Welche Hilfe zu Hause gibt es, zum Beispiel Heimhilfe bei Körperpflege, Haushalt und Einkäufen?"}
+          - {covers: meals, text: "Ist Essen auf Rädern möglich?"}
+          - {covers: escort, text: "Gibt es eine Begleitung für Wege und Besorgungen?"}
+          - {covers: assessment, text: "Wie wird der Bedarf festgestellt, und wie stelle ich den Antrag?"}
+          - {covers: costs, text: "Wovon hängt der Kostenbeitrag ab?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+    - id: documents
+      type: documents
+      title: Unterlagen sammeln
+      why: Diese Unterlagen werden für die Anträge gebraucht.
+
+    - id: send_application
+      type: email
+      title: FSW-Antrag per E-Mail schicken
+      why: Mit dem Antrag kann der FSW die Unterstützung fördern.
+      institution: responsible
+      channel: applications_email
+      form: fsw_application_form
+      after: [call, documents]
+      script_facts: [subject]
+      slots: [user.name, user.phone, user.email, user.address, subject.relation]
+      must_include:
+        - {id: application, text: "Sagen, dass der ausgefüllte und unterschriebene Antrag auf Förderung von Leistungen (Pflege und Betreuung zu Hause) angehängt ist"}
+        - {id: attachments, text: "Sagen, dass die nötigen Beilagen angehängt sind"}
+        - {id: contact, text: "Telefonnummer oder E-Mail-Adresse für Rückfragen nennen"}
+      fallback_script:
+        subject: Antrag auf Förderung von Leistungen – Pflege und Betreuung zu Hause
+        body: |-
+          Sehr geehrte Damen und Herren,
+
+          im Anhang sende ich den ausgefüllten und unterschriebenen Antrag auf Förderung von Leistungen (Pflege und Betreuung zu Hause) für {subject.relation}.
+
+          Die nötigen Beilagen habe ich ebenfalls angehängt.
+
+          Für Rückfragen erreichen Sie mich unter {user.phone} oder {user.email}.
+
+          Mit freundlichen Grüßen
+          {user.name}
+          {user.address}
+        covers: [application, attachments, contact]
+
+    - id: assessment
+      type: wait
+      title: Bedarf wird festgestellt
+      why: Danach wissen Sie, welche Unterstützung gefördert wird.
+      after: [send_application]
+      done_label: Rückmeldung erhalten
+      text: >-
+        Das FSW-Kund:innenservice stellt den individuellen Bedarf fest, berät und vermittelt eine passende Partnerorganisation.
+
+- id: carer_support
+  title: Entlastung für pflegende Angehörige
+  summary: Kostenlose Gespräche mit Psychologinnen und Psychologen für Angehörige, die jemanden pflegen, und Hausbesuche durch Pflegefachkräfte.
+  priority: 3
+  triggers:
+    - {subject: [mother, father, partner, child, other_relative], needs_daily_help: [some, a_lot]}
+  requires: [subject, district]
+  responsible:
+    - {institution: carer_competence_centre}
+  checked_by:
+    - Hausbesuche durch Pflegefachkräfte gibt es für Menschen, die Pflegegeld beziehen, und ihre Angehörigen.
+  source_url: https://www.sozialministerium.gv.at/Themen/Pflege/Betreuende-und-Pflegende-Angehoerige.html
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Was ist das Angehörigengespräch?
+      why: Pflege kann sehr belasten. Dieses Angebot ist für Sie selbst.
+      text: >-
+        Das Angehörigengespräch ist kostenlos und wird von Psychologinnen und Psychologen geführt: zu Hause, an einem
+        anderen Ort, telefonisch oder online. Bei Bedarf sind bis zu zehn Termine möglich. Wer Pflegegeld bezieht, kann
+        außerdem kostenlos einen Hausbesuch durch eine diplomierte Pflegefachkraft anfordern, mit praktischen Pflegetipps
+        und Informationen zu Hilfsmitteln und sozialen Diensten.
+
+    - id: request_talk
+      type: email
+      title: Angehörigengespräch anfragen
+      why: Das Gespräch wird auf Wunsch vereinbart.
+      institution: responsible
+      channel: carer_talk_email
+      script_facts: [subject]
+      slots: [user.name, user.phone, user.email, subject.relation]
+      must_include:
+        - {id: request, text: "Um ein kostenloses Angehörigengespräch bitten"}
+        - {id: situation, text: "Kurz sagen, wen die Person zu Hause betreut"}
+        - {id: contact, text: "Telefonnummer oder E-Mail-Adresse für die Terminvereinbarung nennen"}
+      fallback_script:
+        subject: Anfrage Angehörigengespräch
+        body: |-
+          Sehr geehrte Damen und Herren,
+
+          ich betreue {subject.relation} zu Hause und möchte um ein kostenloses Angehörigengespräch bitten.
+
+          Für einen Termin erreichen Sie mich unter {user.phone} oder {user.email}.
+
+          Mit freundlichen Grüßen
+          {user.name}
+        covers: [request, situation, contact]
+
+
+# Phase 2: after a hospital stay (spec 12.3). The letter's confirmed recommendations trigger the services below.
+- id: after_hospital
+  title: Nach dem Spital
+  summary: Der Lotse liest die Empfehlungen aus Ihrem Entlassungsbrief und macht daraus Ihre nächsten Schritte.
+  priority: 2
+  triggers:
+    - {goal: [after_hospital]}
+  requires: [subject]
+  responsible: []
+  source_url: https://www.pv.at/web/reha-und-praevention/vom-antrag-zu-reha-und-kur
+  verified_at: 2026-11-05
+  steps:
+    - id: upload
+      type: upload
+      title: Entlassungsbrief hochladen
+      why: Im Brief steht, was nach dem Spital empfohlen wird, zum Beispiel Reha oder Pflege zu Hause.
+      text: >-
+        Laden Sie den Brief als PDF hoch. Der Lotse sucht nur Empfehlungen zu Anträgen und Unterstützung, keine Befunde,
+        und zeigt Ihnen jede Stelle wörtlich. Sie bestätigen, was stimmt. Der Brief selbst wird nicht gespeichert.
+- id: rehab
+  title: Medizinische Rehabilitation
+  summary: Ein Reha-Aufenthalt, stationär oder ambulant. Die Ärztin oder der Arzt füllt den Antrag aus, die Pensionsversicherung entscheidet.
+  priority: 4
+  triggers:
+    - {documented_recommendations: [inpatient_rehab, outpatient_rehab]}
+  quotes: [inpatient_rehab, outpatient_rehab]
+  requires: [subject, district]
+  responsible:
+    - {institution: pva_vienna}
+  responsible_note: Den Antrag schicken Sie an die zuständige Landesstelle der Pensionsversicherung; die Zuständigkeit richtet sich nach dem Wohnort.
+  responsible_source: https://www.pv.at/web/reha-und-praevention/vom-antrag-zu-reha-und-kur
+  checked_by:
+    - Die medizinische Notwendigkeit begründet die behandelnde Ärztin oder der behandelnde Arzt. Über die Bewilligung entscheidet die Pensionsversicherung.
+  forms: [rehab_form]
+  source_url: https://www.pv.at/web/reha-und-praevention/vom-antrag-zu-reha-und-kur
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Reha laut Ihrem Brief
+      why: Damit Sie wissen, wie der Weg zur Reha aussieht.
+      text: >-
+        Für eine Reha braucht es einen Antrag, den die behandelnde Ärztin oder der behandelnde Arzt vollständig ausfüllt,
+        unterschreibt und medizinisch begründet. Ob stationär oder ambulant besser passt, besprechen Sie am besten mit ihr
+        oder ihm.
+    - id: call_doctor
+      type: call
+      title: Ärztin oder Arzt um den Reha-Antrag bitten
+      why: Ohne ärztlich ausgefüllten Antrag gibt es keine Reha.
+      contact_label: Ihre behandelnde Ärztin oder Ihr behandelnder Arzt
+      after: [info]
+      script_facts: [subject]
+      have_ready: [subject.svnr]
+      slots: [user.name, user.phone, subject.relation, subject.name, subject.svnr]
+      must_ask:
+        - {id: appointment, text: "Um einen Termin bitten, um den Reha-Antrag auszufüllen"}
+        - {id: form, text: "Fragen, ob der Antrag in der Ordination ausgefüllt und unterschrieben werden kann"}
+        - {id: inpatient_or_outpatient, text: "Fragen, ob eine stationäre oder ambulante Reha besser passt"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe wegen eines Antrags auf Rehabilitation für {subject.relation} an.
+        points:
+          - {covers: appointment, text: "Kann ich einen Termin bekommen, um den Reha-Antrag auszufüllen?"}
+          - {covers: form, text: "Können Sie den Antrag ausfüllen und unterschreiben?"}
+          - {covers: inpatient_or_outpatient, text: "Passt eine stationäre oder eine ambulante Reha besser?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+    - id: submit
+      type: form
+      title: Reha-Antrag einreichen
+      why: Erst mit dem Antrag kann die Pensionsversicherung entscheiden.
+      institution: responsible
+      form: rehab_form
+      after: [call_doctor]
+      text: >-
+        Senden Sie den ausgefüllten Antrag an die zuständige Landesstelle der Pensionsversicherung. Für eine ambulante Reha
+        muss im Antrag das Feld „ambulante Rehabilitation“ angekreuzt sein.
+    - id: decision
+      type: wait
+      title: Auf die Entscheidung warten
+      why: Danach wissen Sie, ob und wo die Reha stattfindet.
+      after: [submit]
+      outcomes:
+        - {id: approved, label: Reha bewilligt, effect: done}
+        - {id: rejected, label: Abgelehnt, effect: done}
+      text: >-
+        Die Pensionsversicherung teilt die Entscheidung schriftlich mit. Warten Sie diese schriftliche Verständigung ab.
+    - id: rejected
+      type: info
+      title: Wenn die Reha abgelehnt wurde
+      why: Eine Ablehnung muss nicht endgültig sein.
+      after: [decision]
+      unlocked_by: "decision:rejected"
+      text: >-
+        Eine Ablehnung kann formelle oder medizinische Gründe haben. Ändert sich der Gesundheitszustand wesentlich, kann
+        ein neuer Antrag gestellt werden, der erneut geprüft wird. Besprechen Sie das mit Ihrer Ärztin oder Ihrem Arzt.
+
+- id: transport_cost_subsidy
+  title: Zuschuss zu Fahrtkosten
+  summary: Die ÖGK gibt einen Zuschuss zu Fahrten, etwa zu Strahlen- oder Chemotherapie, zur Dialyse oder zur Reha.
+  priority: 5
+  triggers:
+    - {documented_recommendations: [transport_to_treatment]}
+  quotes: [transport_to_treatment]
+  requires: [subject, district]
+  responsible:
+    - {institution: oegk_vienna_customer_service}
+  checked_by:
+    - Grundsätzlich für Personen mit Rezeptgebührenbefreiung. Für Fahrten zu Dialyse, Chemo- oder Strahlentherapie und für ausgewählte Fahrten zur Reha gilt das nicht. Ersetzt werden Fahrten zum nächstgelegenen geeigneten Vertragspartner, wenn er mehr als 20 Kilometer entfernt ist.
+  forms: [transport_cost_form]
+  source_url: https://www.oegk.at/cdscontent/load?contentid=10008.777900&version=1785415038
+  verified_at: 2026-11-05
+  steps:
+    - id: collect
+      type: info
+      title: Behandlungen bestätigen lassen
+      why: Der Antrag braucht für jede Fahrt eine Bestätigung der Einrichtung.
+      text: >-
+        Lassen Sie sich nach jeder Behandlung ein Feld auf dem Antragsformular abstempeln. Am Ende der Therapie reichen Sie
+        den Antrag für alle Sitzungen auf einmal ein. Belege über die Fahrtkosten legen Sie in Kopie bei.
+    - id: submit
+      type: form
+      title: Fahrtkosten-Zuschuss beantragen
+      why: Der Zuschuss wird nur auf Antrag überwiesen.
+      institution: responsible
+      form: transport_cost_form
+      after: [collect]
+      text: Füllen Sie den Antrag aus und reichen Sie ihn bei der ÖGK ein.
+
+- id: home_nursing_medical
+  title: Medizinische Hauskrankenpflege
+  summary: Pflege zu Hause, die einen Spitalsaufenthalt ersetzt. Sie wird ärztlich angeordnet und von der Krankenkasse übernommen.
+  priority: 6
+  triggers:
+    - {documented_recommendations: [home_nursing]}
+  quotes: [home_nursing]
+  requires: [subject, district]
+  responsible:
+    - {institution: oegk_vienna_customer_service}
+  checked_by:
+    - Die Krankenkasse übernimmt sie nur, wenn sie die Pflege im Spital ersetzt. Sie gilt längstens vier Wochen; eine Verlängerung braucht eine chef- oder kontrollärztliche Bewilligung.
+  source_url: https://www.oegk.at/cdscontent/load?contentid=10008.734180&version=1585216930
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Was ist medizinische Hauskrankenpflege?
+      why: Damit Sie wissen, wer sie anordnet und wie lange sie gilt.
+      text: >-
+        Medizinische Hauskrankenpflege ordnet die Ärztin oder der Arzt an. Sie gilt längstens vier Wochen. Eine
+        Verlängerung muss spätestens am 24. Tag beantragt werden. Für Hilfe im Alltag, etwa Heimhilfe oder Essen auf Rädern,
+        ist der FSW zuständig.
+
+- id: medical_aids
+  title: Heilbehelfe und Hilfsmittel
+  summary: Die ÖGK übernimmt die Kosten für Heilbehelfe und Hilfsmittel, wenn sie ärztlich verordnet sind. Meist bleibt ein Selbstbehalt.
+  priority: 7
+  triggers:
+    - {documented_recommendations: [medical_aid]}
+  quotes: [medical_aid]
+  requires: [subject, district]
+  responsible:
+    - {institution: oegk_vienna_customer_service}
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.870456&portal=oegkportal
+  verified_at: 2026-11-05
+  steps:
+    - id: call_doctor
+      type: call
+      title: Verordnung bei der Ärztin oder beim Arzt holen
+      why: Ohne ärztliche Verordnung übernimmt die ÖGK die Kosten nicht.
+      contact_label: Ihre Hausärztin oder Ihr Hausarzt
+      script_facts: [subject]
+      slots: [user.name, user.phone, subject.relation]
+      must_ask:
+        - {id: prescription, text: "Um eine Verordnung für das empfohlene Hilfsmittel bitten"}
+        - {id: supplier, text: "Fragen, wo es das Hilfsmittel gibt"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe wegen eines Hilfsmittels für {subject.relation} an.
+        points:
+          - {covers: prescription, text: "Können Sie eine Verordnung für das empfohlene Hilfsmittel ausstellen?"}
+          - {covers: supplier, text: "Wo bekomme ich das Hilfsmittel?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+- id: nutrition_counselling
+  title: Ernährungsberatung
+  summary: Die ÖGK bietet Ernährungsberatung an. Welche Angebote es in Ihrer Nähe gibt, sagt das Kundenservice.
+  priority: 8
+  triggers:
+    - {documented_recommendations: [nutrition_counselling]}
+    - {interests: [nutrition]}
+  quotes: [nutrition_counselling]
+  requires: [subject]
+  responsible:
+    - {institution: oegk_vienna_customer_service}
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.870674&portal=oegkportal
+  verified_at: 2026-11-05
+  steps:
+    - id: ask
+      type: email
+      title: Bei der ÖGK nach Ernährungsberatung fragen
+      why: Das Kundenservice weiß, welche Angebote und Termine es in Ihrer Nähe gibt.
+      institution: responsible
+      script_facts: [subject]
+      slots: [user.name, user.phone, user.email, subject.relation]
+      must_include:
+        - {id: request, text: "Nach Ernährungsberatung und Terminen in der Nähe fragen"}
+        - {id: contact, text: "Telefonnummer oder E-Mail-Adresse für die Antwort nennen"}
+      fallback_script:
+        subject: Anfrage Ernährungsberatung
+        body: |-
+          Sehr geehrte Damen und Herren,
+
+          ich suche eine Ernährungsberatung für {subject.relation}. Welche Angebote und Termine gibt es in der Nähe?
+
+          Sie erreichen mich unter {user.phone} oder {user.email}.
+
+          Mit freundlichen Grüßen
+          {user.name}
+        covers: [request, contact]
+
+- id: gp_follow_up
+  title: Kontrolle bei der Hausärztin oder beim Hausarzt
+  summary: Ihr Brief empfiehlt eine Kontrolle nach der Entlassung. Vereinbaren Sie dafür einen Termin.
+  priority: 3
+  triggers:
+    - {documented_recommendations: [follow_up_check]}
+  quotes: [follow_up_check]
+  requires: [subject, district]
+  responsible: []
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.870674&portal=oegkportal
+  verified_at: 2026-11-05
+  steps:
+    - id: call
+      type: call
+      title: Termin für die Kontrolle vereinbaren
+      why: Ihr Brief empfiehlt eine Kontrolle bald nach der Entlassung.
+      contact_label: Ihre Hausärztin oder Ihr Hausarzt
+      script_facts: [subject]
+      have_ready: [subject.svnr]
+      slots: [user.name, user.phone, subject.relation, subject.name, subject.svnr]
+      must_ask:
+        - {id: appointment, text: "Um einen Termin zur Kontrolle nach der Entlassung aus dem Spital bitten"}
+        - {id: bring, text: "Fragen, was zum Termin mitgebracht werden soll, etwa der Entlassungsbrief"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe für {subject.relation} an.
+        points:
+          - {covers: appointment, text: "Ich hätte gerne einen Termin zur Kontrolle nach der Entlassung aus dem Spital."}
+          - {covers: bring, text: "Was soll ich zum Termin mitbringen, zum Beispiel den Entlassungsbrief?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+
+# Phase 3: Gesundheitsförderung (12.2), Kind (12.4), Arzttermin (12.5), soziale Hilfe (area E).
+- id: health_check
+  title: Gesundheits-Check (Vorsorgeuntersuchung)
+  summary: Einmal im Jahr kostenlos für alle ab 18, die in Österreich leben. Bei Ärztinnen und Ärzten mit Vorsorgeuntersuchungs-Vertrag und in den Gesundheitszentren der ÖGK.
+  priority: 10
+  triggers:
+    - {interests: [screening]}
+  requires: [subject_age_band]
+  responsible:
+    - {institution: oegk_health_check}
+  criteria:
+    - id: adult
+      text: Ab 18 Jahren
+      when: {subject_age_band: {not: ["0-5", "6-14", "15-17"]}}
+  checked_by:
+    - Empfohlen wird sie unter 40 Jahren alle drei Jahre, ab 40 alle zwei Jahre. Möglich ist sie, wenn die letzte mindestens zwölf Monate her ist.
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.912730&portal=oegkportal
+  verified_at: 2026-11-05
+  steps:
+    - id: find
+      type: book
+      title: Ordination mit Vorsorgeuntersuchung finden
+      done_label: Erledigt
+      why: Die Untersuchung machen Ärztinnen und Ärzte mit Vorsorgeuntersuchungs-Vertrag.
+      institution: responsible
+      text: In der Vertragspartnersuche der ÖGK finden Sie Ordinationen in Ihrer Nähe. Meist ist die Hausärztin oder der Hausarzt die erste Anlaufstelle.
+    - id: call
+      type: call
+      title: Termin für den Gesundheits-Check vereinbaren
+      why: Mit einem Termin müssen Sie nicht lange warten.
+      contact_label: Die Ordination, die Sie gefunden haben
+      after: [find]
+      script_facts: [subject, preferred_time]
+      slots: [user.name, user.phone, subject.relation]
+      must_ask:
+        - {id: appointment, text: "Um einen Termin für den kostenlosen Gesundheits-Check (Vorsorgeuntersuchung) bitten"}
+        - {id: time, text: "Die bevorzugte Tageszeit nennen, falls bekannt"}
+        - {id: bring, text: "Fragen, was zum Termin mitzubringen ist"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}.
+        points:
+          - {covers: appointment, text: "Ich hätte gerne einen Termin für den kostenlosen Gesundheits-Check für {subject.relation}."}
+          - {covers: time, text: "Gibt es einen Termin, der gut passt?"}
+          - {covers: bring, text: "Was soll ich zum Termin mitbringen?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+- id: vaccination
+  title: Impfungen
+  summary: Die Impfstellen der Stadt Wien impfen nur mit Termin. Kinder bekommen die Impfungen des Kinder-Impfprogramms kostenlos.
+  priority: 11
+  triggers:
+    - {interests: [vaccination]}
+    - {goal: [child_offers], subject: [child]}
+  requires: [subject, subject_age_band]
+  responsible:
+    - {institution: impfservice_wien}
+  checked_by:
+    - Gratis sind Impfungen für Kinder bis 6 Jahre und für Kinder und Jugendliche von 6 bis 15 Jahren; die HPV-Impfung ist für Personen zwischen 9 und 21 Jahren kostenlos.
+  source_url: https://www.wien.gv.at/gesundheit/impfen
+  verified_at: 2026-11-05
+  steps:
+    - id: book
+      type: book
+      title: Impftermin buchen
+      done_label: Erledigt
+      why: Ohne Termin wird in den Impfstellen der Stadt Wien nicht geimpft.
+      institution: responsible
+      channel: booking
+      text: Buchen Sie online oder telefonisch unter der Gesundheitsberatung. Zum Termin den Impfpass mitnehmen, falls vorhanden.
+
+- id: bewegt_im_park
+  title: Bewegt im Park
+  summary: Kostenlose Bewegungskurse in Parks und auf Plätzen, jedes Jahr von Juni bis September.
+  priority: 12
+  triggers:
+    - {interests: [exercise]}
+  requires: [district]
+  available:
+    - {from: "06-01", to: "09-30", label: von Juni bis September}
+  responsible:
+    - {institution: bewegt_im_park}
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.892973&portal=oegkportal
+  verified_at: 2026-11-05
+  steps:
+    - id: find
+      type: book
+      title: Kurs in Ihrer Nähe finden
+      done_label: Erledigt
+      why: Die Kurse sind kostenlos und offen für alle.
+      institution: responsible
+      text: Auf der Seite von Bewegt im Park finden Sie Kurse und Termine.
+
+- id: parent_child_pass
+  title: Eltern-Kind-Pass-Untersuchungen
+  summary: Ärztliche Untersuchungen des Kindes bis zum 5. Lebensjahr, im ersten Lebensjahr besonders oft.
+  priority: 13
+  triggers:
+    - {goal: [child_offers], subject: [child], subject_age_band: ["0-5"]}
+  requires: [subject_age_band]
+  responsible:
+    - {institution: oegk_health_check}
+  checked_by:
+    - Seit Oktober gibt es ein neues Untersuchungsprogramm; welche Untersuchung gerade fällig ist, steht im Eltern-Kind-Pass.
+  source_url: https://www.oesterreich.gv.at/de/themen/familie_und_partnerschaft/eltern-kind-pass/Seite.082211
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Welche Untersuchung ist fällig?
+      why: Die Untersuchungen sind wichtig für die Gesundheit Ihres Kindes.
+      text: >-
+        Der Eltern-Kind-Pass sieht ärztliche Untersuchungen bis zum 5. Lebensjahr vor, in den ersten 14 Lebensmonaten
+        fünf. Welche als Nächstes fällig ist, steht im Pass.
+    - id: find
+      type: book
+      title: Kinderärztin oder Kinderarzt finden
+      done_label: Erledigt
+      why: Die Untersuchungen machen Ärztinnen und Ärzte, meist in der Kinderheilkunde.
+      institution: responsible
+      after: [info]
+      text: In der Vertragspartnersuche der ÖGK finden Sie Ordinationen in Ihrer Nähe.
+
+- id: family_allowance
+  title: Familienbeihilfe
+  summary: Geld für Eltern für ihre Kinder, unabhängig von Beschäftigung und Einkommen.
+  priority: 14
+  triggers:
+    - {goal: [child_offers], subject: [child]}
+  requires: [subject]
+  responsible:
+    - {institution: tax_office}
+  checked_by:
+    - Bei der Geburt muss sie nicht mehr beantragt werden; die Finanzverwaltung prüft und überweist automatisch. Grundsätzlich gibt es sie bis zum 24. Geburtstag des Kindes.
+  source_url: https://www.oesterreich.gv.at/de/themen/familie_und_partnerschaft/familienbeihilfe/Seite.450233
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Bekommen Sie schon Familienbeihilfe?
+      why: Meist kommt sie automatisch, aber nicht in jedem Fall.
+      text: >-
+        Bei der Geburt eines Kindes prüft die Finanzverwaltung alles automatisch und überweist die Familienbeihilfe. Fehlt
+        etwas, zum Beispiel die Bankverbindung, werden die Eltern gefragt. Kommt keine Familienbeihilfe, gibt es ein
+        Antragsformular.
+    - id: form
+      type: form
+      title: Nur falls nötig - Antrag stellen
+      why: Für Fälle, in denen die Familienbeihilfe nicht automatisch kommt.
+      institution: responsible
+      form: family_allowance_form
+      after: [info]
+      text: Füllen Sie das Formular aus und reichen Sie es beim Finanzamt ein.
+
+- id: family_counselling
+  title: Beratung für Familien (Kinder- und Jugendhilfe)
+  summary: Die Servicestelle der Wiener Kinder- und Jugendhilfe berät bei Fragen, Sorgen und Konflikten in der Familie und vermittelt an die richtige Stelle, auf Wunsch anonym.
+  priority: 15
+  triggers:
+    - {goal: [child_offers], subject: [child]}
+  requires: [subject, district]
+  responsible:
+    - {institution: ma11_service}
+  source_url: https://www.wien.gv.at/zusammenleben/servicestelle-kinder-jugendhilfe
+  verified_at: 2026-11-05
+  steps:
+    - id: call
+      type: call
+      title: Bei der Servicestelle der Kinder- und Jugendhilfe anrufen
+      why: Dort erfahren Sie, welche Beratung und welche Familienzentren für Sie passen.
+      institution: responsible
+      script_facts: [subject, subject_age_band]
+      slots: [user.name, user.phone]
+      must_ask:
+        - {id: offers, text: "Fragen, welche Beratungs- und Familienangebote es für das Alter des Kindes gibt"}
+        - {id: nearby, text: "Nach Familienzentren in der Nähe fragen"}
+        - {id: appointment, text: "Fragen, ob ein Beratungstermin vereinbart werden kann"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich habe ein Kind und möchte wissen, welche Angebote es für uns gibt.
+        points:
+          - {covers: offers, text: "Welche Beratungs- und Familienangebote gibt es für das Alter meines Kindes?"}
+          - {covers: nearby, text: "Gibt es ein Familienzentrum in meiner Nähe?"}
+          - {covers: appointment, text: "Kann ich einen Beratungstermin vereinbaren?"}
+        closing: Vielen Dank. Sie erreichen mich unter {user.phone}.
+
+- id: doctor_appointment
+  title: Arzttermin
+  summary: Der Lotse bucht keine Termine. Er hilft Ihnen, eine Ordination zu finden, und bereitet den Anruf vor.
+  priority: 16
+  triggers:
+    - {goal: [doctor_appointment]}
+  requires: [appointment_reason, specialty, preferred_time]
+  responsible:
+    - {institution: oegk_health_check}
+  source_url: https://www.oegk.at/vaso/
+  verified_at: 2026-11-05
+  steps:
+    - id: find
+      type: book
+      title: Ordination finden
+      done_label: Erledigt
+      why: Die Vertragspartnersuche zeigt Ordinationen mit Kassenvertrag nach Fachrichtung und Ort.
+      institution: responsible
+      text: Suchen Sie nach der Fachrichtung und Ihrem Bezirk. Notieren Sie Name und Telefonnummer der Ordination.
+    - id: call
+      type: call
+      title: Termin vereinbaren
+      why: Mit dem fertigen Leitfaden ist der Anruf schnell erledigt.
+      contact_label: Die Ordination, die Sie gefunden haben
+      after: [find]
+      script_facts: [subject, appointment_reason, specialty, preferred_time]
+      have_ready: [subject.svnr]
+      slots: [user.name, user.phone, subject.relation, subject.svnr]
+      must_ask:
+        - {id: appointment, text: "Um einen Termin bitten und den Grund nennen (aus facts.appointment_reason, ohne Beschwerden zu beschreiben)"}
+        - {id: time, text: "Die bevorzugte Tageszeit nennen"}
+        - {id: bring, text: "Fragen, was zum Termin mitzubringen ist"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}.
+        points:
+          - {covers: appointment, text: "Ich hätte gerne einen Termin für {subject.relation}."}
+          - {covers: time, text: "Wann wäre der nächste freie Termin, der gut passt?"}
+          - {covers: bring, text: "Was soll ich zum Termin mitbringen?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+- id: minimum_income
+  title: Wiener Mindestsicherung
+  summary: Hilfe für Menschen ohne oder mit geringem Einkommen, mit Geld und Beratung durch Sozialarbeiterinnen und Sozialarbeiter.
+  priority: 17
+  triggers:
+    - {goal: [financial_help]}
+  requires: [subject, district]
+  responsible:
+    - {institution: ma40_service}
+  criteria:
+    - id: vienna
+      text: Wohnort in Wien
+      when: {district: {not: [outside_vienna]}}
+  checked_by:
+    - Die Voraussetzungen werden immer im Einzelfall geprüft.
+  documents: [photo_id, income_proof, rent_proof, assets_proof, account_holder_proof]
+  forms: [minimum_income_form]
+  source_url: https://www.wien.gv.at/amtswege/mindestsicherung-antrag
+  verified_at: 2026-11-05
+  steps:
+    - id: call
+      type: call
+      title: Telefonische Erstberatung
+      why: Dort klären Sie, welche Unterstützung passt, auch bei Energiekosten.
+      institution: responsible
+      script_facts: [subject]
+      slots: [user.name, user.phone]
+      must_ask:
+        - {id: minimum_income, text: "Fragen, ob Mindestsicherung in Frage kommt und wie der Antrag geht"}
+        - {id: other_help, text: "Nach Unterstützung bei Energiekosten oder in besonderen Lebenslagen fragen"}
+        - {id: appointment, text: "Fragen, ob ein Beratungsgespräch vereinbart werden kann"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich habe kein oder nur ein geringes Einkommen und brauche Unterstützung.
+        points:
+          - {covers: minimum_income, text: "Kommt die Mindestsicherung für mich in Frage, und wie stelle ich den Antrag?"}
+          - {covers: other_help, text: "Gibt es auch Unterstützung bei Energiekosten?"}
+          - {covers: appointment, text: "Kann ich ein Beratungsgespräch vereinbaren?"}
+        closing: Vielen Dank. Sie erreichen mich unter {user.phone}.
+    - id: documents
+      type: documents
+      title: Unterlagen sammeln
+      why: Alle Unterlagen müssen vollständig und in Kopie beiliegen, von allen im Haushalt.
+    - id: submit
+      type: form
+      title: Antrag stellen
+      why: Erst mit dem Antrag kann die Stadt Wien entscheiden.
+      institution: responsible
+      form: minimum_income_form
+      after: [call, documents]
+      text: Den Antrag können Sie online mit einem Stadt Wien Konto stellen. Hilfe beim Online-Antrag gibt das Sozialzentrum Ihres Wohnbezirks.
+
+# Hubs: no steps of their own. They only make the questions for a broad goal be asked; once the
+# answers are known, the services above match.
+- id: health_promotion_topics
+  title: Etwas für die Gesundheit tun
+  summary: Vorsorge, Impfungen, Bewegung und Ernährung.
+  priority: 90
+  triggers:
+    - {goal: [health_promotion]}
+  requires: [subject, interests]
+  responsible: []
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.912730&portal=oegkportal
+  verified_at: 2026-11-05
+  steps: []
+
+- id: child_topics
+  title: Angebote für Kinder
+  summary: Untersuchungen, Impfungen, Familienbeihilfe und Beratung.
+  priority: 91
+  triggers:
+    - {goal: [child_offers]}
+  requires: [subject, subject_age_band, district]
+  responsible: []
+  source_url: https://www.wien.gv.at/zusammenleben/kind-familie-beratung
+  verified_at: 2026-11-05
+  steps: []
