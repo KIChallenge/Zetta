@@ -65,9 +65,3 @@ class MessageResponse(BaseModel):
     role: Literal["user", "assistant"]
     text: str
     created_at: Timestamp
-
-
-class SendMessageResponse(BaseModel):
-    status: Literal["delivered"] = "delivered"
-    message: MessageResponse
-    reply: MessageResponse

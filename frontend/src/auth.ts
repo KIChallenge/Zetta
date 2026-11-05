@@ -20,7 +20,8 @@ export const GENERIC = 'Das hat leider nicht geklappt. Bitte versuchen Sie es no
 export const getToken = () => localStorage.getItem(KEY)
 export const clearToken = () => localStorage.removeItem(KEY)
 
-export async function request<T>(path: string, init: RequestInit): Promise<T> {
+/** fetch that throws an ApiError unless the response is ok. */
+export async function respond(path: string, init: RequestInit): Promise<Response> {
   let res: Response
   try {
     res = await fetch(path, init)
@@ -29,12 +30,16 @@ export async function request<T>(path: string, init: RequestInit): Promise<T> {
   }
   // The dev proxy (or any gateway) answers 502-504 when the backend is down.
   if (res.status >= 502 && res.status <= 504) throw new ApiError(res.status, UNREACHABLE)
-  const body = await res.json().catch(() => null)
   if (!res.ok) {
-    const detail = body?.detail
+    const detail = (await res.json().catch(() => null))?.detail
     throw new ApiError(res.status, typeof detail === 'string' ? detail : GENERIC)
   }
-  return body as T
+  return res
+}
+
+export async function request<T>(path: string, init: RequestInit): Promise<T> {
+  const res = await respond(path, init)
+  return (await res.json().catch(() => null)) as T
 }
 
 export async function authenticate(path: '/auth/login' | '/auth/register', payload: Record<string, string>): Promise<User> {

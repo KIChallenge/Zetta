@@ -1,4 +1,4 @@
-import { ApiError, GENERIC, getToken, request, UNREACHABLE } from './auth'
+import { ApiError, GENERIC, getToken, request, respond, UNREACHABLE } from './auth'
 
 export interface Chat {
   id: string | number
@@ -14,12 +14,20 @@ export interface Message {
   created_at: string
 }
 
-const api = <T>(path: string, method = 'GET', body?: object) =>
-  request<T>(path, {
-    method,
-    headers: { Authorization: `Bearer ${getToken()}`, ...(body && { 'Content-Type': 'application/json' }) },
-    body: body && JSON.stringify(body),
-  })
+export type ReplyEvent =
+  | { event: 'message'; data: Message }
+  | { event: 'delta'; data: { text: string } }
+  | { event: 'title'; data: Chat }
+  | { event: 'done'; data: Message }
+  | { event: 'error'; data: { status: number; detail: string } }
+
+const init = (method: string, body?: object, signal?: AbortSignal): RequestInit => ({
+  method,
+  headers: { Authorization: `Bearer ${getToken()}`, ...(body && { 'Content-Type': 'application/json' }) },
+  body: body && JSON.stringify(body),
+  signal,
+})
+const api = <T>(path: string, method = 'GET', body?: object) => request<T>(path, init(method, body))
 
 // The id can come from the URL hash, so it is encoded before it becomes part of a path.
 const at = (id: string | number) => `/chats/${encodeURIComponent(id)}`
@@ -29,8 +37,29 @@ export const createChat = (title: string) => api<Chat>('/chats', 'POST', { title
 export const renameChat = (id: string | number, title: string) => api<Chat>(at(id), 'PATCH', { title })
 export const deleteChat = (id: string | number) => api<null>(at(id), 'DELETE')
 export const listMessages = (id: string | number) => api<Message[]>(`${at(id)}/messages`)
-export const sendMessage = (id: string | number, text: string) =>
-  api<{ status: 'delivered'; message: Message; reply: Message }>(`${at(id)}/messages`, 'POST', { text })
+/**
+ * Sends a message and calls `on` for each Server-Sent Event of the streamed reply.
+ * fetch instead of EventSource, which can neither POST nor send the token. Resolves when the stream ends.
+ */
+export async function sendMessage(id: string | number, text: string, signal: AbortSignal, on: (e: ReplyEvent) => void) {
+  const res = await respond(`${at(id)}/messages`, init('POST', { text }, signal))
+  const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader()
+  let buf = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) return
+    buf += value
+    let end
+    while ((end = buf.indexOf('\n\n')) >= 0) {
+      // Our server sends one `event:` and one single-line JSON `data:` per event; keep-alive pings have neither.
+      const block = buf.slice(0, end)
+      buf = buf.slice(end + 2)
+      const event = /^event: (.*)$/m.exec(block)?.[1]
+      const data = /^data: (.*)$/m.exec(block)?.[1]
+      if (event && data) on({ event, data: JSON.parse(data) } as ReplyEvent)
+    }
+  }
+}
 
 export const NOT_FOUND = 'Gespräch nicht gefunden.'
 
