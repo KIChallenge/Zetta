@@ -125,4 +125,8 @@ main:focus-visible { outline: none; }
 @container (max-width: 23.99rem) {
   .xs { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
+/* Phone at text size XL: the labels no longer fit under the icons, so screen readers keep them and the icons stay. */
+@container (max-width: 17.99rem) {
+  .bar-btn > span:not(.avatar) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
 </style>
