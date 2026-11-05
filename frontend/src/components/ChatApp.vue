@@ -82,7 +82,7 @@ const drop = (b: Bubble) => {
   const i = messages.value.indexOf(b)
   if (i >= 0) messages.value.splice(i, 1)
 }
-const withHtml = (m: Message): Bubble => (m.role === 'assistant' && m.kind === 'text' ? { ...m, html: toHtml(m.text) } : m)
+const withHtml = (m: Message): Bubble => (m.role === 'assistant' && m.kind === 'text' ? { ...m, html: toHtml(t(m.text)) } : m)
 const q = (m: Message) => m.payload as QuestionPayload
 const card = (m: Message) => m.payload as CardPayload
 // Only the plan of the latest version is interactive; older plan messages say they were replaced.
@@ -303,7 +303,7 @@ async function retry(id: string, m: Bubble) {
       } else if (e.event === 'title') {
         put(e.data)
       } else if (e.event === 'done') {
-        Object.assign(r, e.data, { pending: false })
+        Object.assign(r, withHtml(e.data), { pending: false })
         done = true
         setStatus(id, plan.value?.status ?? (e.data.kind === 'question' ? k('Frage offen') : null))
       } else {
@@ -446,10 +446,11 @@ async function confirmDelete() {
         </li>
         <li v-if="listLoaded && !chats.length" class="empty">{{ t('Noch keine Gespräche. Ihr erstes Anliegen erscheint dann hier.') }}</li>
       </ul>
+      <div class="side-foot"><slot name="foot" /></div>
     </nav>
 
     <SettingsPage v-if="hash === SETTINGS" :user="user" @expired="emit('expired')" @saved="profileSaved" @deleted="emit('deleted')" />
-    <section v-else class="pane" :class="activeId ? 'is-chat' : 'is-home'" aria-labelledby="view-h">
+    <section v-else class="pane" :class="activeId ? 'is-chat' : 'is-home navy-band'" aria-labelledby="view-h">
       <div v-if="activeId" ref="scroller" class="view">
         <button v-if="plan" type="button" class="plan-pin" @click="toPlan">
           <svg class="i" aria-hidden="true"><use href="#i-route" /></svg><span>{{ t('Ihr Plan') }} · {{ t(plan.status) }}</span><span class="pin-go">{{ t('Zum Plan') }}</span>
@@ -504,14 +505,14 @@ async function confirmDelete() {
           </li>
         </ol>
       </div>
-      <div v-else class="home navy-band">
+      <div v-else class="home">
         <h1 id="view-h" tabindex="-1">{{ t('Guten Tag, {name}.', { name: user.display_name }) }}</h1>
         <p class="lead">{{ t('Beschreiben Sie Ihr Anliegen in eigenen Worten.') }}</p>
         <p v-if="notice" class="notice" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ notice }}</span></p>
       </div>
 
       <p class="sr" aria-live="polite">{{ announce }}</p>
-      <form class="composer" :class="{ 'navy-band': !activeId }" novalidate @submit.prevent="submit">
+      <form class="composer" novalidate @submit.prevent="submit">
         <label class="q-label" :class="{ sr: activeId }" for="q">{{ activeId ? t('Ihre Nachricht') : t('Worum geht es?') }}</label>
         <div class="cbox">
           <textarea
@@ -600,7 +601,9 @@ async function confirmDelete() {
 .shell { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
 
 /* Sidebar: a plain list of rows, the open one on the lavender band. */
-.side { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: .75rem; padding: 1.25rem 1rem; border-right: var(--hair); }
+.side { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: .75rem; padding: 1.25rem 1rem 0; border-right: var(--hair); background: var(--paper); }
+/* Settings, theme and logout: pinned to the bottom edge while the list scrolls. */
+.side-foot { position: sticky; bottom: 0; margin-top: auto; display: flex; align-items: center; gap: .6rem; padding: .9rem .5rem 1.1rem; border-top: var(--hair); background: var(--paper); }
 .side-h-row { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; margin-top: .75rem; padding-inline: .75rem; }
 .side-h-row .muted { font-size: var(--fs-small); }
 .side .btn-secondary { align-self: start; }
@@ -624,14 +627,14 @@ async function confirmDelete() {
 
 .pane { --gut: max(1.25rem, calc((100% - 48rem) / 2)); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 
-/* Home: greeting and the composer in one navy band, like a search field; what the Lotse knows below. */
-.is-home { --gut: max(1.25rem, calc((100% - 44rem) / 2)); overflow-y: auto; }
+/* Home: one blue gradient behind greeting, composer and what the Lotse knows. */
+.is-home { --gut: max(1.25rem, calc((100% - 44rem) / 2)); overflow-y: auto; background: var(--grad); }
 .home { display: grid; gap: .5rem; padding: clamp(1.75rem, 6vh, 3rem) var(--gut) 1.5rem; }
 .home h1 { font-size: clamp(var(--fs-h2), 5cqi, var(--fs-h1)); }
 .lead { font-size: var(--fs-lead); color: var(--on-navy-2); }
 .notice { display: flex; gap: .55em; align-items: flex-start; margin-top: .5rem; padding: .75rem 1rem; border-radius: var(--r-m); background: var(--sheet); color: var(--danger); font-weight: 600; }
 .notice .i { margin-top: .15em; }
-.is-home > :deep(.known) { margin: 2rem var(--gut); }
+.is-home > :deep(.known) { margin: .5rem var(--gut) 2.5rem; }
 
 .view { flex: 1; min-height: 0; overflow-y: auto; padding: 2rem var(--gut) 1.5rem; }
 .chat-h { font-size: var(--fs-h1); margin-bottom: 1.5rem; hyphens: auto; overflow-wrap: anywhere; }
@@ -639,8 +642,14 @@ async function confirmDelete() {
 .msgs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
 .msg { display: flex; justify-content: flex-end; }
 .msg.assistant { justify-content: flex-start; }
-.bubble { max-width: min(34rem, 85%); display: grid; gap: .4rem; justify-items: start; padding: .7rem 1.1rem; border-radius: var(--r-l) var(--r-l) var(--r-s) var(--r-l); background: var(--accent-bg); }
-.assistant .bubble { max-width: min(40rem, 92%); border-radius: var(--r-l) var(--r-l) var(--r-l) var(--r-s); background: var(--sheet); border: var(--hair); }
+/* Rectangular speech bubbles: the user's lavender with a tail on the right, the Lotse's on the blue gradient with a tail on the left. */
+.bubble { position: relative; max-width: min(34rem, 85%); display: grid; gap: .4rem; justify-items: start; padding: .75rem 1.1rem; border-radius: var(--r-s); background: var(--band); color: var(--ink); }
+.bubble::after { content: ""; position: absolute; right: 1.25rem; bottom: -.7rem; width: 1.1rem; height: .75rem; background: var(--band); clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.assistant .bubble { max-width: min(40rem, 92%); background: var(--grad); color: var(--on-navy); box-shadow: 0 14px 30px -18px rgba(0, 30, 80, .7); --focus: var(--on-navy); }
+.assistant .bubble::after { right: auto; left: 1.25rem; background: var(--grad-end); clip-path: polygon(0 0, 100% 0, 0 100%); }
+.assistant .bubble .meta { color: var(--on-navy-2); }
+[data-contrast="high"] .bubble { box-shadow: inset 0 0 0 2px var(--ink); }
+@media (forced-colors: active) { .bubble { border: 1px solid CanvasText; } }
 .bubble.failed { box-shadow: inset 0 0 0 2px var(--danger); }
 .text { white-space: pre-wrap; overflow-wrap: anywhere; }
 
@@ -649,15 +658,15 @@ async function confirmDelete() {
 .md > :deep(* + *) { margin-top: .65em; }
 .md :deep(:is(ul, ol)) { margin-block: 0; padding-left: 1.4em; }
 .md :deep(li + li), .md :deep(li > :is(ul, ol)) { margin-top: .25em; }
-.md :deep(:is(h1, h2, h3, h4, h5, h6)) { margin-bottom: 0; font-size: var(--fs-lead); font-weight: 700; line-height: 1.3; color: var(--ink); }
-.md :deep(a) { color: var(--head); }
-.md :deep(code) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; padding: .1em .3em; border-radius: 5px; background: var(--sunk); }
-.md :deep(pre) { margin-bottom: 0; overflow-x: auto; padding: .6rem .8rem; border-radius: var(--r-s); background: var(--sunk); }
+.md :deep(:is(h1, h2, h3, h4, h5, h6)) { margin-bottom: 0; font-size: var(--fs-lead); font-weight: 700; line-height: 1.3; color: inherit; }
+.md :deep(a) { color: inherit; }
+.md :deep(code) { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; padding: .1em .3em; border-radius: 4px; background: rgba(255, 255, 255, .16); }
+.md :deep(pre) { margin-bottom: 0; overflow-x: auto; padding: .6rem .8rem; border-radius: 4px; background: rgba(255, 255, 255, .12); }
 .md :deep(pre code) { padding: 0; background: none; }
-.md :deep(blockquote) { margin-inline: 0; padding-left: .8rem; border-left: 2px solid var(--rule-2); color: var(--ink-2); }
+.md :deep(blockquote) { margin-inline: 0; padding-left: .8rem; border-left: 2px solid currentColor; color: var(--on-navy-2); }
 .md :deep(table) { display: block; overflow-x: auto; border-collapse: collapse; }
-.md :deep(:is(th, td)) { padding: .3rem .6rem; border: 1px solid var(--rule-2); text-align: left; }
-.md :deep(hr) { border: 0; border-top: var(--hair); }
+.md :deep(:is(th, td)) { padding: .3rem .6rem; border: 1px solid rgba(255, 255, 255, .35); text-align: left; }
+.md :deep(hr) { border: 0; border-top: 1px solid rgba(255, 255, 255, .3); }
 
 /* While the reply is prepared: a line with typing dots. */
 .typing { display: flex; align-items: center; gap: .6rem; color: var(--ink-2); }
@@ -683,14 +692,23 @@ async function confirmDelete() {
 .failed .state { color: var(--danger); }
 
 .composer { flex: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: .65rem; padding: .75rem var(--gut) 1rem; border-top: var(--hair); }
-.composer.navy-band { padding: 0 var(--gut) clamp(1.75rem, 6vh, 3rem); border: 0; }
+.is-home .composer { padding: .5rem var(--gut) clamp(1.75rem, 6vh, 3rem); border: 0; }
 .q-label { font-size: var(--fs-h3); font-weight: 600; }
-.cbox { padding: .4rem; border: 1px solid var(--rule-2); border-radius: 1.6rem; background: var(--sheet); color: var(--ink); --focus: var(--action); }
+/* Composer: a rectangular speech bubble with a tail on the left; the drop shadows follow the tail too. */
+.cbox { position: relative; margin-bottom: .75rem; padding: .4rem; border-radius: var(--r-s); background: var(--sheet); color: var(--ink); --focus: var(--action); filter: drop-shadow(0 0 1px rgba(0, 30, 80, .55)) drop-shadow(0 10px 16px rgba(0, 30, 80, .14)); }
+.cbox::after { content: ""; position: absolute; left: 2rem; bottom: -.75rem; width: 1.3rem; height: .8rem; background: var(--sheet); clip-path: polygon(0 0, 100% 0, 0 100%); }
+[data-scheme="dark"] .cbox { filter: drop-shadow(0 0 1px rgba(255, 255, 255, .6)); }
+[data-contrast="high"] .cbox { filter: none; border: 2px solid var(--ink); }
 .cbox:has(textarea:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
 .navy-band .cbox:has(textarea:focus-visible) { outline-color: var(--on-navy); }
 .cbox:has([aria-invalid="true"]) { box-shadow: inset 0 0 0 2px var(--danger); }
 .cbox textarea { border: 0; background: transparent; resize: none; min-height: 3rem; max-height: 14rem; field-sizing: content; padding: .55rem .9rem; }
-.navy-band .cbox textarea { min-height: 5rem; }
+.navy-band .cbox textarea { min-height: 6rem; font-size: var(--fs-lead); }
+/* Home composer: a rectangular speech bubble with a tail, floating on the gradient. */
+.navy-band .cbox { margin-bottom: 1rem; padding: .6rem; border: 0; filter: none; box-shadow: 0 0 0 5px rgba(255, 255, 255, .14), 0 24px 48px -20px rgba(0, 0, 0, .6); }
+.navy-band .cbox::after { bottom: -1rem; width: 1.6rem; height: 1.05rem; }
+[data-contrast="high"] .navy-band .cbox { box-shadow: 0 0 0 3px var(--on-navy); }
+@media (forced-colors: active) { .navy-band .cbox { border: 2px solid CanvasText; } }
 .cbox textarea:focus-visible { outline: none; }
 .cbox-row { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .75rem; padding-left: .3rem; }
 .cbox-row .send { margin-left: auto; }

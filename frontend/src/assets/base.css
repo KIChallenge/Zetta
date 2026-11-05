@@ -10,6 +10,8 @@
   --navy: #001E50;         /* dark band */
   --on-navy: #FFFFFF;
   --on-navy-2: #C9D3E8;
+  --grad: linear-gradient(170deg, #001E50 0%, #05498C 60%, #1765B5 100%); /* home pane, assistant messages */
+  --grad-end: #1765B5; /* its last stop, for the speech-bubble tail */
   /* Text */
   --ink: #001E50;
   --ink-2: #2D3E5E;
@@ -47,6 +49,8 @@
   color-scheme: dark;
   --paper: #00112E; --sheet: #04193D; --sunk: #000B21; --band: #0D2552;
   --navy: #0B2858; --on-navy: #FFFFFF; --on-navy-2: #C5D2EC;
+  --grad: linear-gradient(170deg, #00112E 0%, #0B2858 60%, #143D80 100%);
+  --grad-end: #143D80;
   --ink: #E7EDF8; --ink-2: #C3CEE3; --ink-3: #9AA8C4; --head: #A8C8F5;
   --rule: rgba(255, 255, 255, .13); --rule-2: #7183A8;
   --action: #9CC2F7; --action-hi: #C4DBFB; --on-action: #00112E;
@@ -60,7 +64,7 @@
 }
 :root[data-contrast="high"] {
   --paper: #FFFFFF; --sheet: #FFFFFF; --sunk: #FFFFFF; --band: #DCE3F7;
-  --navy: #001E50; --on-navy: #FFFFFF; --on-navy-2: #FFFFFF;
+  --navy: #001E50; --on-navy: #FFFFFF; --on-navy-2: #FFFFFF; --grad: #001E50; --grad-end: #001E50;
   --ink: #000; --ink-2: #000; --ink-3: #1A1A1A; --head: #001E50;
   --rule: #000; --rule-2: #000; --hair: 2px solid #000;
   --action: #001E50; --action-hi: #000; --on-action: #FFF;
@@ -74,7 +78,7 @@
 }
 :root[data-contrast="high"][data-scheme="dark"] {
   --paper: #000; --sheet: #000; --sunk: #000; --band: #0B1F45;
-  --navy: #000; --on-navy: #FFF; --on-navy-2: #FFF;
+  --navy: #000; --on-navy: #FFF; --on-navy-2: #FFF; --grad: #000; --grad-end: #000;
   --ink: #FFF; --ink-2: #FFF; --ink-3: #EEE; --head: #BFDBFF;
   --rule: #FFF; --rule-2: #FFF; --hair: 2px solid #FFF;
   --action: #9CC8FF; --action-hi: #C9E1FF; --on-action: #000;

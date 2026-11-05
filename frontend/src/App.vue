@@ -45,41 +45,45 @@ watch(user, () => nextTick(() => main.value?.focus()))
 
 <template>
   <a class="skip" href="#inhalt">{{ t('Zum Inhalt springen') }}</a>
-  <header class="top">
+  <!-- Signed in, the bar is only the way back to the list on narrow screens; the sidebar holds the rest. -->
+  <header class="top" :class="{ signed: user }">
     <div class="wrap">
-      <span class="brand">
+      <span v-if="!user" class="brand">
         <!-- The mark: a "you are here" marker from hospital wayfinding. -->
         <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
           <circle cx="16" cy="16" r="16" class="mark-disc" /><circle cx="16" cy="16" r="8.75" class="mark-ring" /><circle cx="16" cy="16" r="3.75" class="mark-dot" />
         </svg>
-        <span class="brand-t" :class="{ bl: user }"><b>SV KI-Lotse</b><small v-if="user">{{ t('Ihr Wegweiser durch die Sozialversicherung') }}</small></span>
+        <span class="brand-t"><b>SV KI-Lotse</b></span>
       </span>
       <select v-if="!user" class="lang" :aria-label="t('Sprache')" :value="locale" @change="setLocale(($event.target as HTMLSelectElement).value)">
         <option v-for="code in ENTRY_LANGS" :key="code" :value="code">{{ LANGS[code] }}</option>
       </select>
       <span class="me">
-        <button type="button" class="btn btn-quiet bar-btn" :title="dark ? t('Hell') : t('Dunkel')" @click="view.theme = dark ? 'light' : 'dark'">
+        <button v-if="!user" type="button" class="btn btn-quiet bar-btn" :title="dark ? t('Hell') : t('Dunkel')" @click="view.theme = dark ? 'light' : 'dark'">
           <svg class="i" aria-hidden="true"><use :href="dark ? '#i-sun' : '#i-moon'" /></svg><span>{{ dark ? t('Hell') : t('Dunkel') }}</span>
         </button>
-        <template v-if="user">
-          <a class="btn btn-quiet bar-btn bar-list" href="#gespraeche" :title="t('Alle Gespräche')">
-            <svg class="i" aria-hidden="true"><use href="#i-list" /></svg><span class="xs">{{ t('Alle Gespräche') }}</span>
-          </a>
-          <a class="btn btn-quiet bar-btn me-btn" href="#einstellungen" :title="t('Einstellungen')">
-            <span class="avatar" aria-hidden="true">{{ initials }}</span>
-            <span class="me-l"><b>{{ user.display_name }}</b><small>{{ t('Einstellungen') }}</small></span>
-          </a>
-          <button type="button" class="btn btn-quiet bar-btn" :title="t('Abmelden')" @click="signOut">
-            <svg class="i" aria-hidden="true"><use href="#i-logout" /></svg><span>{{ t('Abmelden') }}</span>
-          </button>
-        </template>
+        <a v-else class="btn btn-quiet bar-btn" href="#gespraeche" :title="t('Alle Gespräche')">
+          <svg class="i" aria-hidden="true"><use href="#i-list" /></svg><span class="xs">{{ t('Alle Gespräche') }}</span>
+        </a>
       </span>
     </div>
   </header>
 
   <main id="inhalt" ref="main" :class="user ? 'signed-in' : 'entry'" tabindex="-1">
     <template v-if="ready">
-      <ChatApp v-if="user" :user="user" @expired="logout" @deleted="signOut" />
+      <ChatApp v-if="user" :user="user" @expired="logout" @deleted="signOut">
+        <template #foot>
+          <a class="dock dock-me" href="#einstellungen" :title="t('Einstellungen')">
+            <span aria-hidden="true">{{ initials }}</span><span class="sr">{{ user.display_name }}, {{ t('Einstellungen') }}</span>
+          </a>
+          <button type="button" class="dock" :title="dark ? t('Hell') : t('Dunkel')" @click="view.theme = dark ? 'light' : 'dark'">
+            <svg class="i" aria-hidden="true"><use :href="dark ? '#i-sun' : '#i-moon'" /></svg><span class="sr">{{ dark ? t('Hell') : t('Dunkel') }}</span>
+          </button>
+          <button type="button" class="dock dock-out" :title="t('Abmelden')" @click="signOut">
+            <svg class="i" aria-hidden="true"><use href="#i-logout" /></svg><span class="sr">{{ t('Abmelden') }}</span>
+          </button>
+        </template>
+      </ChatApp>
       <template v-else>
         <div class="entry-text">
           <!-- avoid-ai-design-ignore: SD5 (two-weight headline: a bold first line, as asked in the brief) -->
@@ -106,16 +110,12 @@ watch(user, () => nextTick(() => main.value?.focus()))
 [data-scheme="dark"] .mark-disc { fill: var(--on-navy); }
 [data-scheme="dark"] .mark-ring { stroke: var(--paper); }
 .brand-t b { display: block; font-size: var(--fs-h3); font-weight: 700; line-height: 1.15; color: var(--ink); }
-.brand-t small { display: block; font-size: var(--fs-small); color: var(--ink-3); line-height: 1.3; }
 .me { display: inline-flex; align-items: center; gap: .25rem .5rem; }
-.me-btn { padding-inline: .35rem .9rem; }
-.avatar { width: 2.25rem; height: 2.25rem; flex: none; border-radius: 50%; background: var(--accent); color: var(--paper); display: grid; place-items: center; font-weight: 700; font-size: var(--fs-small); }
-.me-l b { display: block; color: var(--ink); }
-.me-l small { display: block; font-size: var(--fs-small); font-weight: 600; }
 /* Bar buttons are full-height targets, so the focus ring sits inside the bar. */
 .bar-btn:focus-visible { outline-offset: 0; }
 
-main { display: grid; min-height: 0; overflow-y: auto; }
+/* Placed in row 2, so the empty first row collapses when the bar is hidden. */
+main { grid-row: 2; display: grid; min-height: 0; overflow-y: auto; }
 /* Focus moves here only to restart reading after a screen change; a ring around the whole page says nothing. */
 main:focus-visible { outline: none; }
 .signed-in { grid-template-rows: minmax(0, 1fr); }
@@ -131,15 +131,22 @@ main:focus-visible { outline: none; }
   .entry { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-content: stretch; }
 }
 
-@container (min-width: 56rem) { .bar-list { display: none; } }
-/* Narrow, signed in: round icon buttons with a short label underneath. */
+/* Sidebar dock (slot content of ChatApp): round icon buttons, the avatar first. */
+.dock { width: 2.75rem; height: 2.75rem; flex: none; display: grid; place-items: center; padding: 0; border: 1px solid var(--rule); border-radius: 50%; background: var(--sheet); color: var(--action); font: inherit; text-decoration: none; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s, transform .12s cubic-bezier(.23, 1, .32, 1); }
+.dock:hover { background: var(--band); border-color: var(--action); }
+.dock:active { transform: scale(.94); }
+.dock-me { border: 0; background: linear-gradient(135deg, var(--accent), var(--head)); color: var(--on-action); font-weight: 700; font-size: var(--fs-small); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent); }
+.dock-me:hover { background: linear-gradient(135deg, var(--accent), var(--head)); filter: brightness(1.1); }
+.dock-out:hover { color: var(--danger); border-color: var(--danger); }
+[data-contrast="high"] .dock { border: 2px solid var(--ink); }
+
+@container (min-width: 56rem) { .top.signed { display: none; } }
+.top.signed .me { margin-inline: auto 0; }
+/* Narrow: round icon buttons with a short label underneath. */
 @container (max-width: 55.99rem) {
-  .bl, .me-l b { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .me { gap: .15rem; }
   .bar-btn { flex-direction: column; gap: .2rem; min-height: 0; padding: .15rem .35rem; border-radius: var(--r-m); font-size: var(--fs-meta); font-weight: 600; }
   .bar-btn .i { box-sizing: content-box; width: 1.2rem; height: 1.2rem; padding: .45rem; border: 1px solid var(--rule-2); border-radius: 50%; }
-  .avatar { width: calc(1.2rem + .9rem + 2px); height: calc(1.2rem + .9rem + 2px); }
-  .me-l small { font-size: inherit; }
 }
 /* Phone: the list link shows only its icon and the spacing tightens, so four buttons fit one row. */
 @container (max-width: 23.99rem) {
@@ -150,6 +157,6 @@ main:focus-visible { outline: none; }
 }
 /* Phone at text size XL: the labels no longer fit under the icons, so screen readers keep them and the icons stay. */
 @container (max-width: 17.99rem) {
-  .bar-btn > span:not(.avatar) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .bar-btn > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 </style>
