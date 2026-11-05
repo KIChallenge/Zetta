@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.database import Base, engine
 from backend.errors import register_exception_handlers
-from backend.routers import auth, users
+from backend.routers import auth, chats, users
 
 
 @asynccontextmanager
@@ -26,3 +26,4 @@ app.add_middleware(
 register_exception_handlers(app)
 app.include_router(auth.router)
 app.include_router(users.router)
+app.include_router(chats.router)
