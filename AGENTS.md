@@ -26,3 +26,9 @@ Applies to commit messages, merge descriptions, branch names, pull request title
 - **Only merge a pull request after it has at least one approved review.** Do not merge a pull request with no approvals, even with user consent.
 - After a successful merge, delete the merged branch (local and remote).
 - **Never run force operations against the remote** (e.g. `git push --force`, `git push --force-with-lease`, `+refspec` pushes). Git admins are exempt.
+
+# Product
+
+The product spec is in `docs/README.md`. Read it for requirements and scope.
+
+Summary: the goal is not a wall of text, but holding the user's hand and giving concrete next steps. The corpus of institutions is predefined and guarded by many deterministic checks. The LLM's role is slim: converting text to facts and facts back to text. It never searches, queries or looks anything up. That is done by a deterministic system, which is what makes the product reliable.
