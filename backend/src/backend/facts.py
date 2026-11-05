@@ -10,7 +10,7 @@ UNKNOWN, DECLINED = "unknown", "declined"
 SENTINELS = {UNKNOWN: "Weiß nicht", DECLINED: "Möchte ich nicht sagen"}
 
 # Sources, strongest last: an extraction never overwrites a chip answer or an edit.
-SOURCES = ("profile", "user_text", "chip")
+SOURCES = ("profile", "user_text", "chip", "document")
 
 DISTRICTS = [
     "Innere Stadt", "Leopoldstadt", "Landstraße", "Wieden", "Margareten", "Mariahilf", "Neubau",
@@ -26,6 +26,7 @@ class Fact:
     values: dict[str, str]  # value -> German label
     description: str  # for the extraction prompt
     multi: bool = False
+    extract: bool = True  # False: never taken from chat text (e.g. only from a confirmed letter)
     hints: dict[str, str] = field(default_factory=dict)  # value -> extra meaning for the LLM
 
 
@@ -83,12 +84,43 @@ FACTS: dict[str, Fact] = {
     ),
     "goal": Fact(
         "Anliegen",
-        {"apply_care_allowance": "Pflegegeld beantragen", "find_support_services": "Hilfe im Alltag finden"},
+        {
+            "apply_care_allowance": "Pflegegeld beantragen",
+            "find_support_services": "Hilfe im Alltag finden",
+            "after_hospital": "Nach dem Spital: Entlassungsbrief",
+        },
         "What the user wants to achieve. Only goals the user states or clearly implies.",
         multi=True,
         hints={
             "apply_care_allowance": "Pflegegeld: money for people who need care",
             "find_support_services": "help at home, e.g. home help, meals, nursing, someone to accompany",
+            "after_hospital": "what to organise after a hospital stay, e.g. with a discharge letter (Entlassungsbrief)",
+        },
+    ),
+    "documented_recommendations": Fact(
+        "Laut Ihrem Brief",
+        {
+            "outpatient_rehab": "Ambulante Reha",
+            "inpatient_rehab": "Stationäre Reha",
+            "follow_up_check": "Kontrolle bei der Hausärztin oder beim Hausarzt",
+            "medical_aid": "Heilbehelf oder Hilfsmittel",
+            "home_nursing": "Hauskrankenpflege",
+            "home_help": "Hilfe im Haushalt und bei der Körperpflege",
+            "transport_to_treatment": "Fahrten zur Behandlung",
+            "nutrition_counselling": "Ernährungsberatung",
+        },
+        "Recommendations written in a discharge letter, as confirmed by the user.",
+        multi=True,
+        extract=False,
+        hints={
+            "outpatient_rehab": "ambulant rehabilitation",
+            "inpatient_rehab": "inpatient (stationär) rehabilitation stay",
+            "follow_up_check": "a check-up with the GP or another doctor after discharge",
+            "medical_aid": "a medical aid or device (Heilbehelf, Hilfsmittel), e.g. walker, bandage",
+            "home_nursing": "nursing care at home (Hauskrankenpflege)",
+            "home_help": "help with personal care, shopping, household or meals",
+            "transport_to_treatment": "help getting to treatment appointments (transport)",
+            "nutrition_counselling": "nutrition counselling (Ernährungsberatung)",
         },
     ),
 }
@@ -141,10 +173,12 @@ def extraction_schema() -> dict:
             "type": "boolean",
             "description": "True if the user asks for medical advice: symptoms, diagnoses, medication, dosage,"
             " treatment, health risks or an emergency. False for questions about benefits, applications,"
-            " care services or appointments.",
+            " care services, appointments or what to organise after a hospital stay or discharge letter.",
         }
     }
     for key, fact in FACTS.items():
+        if not fact.extract:
+            continue
         hints = "; ".join(f"{v}: {h}" for v, h in fact.hints.items())
         description = fact.description + (f" Values: {hints}." if hints else "")
         if fact.multi:
@@ -174,6 +208,7 @@ def merge(current: dict[str, tuple[object, str]], extracted: dict) -> dict[str, 
         key: value
         for key, value in extracted.items()
         if key in FACTS
+        and FACTS[key].extract
         and value not in (None, [])
         and valid(key, value)
         and (key not in current or current[key][1] != "chip")

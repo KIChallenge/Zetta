@@ -11,7 +11,7 @@ from fastapi import Depends
 from openai import AsyncOpenAI
 
 from backend.config import settings
-from backend.facts import extraction_schema
+from backend.facts import FACTS, extraction_schema
 
 LANGUAGES = {
     "de": 'German (as used in Austria, addressing the user formally with "Sie")',
@@ -59,6 +59,13 @@ SCRIPTS_PROMPT = (
     "- Never write phone numbers, email addresses, web addresses, dates, amounts or account numbers.\n"
     "- Nothing medical: no illnesses, diagnoses, symptoms, medication or treatments.\n"
     "- {detail}"
+)
+LETTER_PROMPT = (
+    "You read a hospital discharge letter for a guide to social insurance and care services. List only "
+    "recommendations that are explicitly written in the letter and match one of the allowed values, each with "
+    "an exact quote copied word for word from the letter (one sentence or list item). Ignore diagnoses, "
+    "findings, lab values, medication, therapy plans and anything doctors decide among themselves: these are "
+    "medical tasks and map to no value. If nothing matches, return an empty list.\nAllowed values: {values}"
 )
 DETAIL = {
     "short": "Keep it short: one sentence per point.",
@@ -149,6 +156,32 @@ class Llm:
         out = {c.pop("step_id"): {"call": c} for c in data["calls"]}
         out |= {e.pop("step_id"): {"email": e} for e in data["emails"]}
         return out
+
+    async def recommendations(self, letter: str) -> list[dict]:
+        """[{recommendation, quote}] from a letter's text; the quotes are checked by documents.checked."""
+        fact = FACTS["documented_recommendations"]
+        schema = {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "recommendation": {"type": "string", "enum": list(fact.values)},
+                            "quote": {"type": "string"},
+                        },
+                        "required": ["recommendation", "quote"],
+                        "additionalProperties": False,
+                    },
+                }
+            },
+            "required": ["items"],
+            "additionalProperties": False,
+        }
+        values = "; ".join(f"{v}: {h}" for v, h in fact.hints.items())
+        content = await self._complete(LETTER_PROMPT.replace("{values}", values), letter, _format("letter", schema))
+        return json.loads(content)["items"]
 
     async def title(self, text: str) -> str:
         return await self._complete(TITLE_PROMPT, text)

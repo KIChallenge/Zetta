@@ -38,7 +38,7 @@ def test_references_resolve():
     for s in corpus.services:
         for rule in s.responsible:
             assert rule.institution in corpus.institutions, s.id
-        assert s.responsible[-1].when is None, f"{s.id}: the last responsible rule is the default"
+        assert not s.responsible or s.responsible[-1].when is None, f"{s.id}: the last rule is the default"
         assert set(s.documents) <= set(corpus.documents), s.id
         assert set(s.forms) <= set(corpus.forms), s.id
         assert set(s.requires) <= set(FACTS), s.id
@@ -50,6 +50,9 @@ def test_references_resolve():
             assert not t.form or t.form in corpus.forms, f"{s.id}.{t.id}"
             if t.institution and t.institution != "responsible":
                 assert t.institution in corpus.institutions
+            if t.institution == "responsible":
+                assert s.responsible, f"{s.id}.{t.id}"
+            assert set(s.quotes) <= set(FACTS["documented_recommendations"].values), s.id
     for form in corpus.forms.values():
         assert form.submit_to in corpus.institutions, form.id
     for card in corpus.cards.values():
@@ -59,9 +62,9 @@ def test_references_resolve():
 def test_step_channels_exist_or_the_institution_has_none():
     """A missing channel only degrades to "contact not in the Lotse yet" for institutions without channels."""
     for s, t in TEMPLATES:
-        if t.type not in ("call", "email"):
+        if t.type not in ("call", "email") or t.contact_label:
             continue
-        assert t.institution, f"{s.id}.{t.id}"
+        assert t.institution, f"{s.id}.{t.id}: an institution or a contact_label"
         targets = [r.institution for r in s.responsible] if t.institution == "responsible" else [t.institution]
         wanted = "phone" if t.type == "call" else "email"
         for target in targets:
@@ -121,7 +124,7 @@ def test_every_fact_key_is_used():
 def test_step_graphs_are_acyclic():
     for s in corpus.services:
         facts = {"subject": "mother"}
-        steps = [_step(s, t, s.responsible[-1].institution, facts, corpus) for t in s.steps]
+        steps = [_step(s, t, s.responsible[-1].institution if s.responsible else None, facts, corpus) for t in s.steps]
         _order(steps)  # raises on a cycle
 
 

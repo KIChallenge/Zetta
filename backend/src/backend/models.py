@@ -76,7 +76,9 @@ class ChatFact(Base):
     chat_id: Mapped[str] = mapped_column(ForeignKey("chats.id"), primary_key=True)
     key: Mapped[str] = mapped_column(String(40), primary_key=True)
     value: Mapped[str | list] = mapped_column(JSON)
-    source: Mapped[str] = mapped_column(String(20))  # profile | user_text | chip
+    source: Mapped[str] = mapped_column(String(20))  # profile | user_text | chip | document
+    # documented_recommendations: recommendation -> the confirmed quote from the letter
+    quote: Mapped[dict | None] = mapped_column(JSON, default=None)
     updated_at: Mapped[datetime] = mapped_column(DateTime)
 
 

@@ -34,12 +34,15 @@ class InventingLlm:
 def all_plans():
     values = {key: [*fact.values] for key, fact in FACTS.items() if not fact.multi}
     values["district"] = ["1010", "1230", "unknown"]
-    for subject, payer, help_, alone, goal in itertools.product(
+    letter = [*FACTS["documented_recommendations"].values]
+    for subject, payer, help_, alone, goal, recs in itertools.product(
         values["subject"], values["pension_payer"], values["needs_daily_help"], values["lives_alone"],
-        [[], ["apply_care_allowance"], ["find_support_services"]],
+        [[], ["apply_care_allowance"], ["find_support_services"]], [[], letter],
     ):  # fmt: skip
-        facts = {"subject": subject, "pension_payer": payer, "needs_daily_help": help_, "lives_alone": alone, "goal": goal}
-        result = evaluate({k: v for k, v in facts.items() if v != []}, corpus, asked=QUESTION_CAP)
+        facts = {"subject": subject, "pension_payer": payer, "needs_daily_help": help_, "lives_alone": alone,
+                 "goal": goal, "documented_recommendations": recs}  # fmt: skip
+        quotes = {r: "Laut Brief empfohlen" for r in recs}
+        result = evaluate({k: v for k, v in facts.items() if v != []}, corpus, asked=QUESTION_CAP, quotes=quotes)
         if result.plan:
             yield facts, result.plan
 

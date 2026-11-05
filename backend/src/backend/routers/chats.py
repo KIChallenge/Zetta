@@ -3,12 +3,14 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from urllib.parse import unquote
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from sqlalchemy import func, literal_column, select
 from sqlalchemy.orm import Session
 
-from backend import pipeline
+from backend import documents, pipeline
 from backend.database import SessionLocal
 from backend.dependencies import CurrentUser, DbSession
 from backend.facts import FACTS, value_label
@@ -154,9 +156,72 @@ async def answer(
         label = next((c["label"] for c in question.payload["chips"] if c["value"] == body.value), label)
     else:
         label = f"{FACTS[body.fact_key].label}: {label}"
+    answer = (body.fact_key, body.value, "chip", None)
+    if body.fact_key == "documented_recommendations":
+        # Only items the letter really contains (and the user saw) can be confirmed; their quotes are kept.
+        offered = letter_items(db, owned.id)
+        confirmed = body.value if isinstance(body.value, list) else []
+        answer = (body.fact_key, body.value, "document", {r: offered[r] for r in confirmed if r in offered})
     message = Message(kind="answer", text=label, payload={"fact_key": body.fact_key, "value": body.value})
-    async for event in turn(owned.id, llm, message, answer=(body.fact_key, body.value)):
+    async for event in turn(owned.id, llm, message, answer=answer):
         yield event
+
+
+def letter_items(db: Session, chat_id: str) -> dict[str, str]:
+    confirm = db.scalar(
+        select(Message)
+        .where(Message.chat_id == chat_id, Message.kind == "confirm")
+        .order_by(literal_column("messages.rowid").desc())
+        .limit(1)
+    )
+    return {i["recommendation"]: i["quote"] for i in confirm.payload["items"]} if confirm else {}
+
+
+MAX_UPLOAD = 10 * 1024 * 1024
+
+
+@router.post("/{chat_id}/documents", status_code=status.HTTP_201_CREATED)
+async def upload_document(
+    request: Request,
+    chat: OwnedChat,
+    db: DbSession,
+    llm: LlmClient,
+    x_filename: Annotated[str, Header()] = "Dokument.pdf",
+) -> list[MessageResponse]:
+    """A discharge letter as the raw PDF body. Only checked recommendations with quotes are kept, not the text."""
+    data = await request.body()
+    if len(data) > MAX_UPLOAD:
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail="File too large")
+    if not data.startswith(b"%PDF"):
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Only PDF files")
+    try:
+        text = documents.pdf_text(data)
+    except Exception:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Unreadable PDF") from None
+    if len(text.strip()) < 50:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No text in the PDF") from None
+    try:
+        items = documents.checked(await llm.recommendations(text), text)
+    except Exception:
+        logger.exception("Letter extraction failed")
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Letter extraction failed") from None
+    labels = FACTS["documented_recommendations"].values
+    now = utcnow()
+    upload = Message(chat_id=chat.id, role="user", kind="document", text=unquote(x_filename)[:100], created_at=now)
+    reply = Message(
+        chat_id=chat.id,
+        role="assistant",
+        kind="confirm",
+        text="In Ihrem Brief stehen diese Empfehlungen, zu denen der Lotse helfen kann. Stimmt das?"
+        if items
+        else "In Ihrem Brief habe ich keine Empfehlung gefunden, zu der der Lotse helfen kann.",
+        payload={"items": [{**i, "label": labels[i["recommendation"]]} for i in items]},
+        created_at=now,
+    )
+    db.add_all([upload, reply])
+    chat.updated_at = now
+    db.commit()
+    return [pipeline.message_response(upload), pipeline.message_response(reply)]
 
 
 @router.patch("/{chat_id}/steps/{step_id}")

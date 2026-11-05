@@ -102,10 +102,11 @@ class EmailScript(Model):
 
 class StepTemplate(Model):
     id: str
-    type: Literal["call", "email", "form", "info", "wait", "documents"]
+    type: Literal["call", "email", "form", "info", "wait", "documents", "upload"]
     title: str
     why: str
     institution: str | None = None  # an institution id, or "responsible"
+    contact_label: str | None = None  # a call/email to someone outside the corpus, e.g. the user's own doctor
     channel: str | None = None
     form: str | None = None
     after: list[str] = []
@@ -137,13 +138,14 @@ class Service(Model):
     priority: int
     triggers: list[Condition]
     requires: list[str]
-    responsible: list[Rule]
+    responsible: list[Rule]  # empty: no institution is responsible (e.g. the user's own doctor)
     responsible_note: str | None = None
     responsible_source: str | None = None
     criteria: list[Criterion] = []
     checked_by: list[str] = []
     documents: list[str] = []
     forms: list[str] = []
+    quotes: list[str] = []  # documented recommendations whose letter quotes the plan shows
     why: str | None = None
     source_url: str
     verified_at: date

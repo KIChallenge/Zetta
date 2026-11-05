@@ -4,7 +4,7 @@ import type { Plan, StepUpdate } from '../chats'
 import StepCard from './StepCard.vue'
 
 const props = defineProps<{ plan: Plan; error: string }>()
-const emit = defineEmits<{ update: [step: string, body: StepUpdate] }>()
+const emit = defineEmits<{ update: [step: string, body: StepUpdate]; upload: [] }>()
 
 const finished = (status: string) => status === 'done' || status === 'skipped'
 const titles = computed(() => Object.fromEntries(props.plan.services.map((s) => [s.id, s.title])))
@@ -39,6 +39,7 @@ function toggle(id: string) {
         </span>
       </div>
       <p class="svc-sum">{{ svc.summary }}</p>
+      <blockquote v-for="qt in svc.quotes" :key="qt" class="quote">In Ihrem Brief steht: „{{ qt }}“</blockquote>
       <details class="svc-more">
         <summary>Voraussetzungen und Zuständigkeit</summary>
         <ul v-if="svc.criteria.length" class="crit">
@@ -48,7 +49,7 @@ function toggle(id: string) {
           </li>
         </ul>
         <p v-for="c in svc.checked_by" :key="c">{{ c }}</p>
-        <p>
+        <p v-if="svc.responsible">
           Zuständig: <b>{{ svc.responsible }}</b>.
           <template v-if="svc.responsible_note">{{ svc.responsible_note }}</template>
           <a v-if="svc.responsible_source" class="src-link" :href="svc.responsible_source" target="_blank" rel="noopener noreferrer">Quelle</a>
@@ -65,6 +66,7 @@ function toggle(id: string) {
           :for-services="(s.services ?? []).map((id) => titles[id] ?? id)"
           @toggle="toggle(s.id)"
           @update="(body) => emit('update', s.id, body)"
+          @upload="emit('upload')"
         />
       </ol>
     </section>
@@ -89,6 +91,7 @@ function toggle(id: string) {
 .svc-h { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem; }
 .svc-h h3 { font-size: 1.25rem; }
 .svc-sum { color: var(--ink-2); max-width: 44rem; }
+.quote { max-width: 44rem; margin: 0; padding: .55rem .9rem; border-left: 3px solid var(--harbor); border-radius: 0 var(--r-s) var(--r-s) 0; background: var(--sunk); font-weight: 600; }
 .svc-more { max-width: 44rem; color: var(--ink-2); }
 .svc-more summary { width: fit-content; min-height: 2.75rem; display: flex; align-items: center; color: var(--harbor); font-weight: 600; cursor: pointer; }
 .svc-more > :not(summary) { margin-top: .5rem; }

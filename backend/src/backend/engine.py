@@ -56,8 +56,10 @@ def next_question(services: list[Service], facts: dict, corpus: Corpus) -> str |
     return min(missing, key=lambda key: (-missing[key], order.index(key)))
 
 
-def evaluate(facts: dict, corpus: Corpus, asked: int = 0, medical: bool = False) -> Result:
-    """`asked`: questions since the last plan or card, for the cap."""
+def evaluate(
+    facts: dict, corpus: Corpus, asked: int = 0, medical: bool = False, quotes: dict[str, str] | None = None
+) -> Result:
+    """`asked`: questions since the last plan or card, for the cap. `quotes`: confirmed letter quotes."""
     if medical:
         return Result("boundary")
     if facts.get("district") == "outside_vienna":
@@ -70,7 +72,7 @@ def evaluate(facts: dict, corpus: Corpus, asked: int = 0, medical: bool = False)
         return Result("general")
     if can_ask and (key := next_question(found, facts, corpus)):
         return Result("question", question=key)
-    return Result("plan", plan=build_plan(found, facts, corpus))
+    return Result("plan", plan=build_plan(found, facts, corpus, quotes or {}))
 
 
 def eligibility(service: Service, facts: dict) -> tuple[str, list[dict]]:
@@ -83,12 +85,12 @@ def eligibility(service: Service, facts: dict) -> tuple[str, list[dict]]:
     return ("not_met" if "not_met" in states else "possible" if "unknown" in states else "likely"), rows
 
 
-def responsible(service: Service, facts: dict) -> str:
+def responsible(service: Service, facts: dict) -> str | None:
     # The last rule has no `when` and is the default (checked by the corpus tests).
-    return next(r.institution for r in service.responsible if r.when is None or check(r.when, facts))
+    return next((r.institution for r in service.responsible if r.when is None or check(r.when, facts)), None)
 
 
-def _step(service: Service, template: StepTemplate, institution_id: str, facts: dict, corpus: Corpus) -> dict:
+def _step(service: Service, template: StepTemplate, institution_id: str | None, facts: dict, corpus: Corpus) -> dict:
     step = {
         "id": f"{service.id}.{template.id}",
         "service": service.id,
@@ -104,7 +106,11 @@ def _step(service: Service, template: StepTemplate, institution_id: str, facts: 
     if template.form:
         form = corpus.forms[template.form]
         step["form"] = {"title": form.title, "url": form.url, "online_url": form.online_url}
-    if template.institution:
+    if template.contact_label:
+        # Someone the user knows, like their own doctor: a script, but never a number from the system.
+        step["institution"] = {"id": None, "name": template.contact_label, "address": None}
+        _must(step, template, facts)
+    elif template.institution:
         institution = corpus.institutions[
             institution_id if template.institution == "responsible" else template.institution
         ]
@@ -125,13 +131,17 @@ def _step(service: Service, template: StepTemplate, institution_id: str, facts: 
                 return step
             step["contact"] = channel.model_dump(mode="json", by_alias=True)
             step["contact"]["source_url"] = channel.source_url or institution.source_url
-            items = template.must_ask if template.type == "call" else template.must_include
-            # An item is left out only when its condition is known to be false.
-            step["must"] = [{"id": i.id, "text": i.text} for i in items if i.when is None or check(i.when, facts) is not False]
-            step["slots"] = template.slots
-            step["have_ready"] = template.have_ready
-            step["script_facts"] = {k: facts[k] for k in template.script_facts if k in facts}
+            _must(step, template, facts)
     return step
+
+
+def _must(step: dict, template: StepTemplate, facts: dict) -> None:
+    items = template.must_ask if template.type == "call" else template.must_include
+    # An item is left out only when its condition is known to be false.
+    step["must"] = [{"id": i.id, "text": i.text} for i in items if i.when is None or check(i.when, facts) is not False]
+    step["slots"] = template.slots
+    step["have_ready"] = template.have_ready
+    step["script_facts"] = {k: facts[k] for k in template.script_facts if k in facts}
 
 
 def _order(steps: list[dict]) -> list[dict]:
@@ -148,13 +158,17 @@ def _order(steps: list[dict]) -> list[dict]:
     return ordered
 
 
-def build_plan(services: list[Service], facts: dict, corpus: Corpus) -> dict:
+def build_plan(services: list[Service], facts: dict, corpus: Corpus, quotes: dict[str, str] | None = None) -> dict:
     kept, dropped, steps = [], [], []
     for service in sorted(services, key=lambda s: s.priority):
         state, criteria = eligibility(service, facts)
         if state == "not_met":
             failed = next(c["text"] for c in criteria if c["state"] == "not_met")
             dropped.append({"id": service.id, "title": service.title, "reason": f"Voraussetzung nicht erfüllt: {failed}"})
+            continue
+        # An upload step is only shown until its result (the confirmed letter) is known.
+        templates = [t for t in service.steps if not (t.type == "upload" and _value(facts, "documented_recommendations"))]
+        if not templates:
             continue
         institution_id = responsible(service, facts)
         kept.append({
@@ -164,12 +178,13 @@ def build_plan(services: list[Service], facts: dict, corpus: Corpus) -> dict:
             "eligibility": state,
             "criteria": criteria,
             "checked_by": service.checked_by,
-            "responsible": corpus.institutions[institution_id].name,
+            "responsible": corpus.institutions[institution_id].name if institution_id else None,
+            "quotes": [quotes[r] for r in service.quotes if quotes and r in quotes],
             "responsible_note": service.responsible_note,
             "responsible_source": service.responsible_source,
             "source_url": service.source_url,
         })
-        steps += [_step(service, t, institution_id, facts, corpus) for t in service.steps]
+        steps += [_step(service, t, institution_id, facts, corpus) for t in templates]
 
     # Document steps of several services become one checklist (spec 6.4).
     collect = [s for s in steps if s["type"] == "documents"]

@@ -30,6 +30,7 @@ OUTCOMES = {
     "documents": {"ready": ("Alles beisammen", "done")},
     "wait": {"received": ("Erledigt", "done")},
     "info": {"read": ("Gelesen", "done")},
+    "upload": {"uploaded": ("Hochgeladen", "done")},
 }  # fmt: skip
 
 
@@ -236,14 +237,17 @@ async def intro(llm: Llm, graph: dict, facts: dict, language: str) -> str | None
 
 
 async def respond(
-    db: Session, chat: Chat, llm: Llm, *, text: str | None = None, answer: tuple[str, object] | None = None
+    db: Session, chat: Chat, llm: Llm, *, text: str | None = None, answer: tuple | None = None
 ) -> AsyncIterator[ServerSentEvent]:
-    """Yields `facts`, then `plan` for a plan, then `done` with the saved assistant message."""
+    """`answer`: (fact key, value, source, letter quotes or None) of a chip or confirmed letter items."""
+    # Yields `facts`, then `plan` for a plan, then `done` with the saved assistant message.
     corpus = get_corpus()
     rows = fact_rows(db, chat.id)
     medical = False
     if answer:
-        set_fact(db, chat.id, rows, *answer, "chip")
+        key, value, source, quote = answer
+        set_fact(db, chat.id, rows, key, value, source)
+        rows[key].quote = quote
     else:
         question = pending_question(db, chat.id)
         try:
@@ -264,7 +268,9 @@ async def respond(
     db.commit()
     yield ServerSentEvent(event="facts", data=fact_list(rows))
 
-    result = evaluate(facts, corpus, asked=questions_asked(db, chat.id), medical=medical)
+    letter = rows.get("documented_recommendations")
+    quotes = (letter.quote or {}) if letter else {}
+    result = evaluate(facts, corpus, asked=questions_asked(db, chat.id), medical=medical, quotes=quotes)
     if result.kind == "question":
         reply = question_message(chat.id, result.question, facts, corpus)
     elif result.kind != "plan":

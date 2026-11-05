@@ -29,6 +29,7 @@ class FakeLlm:
         self.fail = False  # every call raises, like an LLM that is down
         self.hang = False
         self.calls = []  # (method, input) in call order
+        self.letter_items = []  # what recommendations() finds in an uploaded letter
 
     async def _call(self, method, value):
         self.calls.append((method, value))
@@ -48,6 +49,10 @@ class FakeLlm:
     async def scripts(self, steps, detail):
         await self._call("scripts", steps)
         return {step["step_id"]: (self.script_text or valid_script)(step) for step in steps}
+
+    async def recommendations(self, letter):
+        await self._call("recommendations", letter)
+        return self.letter_items
 
     async def title(self, text):
         if self.title_text is None:

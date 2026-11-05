@@ -4,6 +4,7 @@ Live run, from backend/ with a .env that has the API key:
 
     uv run python tests/eval/runner.py            # all splits
     uv run python tests/eval/runner.py held_out   # only measure the held-out set
+    uv run python tests/eval/runner.py letters    # the discharge letters in tests/eval/letters/
 
 Prints per case what went wrong and exits non-zero if the held-out set misses the threshold or any
 contact data in the output is not from the corpus.
@@ -144,5 +145,23 @@ async def live(split: str | None) -> int:
     return 1 if failures else code
 
 
+async def letters() -> int:
+    """Each letter must yield exactly its expected recommendations, all with a checked quote."""
+    from backend.documents import checked, pdf_text
+    from backend.llm import Llm
+
+    raw = Path(__file__).resolve().parents[2] / "data" / "raw"
+    failed = 0
+    for spec in sorted((SETS / "letters").glob("*.yaml")):
+        case = yaml.safe_load(spec.read_text(encoding="utf-8"))
+        text = pdf_text((raw / case["file"]).read_bytes())
+        found = sorted(i["recommendation"] for i in checked(await Llm().recommendations(text), text))
+        ok = found == sorted(case["expect"])
+        failed += not ok
+        print(f"{'ok  ' if ok else 'FAIL'} {spec.stem}: {found}" + ("" if ok else f", expected {sorted(case['expect'])}"))
+    return 1 if failed else 0
+
+
 if __name__ == "__main__":
-    sys.exit(asyncio.run(live(sys.argv[1] if len(sys.argv) > 1 else None)))
+    arg = sys.argv[1] if len(sys.argv) > 1 else None
+    sys.exit(asyncio.run(letters() if arg == "letters" else live(arg)))

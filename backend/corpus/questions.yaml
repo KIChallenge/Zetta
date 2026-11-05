@@ -10,6 +10,7 @@
   chips:
     - {value: apply_care_allowance}
     - {value: find_support_services}
+    - {value: after_hospital}
     - {value: unknown, label: Etwas anderes}
 
 - fact_key: subject

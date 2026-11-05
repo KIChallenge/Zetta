@@ -122,3 +122,13 @@ def test_statuses_follow_the_after_edges():
     assert status["care_allowance.call"] == "done"
     assert status["care_allowance.submit"] == "available"
     assert status["care_allowance.assessment"] == "blocked"
+
+
+def test_after_a_hospital_stay_the_plan_asks_for_the_letter_until_it_is_confirmed():
+    facts = {"subject": "self", "goal": ["after_hospital"], "district": "1100"}
+    assert [s["id"] for s in evaluate(facts, corpus).plan["steps"]] == ["after_hospital.upload"]
+
+    plan = evaluate({**facts, "documented_recommendations": ["inpatient_rehab"]}, corpus, quotes={"inpatient_rehab": "Reha empfohlen"}).plan
+    assert [s["id"] for s in plan["services"]] == ["rehab"]
+    assert plan["services"][0]["quotes"] == ["Reha empfohlen"]
+    assert "contact" not in next(s for s in plan["steps"] if s["id"] == "rehab.call_doctor")

@@ -3,12 +3,14 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, shallowRef, 
 import { ApiError, UNREACHABLE, type User } from '../auth'
 import {
   createChat, deleteChat, getState, listChats, listMessages, NOT_FOUND, renameChat, say, sendMessage, titleFrom,
-  updateStep, when,
-  type AnswerPayload, type CardPayload, type Chat, type Chip, type Fact, type Message, type Plan, type PlanPayload,
+  updateStep, uploadDocument, when,
+  type AnswerPayload, type CardPayload, type Chat, type Chip, type ConfirmPayload, type Fact, type Message, type Plan,
+  type PlanPayload,
   type QuestionPayload, type StepUpdate,
 } from '../chats'
 import { toHtml } from '../markdown'
 import { getProfile, type Profile } from '../profile'
+import DocumentConfirm from './DocumentConfirm.vue'
 import FactChips from './FactChips.vue'
 import NoticeCard from './NoticeCard.vue'
 import PlanView from './PlanView.vue'
@@ -215,6 +217,37 @@ function answer(key: string, chip: Chip, label = chip.label) {
   deliver(activeId.value, label, { fact_key: key, value: key === 'goal' && chip.value !== 'unknown' ? [chip.value] : chip.value })
 }
 const editFact = (f: Fact, chip: Chip) => answer(f.key, chip, `${f.label}: ${chip.label}`)
+function confirmLetter(values: string[], labels: string[]) {
+  if (run.value || !activeId.value) return
+  const label = labels.length ? `Laut Ihrem Brief: ${labels.join(', ')}` : 'Keine der Empfehlungen stimmt'
+  deliver(activeId.value, label, { fact_key: 'documented_recommendations', value: values.length ? values : 'unknown' })
+}
+
+// A discharge letter (PDF with text). Photos are not supported yet.
+const fileInput = ref<HTMLInputElement>()
+const uploading = ref(false)
+async function upload(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  const id = activeId.value
+  if (!file || !id || run.value) return
+  draftErr.value = ''
+  uploading.value = true
+  try {
+    const added = await uploadDocument(id, file)
+    if (activeId.value === id) messages.value.push(...added)
+    scrollDown()
+  } catch (err) {
+    const status = err instanceof ApiError ? err.status : 0
+    draftErr.value =
+      status === 415 ? 'Bitte laden Sie eine PDF-Datei hoch.'
+      : status === 413 ? 'Die Datei ist zu groß (höchstens 10 MB).'
+      : status === 422 ? 'In dieser PDF ist kein Text lesbar. Fotos und Scans gehen noch nicht.'
+      : fail(err)
+  }
+  uploading.value = false
+}
 
 async function retry(id: string, m: Bubble) {
   if (run.value) return
@@ -408,13 +441,21 @@ async function confirmDelete() {
               @answer="(chip) => answer(q(m).fact_key, chip)"
             />
             <NoticeCard v-else-if="m.kind === 'card'" :card="card(m)" :text="m.text" />
+            <DocumentConfirm
+              v-else-if="m.kind === 'confirm'"
+              :text="m.text"
+              :payload="m.payload as ConfirmPayload"
+              :active="m === lastMsg && !run"
+              @confirm="confirmLetter"
+            />
             <div v-else-if="m.kind === 'plan'" class="plan-msg">
               <div class="bubble"><p>{{ m.text }}</p></div>
-              <PlanView v-if="isCurrent(m)" :plan="plan!" :error="planErr" @update="patchStep" />
+              <PlanView v-if="isCurrent(m)" :plan="plan!" :error="planErr" @update="patchStep" @upload="fileInput?.click()" />
               <p v-else class="muted">Dieser Plan wurde später angepasst. Der aktuelle Plan steht weiter unten.</p>
             </div>
             <div v-else class="bubble" :class="m.state">
               <div v-if="m.role === 'assistant'" class="md" v-html="m.html"></div>
+              <p v-else-if="m.kind === 'document'" class="text"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg> {{ m.text }}</p>
               <p v-else class="text">{{ m.text }}</p>
               <p class="meta">
                 <time :datetime="m.created_at">{{ when(m.created_at) }}</time>
@@ -451,6 +492,12 @@ async function confirmDelete() {
             @keydown.enter.meta.prevent="submit"
           ></textarea>
           <div class="cbox-row">
+            <template v-if="activeId">
+              <input ref="fileInput" type="file" accept="application/pdf" class="sr" tabindex="-1" @change="upload" />
+              <button type="button" class="btn btn-quiet" :aria-disabled="uploading || !!run" @click="!uploading && !run && fileInput?.click()">
+                <svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ uploading ? 'Brief wird gelesen …' : 'Entlassungsbrief (PDF)' }}
+              </button>
+            </template>
             <span id="q-hint" class="hint">Senden mit Strg + Enter (Mac: ⌘ + Enter)</span>
             <button type="submit" class="btn btn-primary send" :aria-disabled="busy || !!run">
               {{ busy || run ? 'Einen Moment …' : 'Senden' }}<svg class="i" aria-hidden="true"><use href="#i-arrow" /></svg>
@@ -582,7 +629,7 @@ async function confirmDelete() {
 @keyframes dot { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
 
 /* Question, fact, card and plan replies use the full width, not a bubble. */
-.msg.assistant:is(.question, .card, .plan) { display: grid; gap: 1rem; justify-content: stretch; }
+.msg.assistant:is(.question, .card, .plan, .confirm) { display: grid; gap: 1rem; justify-content: stretch; }
 .msg-facts { margin-top: .25rem; }
 .plan-msg { display: grid; gap: 1.25rem; }
 .plan-msg > .bubble { justify-self: start; }

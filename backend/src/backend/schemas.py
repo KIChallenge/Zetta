@@ -69,7 +69,7 @@ class MessageResponse(BaseModel):
 
     id: str
     role: Literal["user", "assistant"]
-    kind: Literal["text", "answer", "question", "plan", "card"]
+    kind: Literal["text", "answer", "document", "question", "confirm", "plan", "card"]
     text: str
     payload: dict | None
     created_at: Timestamp

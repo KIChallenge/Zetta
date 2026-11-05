@@ -34,12 +34,13 @@ export interface QuestionPayload { fact_key: string; chips: Chip[]; why: string 
 export interface AnswerPayload { fact_key: string; value: string | string[] }
 export interface PlanPayload { version: number }
 export interface CardPayload { card: 'boundary' | 'out_of_scope' | 'general'; title: string; contacts: Institution[] }
-export type Payload = QuestionPayload | AnswerPayload | PlanPayload | CardPayload
+export interface ConfirmPayload { items: { recommendation: string; label: string; quote: string }[] }
+export type Payload = QuestionPayload | AnswerPayload | PlanPayload | CardPayload | ConfirmPayload
 
 export interface Message {
   id: string | number
   role: 'user' | 'assistant'
-  kind: 'text' | 'answer' | 'question' | 'plan' | 'card'
+  kind: 'text' | 'answer' | 'document' | 'question' | 'confirm' | 'plan' | 'card'
   text: string
   payload: Payload | null
   created_at: string
@@ -75,7 +76,7 @@ export interface Step {
   id: string
   service: string
   services?: string[] // a merged checklist
-  type: 'call' | 'email' | 'form' | 'info' | 'wait' | 'documents'
+  type: 'call' | 'email' | 'form' | 'info' | 'wait' | 'documents' | 'upload'
   title: string
   why: string
   after: string[]
@@ -86,7 +87,7 @@ export interface Step {
   checks: string[]
   updated_at: string | null
   outcomes: { id: string; label: string }[]
-  institution?: { id: string; name: string; address: string | null }
+  institution?: { id: string | null; name: string; address: string | null } // id null: the user's own doctor
   contact?: Channel
   form?: { title: string; url: string; online_url: string | null }
   documents?: Doc[]
@@ -100,7 +101,8 @@ export interface Service {
   eligibility: 'likely' | 'possible'
   criteria: { text: string; state: 'met' | 'not_met' | 'unknown' }[]
   checked_by: string[]
-  responsible: string
+  responsible: string | null
+  quotes: string[] // from the user's confirmed letter
   responsible_note: string | null
   responsible_source: string | null
   source_url: string
@@ -146,6 +148,15 @@ export const renameChat = (id: string | number, title: string) => api<Chat>(at(i
 export const deleteChat = (id: string | number) => api<null>(at(id), 'DELETE')
 export const listMessages = (id: string | number) => api<Message[]>(`${at(id)}/messages`)
 export const getState = (id: string | number) => api<{ facts: Fact[]; plan: Plan | null }>(`${at(id)}/state`)
+// The raw PDF as the body; the server keeps only the recommendations the user then confirms.
+export const uploadDocument = async (id: string | number, file: File) => {
+  const res = await respond(`${at(id)}/documents`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/pdf', 'X-Filename': encodeURIComponent(file.name) },
+    body: file,
+  })
+  return (await res.json()) as Message[]
+}
 export const updateStep = (id: string | number, step: string, body: StepUpdate) =>
   api<Plan>(`${at(id)}/steps/${encodeURIComponent(step)}`, 'PATCH', body)
 

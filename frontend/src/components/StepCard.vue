@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { when, type Step, type StepUpdate } from '../chats'
 
 const props = defineProps<{ step: Step; now: boolean; open: boolean; forServices: string[] }>()
-const emit = defineEmits<{ toggle: []; update: [body: StepUpdate] }>()
+const emit = defineEmits<{ toggle: []; update: [body: StepUpdate]; upload: [] }>()
 
 const KIND = {
   call: ['phone', 'Anrufen'],
@@ -12,6 +12,7 @@ const KIND = {
   info: ['info', 'Gut zu wissen'],
   wait: ['clock', 'Abwarten'],
   documents: ['list-check', 'Unterlagen'],
+  upload: ['file', 'Hochladen'],
 } as const
 
 const s = computed(() => props.step)
@@ -25,6 +26,7 @@ const docs = computed(() => s.value.documents ?? [])
 const peek = computed(() => {
   const st = s.value
   if (done.value) return `${outcomeLabel.value}${st.updated_at ? ' · ' + when(st.updated_at) : ''}`
+  if (st.type === 'call' && !st.contact && st.institution) return st.institution.name
   if (st.type === 'call' && st.contact) return `${st.contact.value}${st.contact.reachable ? ' · ' + st.contact.reachable.text : ''}`
   if (st.type === 'email' && st.institution) return `An: ${st.institution.name}`
   if (st.type === 'documents') return `${st.checks.length} von ${docs.value.length} bereit`
@@ -34,7 +36,11 @@ const peek = computed(() => {
 
 // Gaps like "[Ihr Name]" are highlighted, so the user sees what is still missing.
 const parts = (text = '') => text.split(/(\[[^\]]+\])/).filter(Boolean).map((t) => ({ t, gap: /^\[.*\]$/.test(t) }))
-const hasGap = computed(() => /\[[^\]]+\]/.test(JSON.stringify(s.value.script ?? {})))
+const hasGap = computed(() => {
+  const sc = s.value.script
+  const texts = [sc?.opening, sc?.closing, sc?.body, sc?.subject, ...(sc?.points ?? []).map((p) => p.text)]
+  return texts.some((t) => t && /\[[^\]]+\]/.test(t))
+})
 
 function tick(id: string, on: boolean) {
   const checks = on ? [...s.value.checks, id] : s.value.checks.filter((c) => c !== id)
@@ -116,8 +122,12 @@ async function copy() {
           <p v-if="forServices.length > 1" class="hint">Gilt für: {{ forServices.join(' und ') }}</p>
 
           <!-- Call -->
-          <template v-if="s.type === 'call' && s.contact">
-            <div class="callbox">
+          <template v-if="s.type === 'call'">
+            <div v-if="!s.contact" class="callbox">
+              <p class="mini-h"><svg class="i" aria-hidden="true"><use href="#i-phone" /></svg>{{ s.institution?.name }}</p>
+              <p class="hours">Die Nummer kennen Sie selbst: Der Lotse hat keine Daten zu Ihrer Ordination.</p>
+            </div>
+            <div v-else class="callbox">
               <a class="phone" :href="s.contact.href"><svg class="i" aria-hidden="true"><use href="#i-phone" /></svg><span>{{ s.contact.value }}</span><span class="sr"> anrufen</span></a>
               <div class="call-meta">
                 <p v-if="s.contact.reachable" class="avail" :data-open="s.contact.reachable.open">{{ s.contact.reachable.text }}</p>
@@ -125,7 +135,7 @@ async function copy() {
                 <p class="hours">{{ s.institution?.name }}<template v-if="s.contact.hours"><br />{{ s.contact.hours }}</template></p>
               </div>
             </div>
-            <p v-if="s.outcome === 'not_reached'" class="attempt">
+            <p v-if="s.outcome === 'not_reached' && s.contact" class="attempt">
               <svg class="i" aria-hidden="true"><use href="#i-alert" /></svg>
               <span>Nicht erreicht<template v-if="s.updated_at"> ({{ when(s.updated_at) }})</template>. Versuchen Sie es noch einmal<template v-if="s.contact.reachable && !s.contact.reachable.open">: {{ s.contact.reachable.text }}</template>.</span>
             </p>
@@ -157,7 +167,7 @@ async function copy() {
               </ol>
               <p v-if="hasGap" class="hint">Markierte Stellen fehlen noch. <a href="#einstellungen">In den Einstellungen ergänzen</a></p>
             </div>
-            <div class="actions"><a class="btn btn-primary" :href="s.contact.href"><svg class="i" aria-hidden="true"><use href="#i-phone" /></svg>Jetzt anrufen</a></div>
+            <div v-if="s.contact" class="actions"><a class="btn btn-primary" :href="s.contact.href"><svg class="i" aria-hidden="true"><use href="#i-phone" /></svg>Jetzt anrufen</a></div>
             <div class="outcome">
               <button type="button" class="btn btn-secondary" :aria-expanded="outcomeOpen" :aria-controls="`of-${s.id}`" @click="outcomeOpen = !outcomeOpen">
                 <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>Anruf erledigt
@@ -223,10 +233,15 @@ async function copy() {
             </ul>
           </template>
 
+          <template v-else-if="s.type === 'upload'">
+            <p v-if="s.text">{{ s.text }}</p>
+            <div class="actions"><button type="button" class="btn btn-primary" @click="emit('upload')"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>PDF auswählen</button></div>
+          </template>
+
           <!-- Info, wait, or a call/email without curated contact data -->
           <p v-else-if="s.text">{{ s.text }}</p>
 
-          <div v-if="s.type !== 'call' || !s.contact" class="outcome">
+          <div v-if="s.type !== 'call' && s.type !== 'upload'" class="outcome">
             <button type="button" class="btn btn-secondary" @click="emit('update', { outcome: s.outcomes[0]!.id })">
               <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ s.outcomes[0]?.label }}
             </button>

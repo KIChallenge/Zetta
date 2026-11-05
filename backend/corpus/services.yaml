@@ -105,6 +105,8 @@
   triggers:
     - {goal: [find_support_services]}
     - {needs_daily_help: [some, a_lot]}
+    - {documented_recommendations: [home_nursing, home_help]}
+  quotes: [home_nursing, home_help]
   requires: [subject, district, lives_alone]
   responsible:
     - {institution: fsw_customer_service}
@@ -236,3 +238,240 @@
           Mit freundlichen Grüßen
           {user.name}
         covers: [request, situation, contact]
+
+
+# Phase 2: after a hospital stay (spec 12.3). The letter's confirmed recommendations trigger the services below.
+- id: after_hospital
+  title: Nach dem Spital
+  summary: Der Lotse liest die Empfehlungen aus Ihrem Entlassungsbrief und macht daraus Ihre nächsten Schritte.
+  priority: 2
+  triggers:
+    - {goal: [after_hospital]}
+  requires: [subject]
+  responsible: []
+  source_url: https://www.pv.at/web/reha-und-praevention/vom-antrag-zu-reha-und-kur
+  verified_at: 2026-11-05
+  steps:
+    - id: upload
+      type: upload
+      title: Entlassungsbrief hochladen
+      why: Im Brief steht, was nach dem Spital empfohlen wird, zum Beispiel Reha oder Pflege zu Hause.
+      text: >-
+        Laden Sie den Brief als PDF hoch. Der Lotse sucht nur Empfehlungen zu Anträgen und Unterstützung, keine Befunde,
+        und zeigt Ihnen jede Stelle wörtlich. Sie bestätigen, was stimmt. Der Brief selbst wird nicht gespeichert.
+- id: rehab
+  title: Medizinische Rehabilitation
+  summary: Ein Reha-Aufenthalt, stationär oder ambulant. Die Ärztin oder der Arzt füllt den Antrag aus, die Pensionsversicherung entscheidet.
+  priority: 4
+  triggers:
+    - {documented_recommendations: [inpatient_rehab, outpatient_rehab]}
+  quotes: [inpatient_rehab, outpatient_rehab]
+  requires: [subject, district]
+  responsible:
+    - {institution: pva_vienna}
+  responsible_note: Den Antrag schicken Sie an die zuständige Landesstelle der Pensionsversicherung; die Zuständigkeit richtet sich nach dem Wohnort.
+  responsible_source: https://www.pv.at/web/reha-und-praevention/vom-antrag-zu-reha-und-kur
+  checked_by:
+    - Die medizinische Notwendigkeit begründet die behandelnde Ärztin oder der behandelnde Arzt. Über die Bewilligung entscheidet die Pensionsversicherung.
+  forms: [rehab_form]
+  source_url: https://www.pv.at/web/reha-und-praevention/vom-antrag-zu-reha-und-kur
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Reha laut Ihrem Brief
+      why: Damit Sie wissen, wie der Weg zur Reha aussieht.
+      text: >-
+        Für eine Reha braucht es einen Antrag, den die behandelnde Ärztin oder der behandelnde Arzt vollständig ausfüllt,
+        unterschreibt und medizinisch begründet. Ob stationär oder ambulant besser passt, besprechen Sie am besten mit ihr
+        oder ihm.
+    - id: call_doctor
+      type: call
+      title: Ärztin oder Arzt um den Reha-Antrag bitten
+      why: Ohne ärztlich ausgefüllten Antrag gibt es keine Reha.
+      contact_label: Ihre behandelnde Ärztin oder Ihr behandelnder Arzt
+      after: [info]
+      script_facts: [subject]
+      have_ready: [subject.svnr]
+      slots: [user.name, user.phone, subject.relation, subject.name, subject.svnr]
+      must_ask:
+        - {id: appointment, text: "Um einen Termin bitten, um den Reha-Antrag auszufüllen"}
+        - {id: form, text: "Fragen, ob der Antrag in der Ordination ausgefüllt und unterschrieben werden kann"}
+        - {id: inpatient_or_outpatient, text: "Fragen, ob eine stationäre oder ambulante Reha besser passt"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe wegen eines Antrags auf Rehabilitation für {subject.relation} an.
+        points:
+          - {covers: appointment, text: "Kann ich einen Termin bekommen, um den Reha-Antrag auszufüllen?"}
+          - {covers: form, text: "Können Sie den Antrag ausfüllen und unterschreiben?"}
+          - {covers: inpatient_or_outpatient, text: "Passt eine stationäre oder eine ambulante Reha besser?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+    - id: submit
+      type: form
+      title: Reha-Antrag einreichen
+      why: Erst mit dem Antrag kann die Pensionsversicherung entscheiden.
+      institution: responsible
+      form: rehab_form
+      after: [call_doctor]
+      text: >-
+        Senden Sie den ausgefüllten Antrag an die zuständige Landesstelle der Pensionsversicherung. Für eine ambulante Reha
+        muss im Antrag das Feld „ambulante Rehabilitation“ angekreuzt sein.
+    - id: decision
+      type: wait
+      title: Auf die Entscheidung warten
+      why: Danach wissen Sie, ob und wo die Reha stattfindet.
+      after: [submit]
+      done_label: Entscheidung erhalten
+      text: >-
+        Die Pensionsversicherung teilt die Entscheidung schriftlich mit. Warten Sie diese schriftliche Verständigung ab.
+
+- id: transport_cost_subsidy
+  title: Zuschuss zu Fahrtkosten
+  summary: Die ÖGK gibt einen Zuschuss zu Fahrten, etwa zu Strahlen- oder Chemotherapie, zur Dialyse oder zur Reha.
+  priority: 5
+  triggers:
+    - {documented_recommendations: [transport_to_treatment]}
+  quotes: [transport_to_treatment]
+  requires: [subject, district]
+  responsible:
+    - {institution: oegk_vienna_customer_service}
+  checked_by:
+    - Grundsätzlich für Personen mit Rezeptgebührenbefreiung. Für Fahrten zu Dialyse, Chemo- oder Strahlentherapie und für ausgewählte Fahrten zur Reha gilt das nicht. Ersetzt werden Fahrten zum nächstgelegenen geeigneten Vertragspartner, wenn er mehr als 20 Kilometer entfernt ist.
+  forms: [transport_cost_form]
+  source_url: https://www.oegk.at/cdscontent/load?contentid=10008.777900&version=1785415038
+  verified_at: 2026-11-05
+  steps:
+    - id: collect
+      type: info
+      title: Behandlungen bestätigen lassen
+      why: Der Antrag braucht für jede Fahrt eine Bestätigung der Einrichtung.
+      text: >-
+        Lassen Sie sich nach jeder Behandlung ein Feld auf dem Antragsformular abstempeln. Am Ende der Therapie reichen Sie
+        den Antrag für alle Sitzungen auf einmal ein. Belege über die Fahrtkosten legen Sie in Kopie bei.
+    - id: submit
+      type: form
+      title: Fahrtkosten-Zuschuss beantragen
+      why: Der Zuschuss wird nur auf Antrag überwiesen.
+      institution: responsible
+      form: transport_cost_form
+      after: [collect]
+      text: Füllen Sie den Antrag aus und reichen Sie ihn bei der ÖGK ein.
+
+- id: home_nursing_medical
+  title: Medizinische Hauskrankenpflege
+  summary: Pflege zu Hause, die einen Spitalsaufenthalt ersetzt. Sie wird ärztlich angeordnet und von der Krankenkasse übernommen.
+  priority: 6
+  triggers:
+    - {documented_recommendations: [home_nursing]}
+  quotes: [home_nursing]
+  requires: [subject, district]
+  responsible:
+    - {institution: oegk_vienna_customer_service}
+  checked_by:
+    - Die Krankenkasse übernimmt sie nur, wenn sie die Pflege im Spital ersetzt. Sie gilt längstens vier Wochen; eine Verlängerung braucht eine chef- oder kontrollärztliche Bewilligung.
+  source_url: https://www.oegk.at/cdscontent/load?contentid=10008.734180&version=1585216930
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Was ist medizinische Hauskrankenpflege?
+      why: Damit Sie wissen, wer sie anordnet und wie lange sie gilt.
+      text: >-
+        Medizinische Hauskrankenpflege ordnet die Ärztin oder der Arzt an. Sie gilt längstens vier Wochen. Eine
+        Verlängerung muss spätestens am 24. Tag beantragt werden. Für Hilfe im Alltag, etwa Heimhilfe oder Essen auf Rädern,
+        ist der FSW zuständig.
+
+- id: medical_aids
+  title: Heilbehelfe und Hilfsmittel
+  summary: Die ÖGK übernimmt die Kosten für Heilbehelfe und Hilfsmittel, wenn sie ärztlich verordnet sind. Meist bleibt ein Selbstbehalt.
+  priority: 7
+  triggers:
+    - {documented_recommendations: [medical_aid]}
+  quotes: [medical_aid]
+  requires: [subject, district]
+  responsible:
+    - {institution: oegk_vienna_customer_service}
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.870456&portal=oegkportal
+  verified_at: 2026-11-05
+  steps:
+    - id: call_doctor
+      type: call
+      title: Verordnung bei der Ärztin oder beim Arzt holen
+      why: Ohne ärztliche Verordnung übernimmt die ÖGK die Kosten nicht.
+      contact_label: Ihre Hausärztin oder Ihr Hausarzt
+      script_facts: [subject]
+      slots: [user.name, user.phone, subject.relation]
+      must_ask:
+        - {id: prescription, text: "Um eine Verordnung für das empfohlene Hilfsmittel bitten"}
+        - {id: supplier, text: "Fragen, wo es das Hilfsmittel gibt"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe wegen eines Hilfsmittels für {subject.relation} an.
+        points:
+          - {covers: prescription, text: "Können Sie eine Verordnung für das empfohlene Hilfsmittel ausstellen?"}
+          - {covers: supplier, text: "Wo bekomme ich das Hilfsmittel?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+- id: nutrition_counselling
+  title: Ernährungsberatung
+  summary: Die ÖGK bietet Ernährungsberatung an. Welche Angebote es in Ihrer Nähe gibt, sagt das Kundenservice.
+  priority: 8
+  triggers:
+    - {documented_recommendations: [nutrition_counselling]}
+  quotes: [nutrition_counselling]
+  requires: [subject, district]
+  responsible:
+    - {institution: oegk_vienna_customer_service}
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.870674&portal=oegkportal
+  verified_at: 2026-11-05
+  steps:
+    - id: ask
+      type: email
+      title: Bei der ÖGK nach Ernährungsberatung fragen
+      why: Das Kundenservice weiß, welche Angebote und Termine es in Ihrer Nähe gibt.
+      institution: responsible
+      script_facts: [subject]
+      slots: [user.name, user.phone, user.email, subject.relation]
+      must_include:
+        - {id: request, text: "Nach Ernährungsberatung und Terminen in der Nähe fragen"}
+        - {id: contact, text: "Telefonnummer oder E-Mail-Adresse für die Antwort nennen"}
+      fallback_script:
+        subject: Anfrage Ernährungsberatung
+        body: |-
+          Sehr geehrte Damen und Herren,
+
+          ich suche eine Ernährungsberatung für {subject.relation}. Welche Angebote und Termine gibt es in der Nähe?
+
+          Sie erreichen mich unter {user.phone} oder {user.email}.
+
+          Mit freundlichen Grüßen
+          {user.name}
+        covers: [request, contact]
+
+- id: gp_follow_up
+  title: Kontrolle bei der Hausärztin oder beim Hausarzt
+  summary: Ihr Brief empfiehlt eine Kontrolle nach der Entlassung. Vereinbaren Sie dafür einen Termin.
+  priority: 3
+  triggers:
+    - {documented_recommendations: [follow_up_check]}
+  quotes: [follow_up_check]
+  requires: [subject, district]
+  responsible: []
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.870674&portal=oegkportal
+  verified_at: 2026-11-05
+  steps:
+    - id: call
+      type: call
+      title: Termin für die Kontrolle vereinbaren
+      why: Ihr Brief empfiehlt eine Kontrolle bald nach der Entlassung.
+      contact_label: Ihre Hausärztin oder Ihr Hausarzt
+      script_facts: [subject]
+      have_ready: [subject.svnr]
+      slots: [user.name, user.phone, subject.relation, subject.name, subject.svnr]
+      must_ask:
+        - {id: appointment, text: "Um einen Termin zur Kontrolle nach der Entlassung aus dem Spital bitten"}
+        - {id: bring, text: "Fragen, was zum Termin mitgebracht werden soll, etwa der Entlassungsbrief"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe für {subject.relation} an.
+        points:
+          - {covers: appointment, text: "Ich hätte gerne einen Termin zur Kontrolle nach der Entlassung aus dem Spital."}
+          - {covers: bring, text: "Was soll ich zum Termin mitbringen, zum Beispiel den Entlassungsbrief?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.

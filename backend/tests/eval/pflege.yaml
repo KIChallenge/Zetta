@@ -165,3 +165,18 @@ cases:
     answers: {district: "1100", pension_payer: pv}
     expect: plan
     services: [care_allowance, home_care_fsw]
+
+  # Scenario 12.3: after a hospital stay the plan starts with uploading the letter.
+  - id: tuning-09
+    split: tuning
+    text: Ich habe einen Entlassungsbrief bekommen, was muss ich jetzt erledigen?
+    facts: {subject: self, goal: [after_hospital]}
+    expect: plan
+    services: [after_hospital]
+
+  - id: held-out-13
+    split: held_out
+    text: Mein Vater ist gestern aus dem Krankenhaus heimgekommen. Was müssen wir jetzt organisieren?
+    facts: {subject: father, goal: [after_hospital]}
+    expect: plan
+    services: [after_hospital]
