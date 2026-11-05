@@ -11,6 +11,10 @@
     - {value: apply_care_allowance}
     - {value: find_support_services}
     - {value: after_hospital}
+    - {value: health_promotion}
+    - {value: child_offers}
+    - {value: doctor_appointment}
+    - {value: financial_help}
     - {value: unknown, label: Etwas anderes}
 
 - fact_key: subject
@@ -36,3 +40,34 @@
     self: Leben Sie allein?
     other: Lebt {subject.ihr} allein?
   why_we_ask: Das hilft beim Gespräch über Unterstützung zu Hause.
+
+- fact_key: subject_age_band
+  text:
+    self: Wie alt sind Sie?
+    other: Wie alt ist {subject.ihr}?
+  why_we_ask: Untersuchungen und Impfungen hängen vom Alter ab.
+
+- fact_key: interests
+  text:
+    self: Was interessiert Sie am meisten?
+    other: Was interessiert Sie am meisten?
+  why_we_ask: Der Lotse zeigt nur Angebote zu dem, was Sie gewählt haben.
+  multi: true
+
+- fact_key: appointment_reason
+  text:
+    self: Worum geht es beim Termin?
+    other: Worum geht es beim Termin?
+  why_we_ask: Bei akuten Beschwerden ist ein anderer Weg schneller als ein normaler Termin.
+
+- fact_key: specialty
+  text:
+    self: Zu welcher Fachrichtung möchten Sie?
+    other: Zu welcher Fachrichtung möchten Sie?
+  why_we_ask: Danach suchen Sie die Ordination. Der Lotse wählt keine Fachrichtung für Sie aus.
+
+- fact_key: preferred_time
+  text:
+    self: Wann passt Ihnen ein Termin am besten?
+    other: Wann passt ein Termin am besten?
+  why_we_ask: Damit Ihr Gesprächsleitfaden gleich danach fragt.

@@ -36,3 +36,15 @@
   where_to_get: z. B. Rechnungen für Pflegebett oder Notrufsystem
   source_url: https://www.fsw.at/downloads/foerderwesen_anerkennung/foerderansuchen/subjektfoerderung/fsw-antrag-auf-foerderung-von-leistungen.pdf
   verified_at: 2026-11-05
+
+- id: assets_proof
+  title: Nachweise über Vermögen
+  where_to_get: z. B. Kontoauszüge, Sparbücher
+  source_url: https://www.wien.gv.at/amtswege/mindestsicherung-antrag
+  verified_at: 2026-11-05
+
+- id: account_holder_proof
+  title: Nachweis über die Kontoinhaberin oder den Kontoinhaber
+  where_to_get: Von Ihrer Bank
+  source_url: https://www.wien.gv.at/amtswege/mindestsicherung-antrag
+  verified_at: 2026-11-05

@@ -102,7 +102,7 @@ class EmailScript(Model):
 
 class StepTemplate(Model):
     id: str
-    type: Literal["call", "email", "form", "info", "wait", "documents", "upload"]
+    type: Literal["call", "email", "form", "info", "wait", "documents", "upload", "book"]
     title: str
     why: str
     institution: str | None = None  # an institution id, or "responsible"
@@ -131,6 +131,14 @@ class Criterion(Model):
     when: Condition
 
 
+class Season(Model):
+    """A yearly date range, e.g. June to September, as month-day strings."""
+
+    from_: str = Field(alias="from", pattern=r"^\d{2}-\d{2}$")
+    to: str = Field(pattern=r"^\d{2}-\d{2}$")
+    label: str  # e.g. "von Juni bis September"
+
+
 class Service(Model):
     id: str
     title: str
@@ -145,6 +153,7 @@ class Service(Model):
     checked_by: list[str] = []
     documents: list[str] = []
     forms: list[str] = []
+    available: list[Season] = []  # empty: all year
     quotes: list[str] = []  # documented recommendations whose letter quotes the plan shows
     why: str | None = None
     source_url: str
@@ -162,6 +171,7 @@ class Question(Model):
     text: dict[Literal["self", "other"], str]
     why_we_ask: str
     chips: list[Chip] | None = None
+    multi: bool = False  # several chips can be picked
 
 
 class Card(Model):

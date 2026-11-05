@@ -1,0 +1,5 @@
+# Scenario 12.6: two topics at once, shared questions.
+cases:
+  - {id: multi-tuning-01, split: tuning, text: "Meine Mutter war im Spital und braucht jetzt Hilfe.", facts: {subject: mother, needs_daily_help: a_lot, goal: [after_hospital]}, answers: {district: "1100", pension_payer: pv, lives_alone: "yes"}, expect: plan, services: [after_hospital, care_allowance, home_care_fsw]}
+  - {id: multi-held-01, split: held_out, text: "Mein Vater kommt nächste Woche aus dem Krankenhaus heim und wird Pflege brauchen. Wir wissen nicht, wo wir anfangen sollen.", facts: {subject: father, needs_daily_help: a_lot, goal: [after_hospital]}, answers: {district: "1220", pension_payer: pv, lives_alone: "no"}, expect: plan, services: [after_hospital, care_allowance, home_care_fsw]}
+  - {id: multi-held-02, split: held_out, text: "Ich bin 45 und will Vorsorge machen und brauche auch einen Termin beim Augenarzt.", facts: {subject: self, subject_age_band: "40-64", interests: [screening], goal: [doctor_appointment], specialty: ophthalmology}, answers: {appointment_reason: check_up, preferred_time: any}, expect: plan, services: [health_check, doctor_appointment]}

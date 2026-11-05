@@ -416,8 +416,9 @@
   priority: 8
   triggers:
     - {documented_recommendations: [nutrition_counselling]}
+    - {interests: [nutrition]}
   quotes: [nutrition_counselling]
-  requires: [subject, district]
+  requires: [subject]
   responsible:
     - {institution: oegk_vienna_customer_service}
   source_url: https://www.oegk.at/cdscontent/?contentid=10007.870674&portal=oegkportal
@@ -475,3 +476,305 @@
           - {covers: appointment, text: "Ich hätte gerne einen Termin zur Kontrolle nach der Entlassung aus dem Spital."}
           - {covers: bring, text: "Was soll ich zum Termin mitbringen, zum Beispiel den Entlassungsbrief?"}
         closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+
+# Phase 3: Gesundheitsförderung (12.2), Kind (12.4), Arzttermin (12.5), soziale Hilfe (area E).
+- id: health_check
+  title: Gesundheits-Check (Vorsorgeuntersuchung)
+  summary: Einmal im Jahr kostenlos für alle ab 18, die in Österreich leben. Bei Ärztinnen und Ärzten mit Vorsorgeuntersuchungs-Vertrag und in den Gesundheitszentren der ÖGK.
+  priority: 10
+  triggers:
+    - {interests: [screening]}
+  requires: [subject_age_band]
+  responsible:
+    - {institution: oegk_health_check}
+  criteria:
+    - id: adult
+      text: Ab 18 Jahren
+      when: {subject_age_band: {not: ["0-5", "6-14", "15-17"]}}
+  checked_by:
+    - Empfohlen wird sie unter 40 Jahren alle drei Jahre, ab 40 alle zwei Jahre. Möglich ist sie, wenn die letzte mindestens zwölf Monate her ist.
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.912730&portal=oegkportal
+  verified_at: 2026-11-05
+  steps:
+    - id: find
+      type: book
+      title: Ordination mit Vorsorgeuntersuchung finden
+      done_label: Erledigt
+      why: Die Untersuchung machen Ärztinnen und Ärzte mit Vorsorgeuntersuchungs-Vertrag.
+      institution: responsible
+      text: In der Vertragspartnersuche der ÖGK finden Sie Ordinationen in Ihrer Nähe. Meist ist die Hausärztin oder der Hausarzt die erste Anlaufstelle.
+    - id: call
+      type: call
+      title: Termin für den Gesundheits-Check vereinbaren
+      why: Mit einem Termin müssen Sie nicht lange warten.
+      contact_label: Die Ordination, die Sie gefunden haben
+      after: [find]
+      script_facts: [subject, preferred_time]
+      slots: [user.name, user.phone, subject.relation]
+      must_ask:
+        - {id: appointment, text: "Um einen Termin für den kostenlosen Gesundheits-Check (Vorsorgeuntersuchung) bitten"}
+        - {id: time, text: "Die bevorzugte Tageszeit nennen, falls bekannt"}
+        - {id: bring, text: "Fragen, was zum Termin mitzubringen ist"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}.
+        points:
+          - {covers: appointment, text: "Ich hätte gerne einen Termin für den kostenlosen Gesundheits-Check für {subject.relation}."}
+          - {covers: time, text: "Gibt es einen Termin, der gut passt?"}
+          - {covers: bring, text: "Was soll ich zum Termin mitbringen?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+- id: vaccination
+  title: Impfungen
+  summary: Die Impfstellen der Stadt Wien impfen nur mit Termin. Kinder bekommen die Impfungen des Kinder-Impfprogramms kostenlos.
+  priority: 11
+  triggers:
+    - {interests: [vaccination]}
+    - {goal: [child_offers], subject: [child]}
+  requires: [subject, subject_age_band]
+  responsible:
+    - {institution: impfservice_wien}
+  checked_by:
+    - Gratis sind Impfungen für Kinder bis 6 Jahre und für Kinder und Jugendliche von 6 bis 15 Jahren; die HPV-Impfung ist für Personen zwischen 9 und 21 Jahren kostenlos.
+  source_url: https://www.wien.gv.at/gesundheit/impfen
+  verified_at: 2026-11-05
+  steps:
+    - id: book
+      type: book
+      title: Impftermin buchen
+      done_label: Erledigt
+      why: Ohne Termin wird in den Impfstellen der Stadt Wien nicht geimpft.
+      institution: responsible
+      channel: booking
+      text: Buchen Sie online oder telefonisch unter der Gesundheitsberatung. Zum Termin den Impfpass mitnehmen, falls vorhanden.
+
+- id: bewegt_im_park
+  title: Bewegt im Park
+  summary: Kostenlose Bewegungskurse in Parks und auf Plätzen, jedes Jahr von Juni bis September.
+  priority: 12
+  triggers:
+    - {interests: [exercise]}
+  requires: [district]
+  available:
+    - {from: "06-01", to: "09-30", label: von Juni bis September}
+  responsible:
+    - {institution: bewegt_im_park}
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.892973&portal=oegkportal
+  verified_at: 2026-11-05
+  steps:
+    - id: find
+      type: book
+      title: Kurs in Ihrer Nähe finden
+      done_label: Erledigt
+      why: Die Kurse sind kostenlos und offen für alle.
+      institution: responsible
+      text: Auf der Seite von Bewegt im Park finden Sie Kurse und Termine.
+
+- id: parent_child_pass
+  title: Eltern-Kind-Pass-Untersuchungen
+  summary: Ärztliche Untersuchungen des Kindes bis zum 5. Lebensjahr, im ersten Lebensjahr besonders oft.
+  priority: 13
+  triggers:
+    - {goal: [child_offers], subject: [child], subject_age_band: ["0-5"]}
+  requires: [subject_age_band]
+  responsible:
+    - {institution: oegk_health_check}
+  checked_by:
+    - Seit Oktober gibt es ein neues Untersuchungsprogramm; welche Untersuchung gerade fällig ist, steht im Eltern-Kind-Pass.
+  source_url: https://www.oesterreich.gv.at/de/themen/familie_und_partnerschaft/eltern-kind-pass/Seite.082211
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Welche Untersuchung ist fällig?
+      why: Die Untersuchungen sind wichtig für die Gesundheit Ihres Kindes.
+      text: >-
+        Der Eltern-Kind-Pass sieht ärztliche Untersuchungen bis zum 5. Lebensjahr vor, in den ersten 14 Lebensmonaten
+        fünf. Welche als Nächstes fällig ist, steht im Pass.
+    - id: find
+      type: book
+      title: Kinderärztin oder Kinderarzt finden
+      done_label: Erledigt
+      why: Die Untersuchungen machen Ärztinnen und Ärzte, meist in der Kinderheilkunde.
+      institution: responsible
+      after: [info]
+      text: In der Vertragspartnersuche der ÖGK finden Sie Ordinationen in Ihrer Nähe.
+
+- id: family_allowance
+  title: Familienbeihilfe
+  summary: Geld für Eltern für ihre Kinder, unabhängig von Beschäftigung und Einkommen.
+  priority: 14
+  triggers:
+    - {goal: [child_offers], subject: [child]}
+  requires: [subject]
+  responsible:
+    - {institution: tax_office}
+  checked_by:
+    - Bei der Geburt muss sie nicht mehr beantragt werden; die Finanzverwaltung prüft und überweist automatisch. Grundsätzlich gibt es sie bis zum 24. Geburtstag des Kindes.
+  source_url: https://www.oesterreich.gv.at/de/themen/familie_und_partnerschaft/familienbeihilfe/Seite.450233
+  verified_at: 2026-11-05
+  steps:
+    - id: info
+      type: info
+      title: Bekommen Sie schon Familienbeihilfe?
+      why: Meist kommt sie automatisch, aber nicht in jedem Fall.
+      text: >-
+        Bei der Geburt eines Kindes prüft die Finanzverwaltung alles automatisch und überweist die Familienbeihilfe. Fehlt
+        etwas, zum Beispiel die Bankverbindung, werden die Eltern gefragt. Kommt keine Familienbeihilfe, gibt es ein
+        Antragsformular.
+    - id: form
+      type: form
+      title: Nur falls nötig - Antrag stellen
+      why: Für Fälle, in denen die Familienbeihilfe nicht automatisch kommt.
+      institution: responsible
+      form: family_allowance_form
+      after: [info]
+      text: Füllen Sie das Formular aus und reichen Sie es beim Finanzamt ein.
+
+- id: family_counselling
+  title: Beratung für Familien (Kinder- und Jugendhilfe)
+  summary: Die Servicestelle der Wiener Kinder- und Jugendhilfe berät bei Fragen, Sorgen und Konflikten in der Familie und vermittelt an die richtige Stelle, auf Wunsch anonym.
+  priority: 15
+  triggers:
+    - {goal: [child_offers], subject: [child]}
+  requires: [subject, district]
+  responsible:
+    - {institution: ma11_service}
+  source_url: https://www.wien.gv.at/zusammenleben/servicestelle-kinder-jugendhilfe
+  verified_at: 2026-11-05
+  steps:
+    - id: call
+      type: call
+      title: Bei der Servicestelle der Kinder- und Jugendhilfe anrufen
+      why: Dort erfahren Sie, welche Beratung und welche Familienzentren für Sie passen.
+      institution: responsible
+      script_facts: [subject, subject_age_band]
+      slots: [user.name, user.phone]
+      must_ask:
+        - {id: offers, text: "Fragen, welche Beratungs- und Familienangebote es für das Alter des Kindes gibt"}
+        - {id: nearby, text: "Nach Familienzentren in der Nähe fragen"}
+        - {id: appointment, text: "Fragen, ob ein Beratungstermin vereinbart werden kann"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich habe ein Kind und möchte wissen, welche Angebote es für uns gibt.
+        points:
+          - {covers: offers, text: "Welche Beratungs- und Familienangebote gibt es für das Alter meines Kindes?"}
+          - {covers: nearby, text: "Gibt es ein Familienzentrum in meiner Nähe?"}
+          - {covers: appointment, text: "Kann ich einen Beratungstermin vereinbaren?"}
+        closing: Vielen Dank. Sie erreichen mich unter {user.phone}.
+
+- id: doctor_appointment
+  title: Arzttermin
+  summary: Der Lotse bucht keine Termine. Er hilft Ihnen, eine Ordination zu finden, und bereitet den Anruf vor.
+  priority: 16
+  triggers:
+    - {goal: [doctor_appointment]}
+  requires: [appointment_reason, specialty, preferred_time]
+  responsible:
+    - {institution: oegk_health_check}
+  source_url: https://www.oegk.at/vaso/
+  verified_at: 2026-11-05
+  steps:
+    - id: find
+      type: book
+      title: Ordination finden
+      done_label: Erledigt
+      why: Die Vertragspartnersuche zeigt Ordinationen mit Kassenvertrag nach Fachrichtung und Ort.
+      institution: responsible
+      text: Suchen Sie nach der Fachrichtung und Ihrem Bezirk. Notieren Sie Name und Telefonnummer der Ordination.
+    - id: call
+      type: call
+      title: Termin vereinbaren
+      why: Mit dem fertigen Leitfaden ist der Anruf schnell erledigt.
+      contact_label: Die Ordination, die Sie gefunden haben
+      after: [find]
+      script_facts: [subject, appointment_reason, specialty, preferred_time]
+      have_ready: [subject.svnr]
+      slots: [user.name, user.phone, subject.relation, subject.svnr]
+      must_ask:
+        - {id: appointment, text: "Um einen Termin bitten und den Grund nennen (aus facts.appointment_reason, ohne Beschwerden zu beschreiben)"}
+        - {id: time, text: "Die bevorzugte Tageszeit nennen"}
+        - {id: bring, text: "Fragen, was zum Termin mitzubringen ist"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}.
+        points:
+          - {covers: appointment, text: "Ich hätte gerne einen Termin für {subject.relation}."}
+          - {covers: time, text: "Wann wäre der nächste freie Termin, der gut passt?"}
+          - {covers: bring, text: "Was soll ich zum Termin mitbringen?"}
+        closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+
+- id: minimum_income
+  title: Wiener Mindestsicherung
+  summary: Hilfe für Menschen ohne oder mit geringem Einkommen, mit Geld und Beratung durch Sozialarbeiterinnen und Sozialarbeiter.
+  priority: 17
+  triggers:
+    - {goal: [financial_help]}
+  requires: [subject, district]
+  responsible:
+    - {institution: ma40_service}
+  criteria:
+    - id: vienna
+      text: Wohnort in Wien
+      when: {district: {not: [outside_vienna]}}
+  checked_by:
+    - Die Voraussetzungen werden immer im Einzelfall geprüft.
+  documents: [photo_id, income_proof, rent_proof, assets_proof, account_holder_proof]
+  forms: [minimum_income_form]
+  source_url: https://www.wien.gv.at/amtswege/mindestsicherung-antrag
+  verified_at: 2026-11-05
+  steps:
+    - id: call
+      type: call
+      title: Telefonische Erstberatung
+      why: Dort klären Sie, welche Unterstützung passt, auch bei Energiekosten.
+      institution: responsible
+      script_facts: [subject]
+      slots: [user.name, user.phone]
+      must_ask:
+        - {id: minimum_income, text: "Fragen, ob Mindestsicherung in Frage kommt und wie der Antrag geht"}
+        - {id: other_help, text: "Nach Unterstützung bei Energiekosten oder in besonderen Lebenslagen fragen"}
+        - {id: appointment, text: "Fragen, ob ein Beratungsgespräch vereinbart werden kann"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich habe kein oder nur ein geringes Einkommen und brauche Unterstützung.
+        points:
+          - {covers: minimum_income, text: "Kommt die Mindestsicherung für mich in Frage, und wie stelle ich den Antrag?"}
+          - {covers: other_help, text: "Gibt es auch Unterstützung bei Energiekosten?"}
+          - {covers: appointment, text: "Kann ich ein Beratungsgespräch vereinbaren?"}
+        closing: Vielen Dank. Sie erreichen mich unter {user.phone}.
+    - id: documents
+      type: documents
+      title: Unterlagen sammeln
+      why: Alle Unterlagen müssen vollständig und in Kopie beiliegen, von allen im Haushalt.
+    - id: submit
+      type: form
+      title: Antrag stellen
+      why: Erst mit dem Antrag kann die Stadt Wien entscheiden.
+      institution: responsible
+      form: minimum_income_form
+      after: [call, documents]
+      text: Den Antrag können Sie online mit einem Stadt Wien Konto stellen. Hilfe beim Online-Antrag gibt das Sozialzentrum Ihres Wohnbezirks.
+
+# Hubs: no steps of their own. They only make the questions for a broad goal be asked; once the
+# answers are known, the services above match.
+- id: health_promotion_topics
+  title: Etwas für die Gesundheit tun
+  summary: Vorsorge, Impfungen, Bewegung und Ernährung.
+  priority: 90
+  triggers:
+    - {goal: [health_promotion]}
+  requires: [subject, interests]
+  responsible: []
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.912730&portal=oegkportal
+  verified_at: 2026-11-05
+  steps: []
+
+- id: child_topics
+  title: Angebote für Kinder
+  summary: Untersuchungen, Impfungen, Familienbeihilfe und Beratung.
+  priority: 91
+  triggers:
+    - {goal: [child_offers]}
+  requires: [subject, subject_age_band, district]
+  responsible: []
+  source_url: https://www.wien.gv.at/zusammenleben/kind-familie-beratung
+  verified_at: 2026-11-05
+  steps: []

@@ -78,7 +78,7 @@ FACTS: dict[str, Fact] = {
         "How much help in daily life the person needs, as reported by the user (not assessed).",
         hints={
             "none": "manages daily life alone",
-            "some": "needs help with some tasks, e.g. shopping or cleaning",
+            "some": "needs help with some tasks, e.g. shopping or cleaning, or needs help without saying how much",
             "a_lot": "needs care (Pflege), is being cared for by someone, or cannot manage daily life alone",
         },
     ),
@@ -88,6 +88,10 @@ FACTS: dict[str, Fact] = {
             "apply_care_allowance": "Pflegegeld beantragen",
             "find_support_services": "Hilfe im Alltag finden",
             "after_hospital": "Nach dem Spital: Entlassungsbrief",
+            "health_promotion": "Etwas für die Gesundheit tun",
+            "child_offers": "Angebote für mein Kind",
+            "doctor_appointment": "Arzttermin vereinbaren",
+            "financial_help": "Finanzielle Hilfe",
         },
         "What the user wants to achieve. Only goals the user states or clearly implies.",
         multi=True,
@@ -95,7 +99,40 @@ FACTS: dict[str, Fact] = {
             "apply_care_allowance": "Pflegegeld: money for people who need care",
             "find_support_services": "help at home, e.g. home help, meals, nursing, someone to accompany",
             "after_hospital": "what to organise after a hospital stay, e.g. with a discharge letter (Entlassungsbrief)",
+            "health_promotion": "do something for one's health: exercise, nutrition, check-ups, vaccinations",
+            "child_offers": "offers for a child: check-ups, vaccinations, family allowance (Familienbeihilfe), counselling",
+            "doctor_appointment": "get an appointment with a doctor",
+            "financial_help": "own money problems, low or no income, social assistance (Mindestsicherung); not child benefits",
         },
+    ),
+    "subject_age_band": Fact(
+        "Alter",
+        {"0-5": "0 bis 5 Jahre", "6-14": "6 bis 14 Jahre", "15-17": "15 bis 17 Jahre",
+         "18-39": "18 bis 39 Jahre", "40-64": "40 bis 64 Jahre", "65+": "65 Jahre oder älter"},
+        "Age of the person concerned, as a band. Only if stated.",
+    ),
+    "interests": Fact(
+        "Interessiert an",
+        {"exercise": "Bewegung", "nutrition": "Ernährung", "screening": "Vorsorgeuntersuchung", "vaccination": "Impfungen"},
+        "Health topics the user is interested in.",
+        multi=True,
+    ),
+    "appointment_reason": Fact(
+        "Grund für den Termin",
+        {"check_up": "Vorsorge oder Kontrolle", "follow_up": "Nachkontrolle", "acute": "Akute Beschwerden"},
+        "Why the user wants a doctor's appointment. acute: current symptoms or complaints.",
+    ),
+    "specialty": Fact(
+        "Fachrichtung",
+        {"general_practice": "Allgemeinmedizin", "internal_medicine": "Innere Medizin", "gynaecology": "Frauenheilkunde",
+         "paediatrics": "Kinderheilkunde", "dermatology": "Haut", "ophthalmology": "Augen", "ent": "Hals-Nasen-Ohren",
+         "orthopaedics": "Orthopädie", "dentistry": "Zahnmedizin"},
+        "The medical specialty the user asks for by name. Never derive it from symptoms.",
+    ),
+    "preferred_time": Fact(
+        "Wann am liebsten",
+        {"morning": "Vormittags", "afternoon": "Nachmittags", "any": "Egal"},
+        "When the user prefers appointments or calls.",
     ),
     "documented_recommendations": Fact(
         "Laut Ihrem Brief",
@@ -173,7 +210,9 @@ def extraction_schema() -> dict:
             "type": "boolean",
             "description": "True if the user asks for medical advice: symptoms, diagnoses, medication, dosage,"
             " treatment, health risks or an emergency. False for questions about benefits, applications,"
-            " care services, appointments or what to organise after a hospital stay or discharge letter.",
+            " care services, appointments, preventive check-ups, vaccinations offered, or what to organise after a"
+            " hospital stay or discharge letter. Wanting a doctor's appointment is not medical either; it is only"
+            " medical if the user asks what is wrong, what to take or what to do about symptoms.",
         }
     }
     for key, fact in FACTS.items():

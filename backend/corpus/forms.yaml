@@ -33,3 +33,17 @@
   submit_to: oegk_vienna_customer_service
   source_url: https://www.oegk.at/cdscontent/load?contentid=10008.777900&version=1785415038
   verified_at: 2026-11-05
+
+- id: family_allowance_form
+  title: Antrag auf Familienbeihilfe (Beih 3)
+  url: https://formulare.bmf.gv.at/service/formulare/inter-steuern/pdfs/9999/beih3.pdf
+  submit_to: tax_office
+  source_url: https://www.oesterreich.gv.at/de/themen/familie_und_partnerschaft/familienbeihilfe/Seite.450233
+  verified_at: 2026-11-05
+
+- id: minimum_income_form
+  title: Antrag auf Mindestsicherung (online, Stadt Wien)
+  url: https://mein.wien.gv.at/formularserver-mw/user/formular.aspx?path=(mw%2Fstandard)&pid=06a2e3ecbb6b4302b4f134a505de83
+  submit_to: ma40_service
+  source_url: https://www.wien.gv.at/amtswege/mindestsicherung-antrag
+  verified_at: 2026-11-05

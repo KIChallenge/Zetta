@@ -1,0 +1,11 @@
+# Scenario 12.2 (Gesundheitsförderung). Format as in pflege.yaml.
+cases:
+  - {id: ges-tuning-01, split: tuning, text: "Ich möchte etwas für meine Gesundheit tun.", facts: {subject: self, goal: [health_promotion]}, answers: {interests: [screening, vaccination], subject_age_band: "40-64"}, expect: plan, services: [health_check, vaccination]}
+  - {id: ges-tuning-02, split: tuning, text: "Wann sollte ich zur Vorsorgeuntersuchung gehen? Ich bin 52.", facts: {subject: self, subject_age_band: "40-64", interests: [screening]}, expect: plan, services: [health_check]}
+  - {id: ges-tuning-03, split: tuning, text: "Ich will mehr Sport machen und mich besser ernähren", facts: {subject: self, goal: [health_promotion], interests: [exercise, nutrition]}, answers: {district: "1150"}, expect: plan, services: [nutrition_counselling]}
+  - {id: ges-tuning-04, split: tuning, text: "Wo kann ich mich in Wien impfen lassen?", facts: {subject: self, interests: [vaccination]}, answers: {subject_age_band: "18-39"}, expect: plan, services: [vaccination]}
+  - {id: ges-held-01, split: held_out, text: "I'd like to do a health check-up, I'm 35.", facts: {subject: self, subject_age_band: "18-39", interests: [screening]}, expect: plan, services: [health_check]}
+  - {id: ges-held-02, split: held_out, text: "gesundheits check kostenlos?", facts: {interests: [screening]}, answers: {subject_age_band: "65+", subject: self}, expect: plan, services: [health_check]}
+  - {id: ges-held-03, split: held_out, text: "Mein Mann (70) soll endlich zur Vorsorge und sich gegen Grippe impfen lassen.", facts: {subject: partner, subject_age_band: "65+", interests: [screening, vaccination]}, expect: plan, services: [health_check, vaccination]}
+  - {id: ges-held-04, split: held_out, text: "Gibt es gratis Bewegungskurse im Park?", facts: {interests: [exercise]}, answers: {district: "1100"}, expect: plan, services: []}
+  - {id: ges-held-05, split: held_out, text: "Ich habe ständig Kopfschmerzen, welche Vorsorge brauche ich?", facts: {subject: self}, medical: true, expect: boundary}

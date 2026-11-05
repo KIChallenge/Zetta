@@ -30,7 +30,7 @@ export interface Institution {
   source_url: string
 }
 
-export interface QuestionPayload { fact_key: string; chips: Chip[]; why: string }
+export interface QuestionPayload { fact_key: string; chips: Chip[]; why: string; multi?: boolean }
 export interface AnswerPayload { fact_key: string; value: string | string[] }
 export interface PlanPayload { version: number }
 export interface CardPayload { card: 'boundary' | 'out_of_scope' | 'general'; title: string; contacts: Institution[] }
@@ -76,7 +76,7 @@ export interface Step {
   id: string
   service: string
   services?: string[] // a merged checklist
-  type: 'call' | 'email' | 'form' | 'info' | 'wait' | 'documents' | 'upload'
+  type: 'call' | 'email' | 'form' | 'info' | 'wait' | 'documents' | 'upload' | 'book'
   title: string
   why: string
   after: string[]

@@ -1,10 +1,16 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { Chip } from '../chats'
 
 // One question at a time. Only the latest one has chips; answered ones stay as plain text in the history.
-defineProps<{ text: string; why: string; chips: Chip[]; active: boolean }>()
-const emit = defineEmits<{ answer: [chip: Chip] }>()
+defineProps<{ text: string; why: string; chips: Chip[]; active: boolean; multi?: boolean }>()
+const emit = defineEmits<{ answer: [chip: Chip]; many: [chips: Chip[]] }>()
 const QUIET = ['unknown', 'declined']
+const picked = ref<Chip[]>([]) // multi: chips toggle, "Weiter" sends them; "Weiß nicht" still answers at once
+function pick(c: Chip, multi: boolean) {
+  if (!multi || QUIET.includes(c.value)) return emit('answer', c)
+  picked.value = picked.value.includes(c) ? picked.value.filter((x) => x !== c) : [...picked.value, c]
+}
 </script>
 
 <template>
@@ -19,10 +25,15 @@ const QUIET = ['unknown', 'declined']
           type="button"
           class="chip"
           :class="{ quiet: QUIET.includes(c.value) }"
-          @click="emit('answer', c)"
+          :aria-pressed="multi && !QUIET.includes(c.value) ? picked.includes(c) : undefined"
+          @click="pick(c, !!multi)"
         >
           {{ c.label }}
         </button>
+      </div>
+      <div v-if="multi" class="actions">
+        <button type="button" class="btn btn-primary" :aria-disabled="!picked.length" @click="picked.length && emit('many', picked)">Weiter</button>
+        <span class="hint">Mehrere möglich</span>
       </div>
       <p class="hint">Oder schreiben Sie Ihre Antwort unten ins Textfeld.</p>
     </template>

@@ -2,6 +2,7 @@
 
 from collections import Counter
 from dataclasses import dataclass
+from datetime import date
 
 from backend.corpus import Condition, Corpus, Not, Service, StepTemplate
 from backend.facts import is_sentinel
@@ -9,6 +10,8 @@ from backend.facts import is_sentinel
 QUESTION_CAP = 4
 # Asked when nothing matches yet, so a vague first message (or a failed extraction) still leads somewhere.
 ENTRY_FACT = "goal"
+# Fact values that mean "this is medical": the boundary card, never a plan (spec 10).
+BOUNDARY = {"appointment_reason": "acute"}
 DONE = ("done", "skipped")
 
 
@@ -57,10 +60,15 @@ def next_question(services: list[Service], facts: dict, corpus: Corpus) -> str |
 
 
 def evaluate(
-    facts: dict, corpus: Corpus, asked: int = 0, medical: bool = False, quotes: dict[str, str] | None = None
+    facts: dict,
+    corpus: Corpus,
+    asked: int = 0,
+    medical: bool = False,
+    quotes: dict[str, str] | None = None,
+    today: date | None = None,
 ) -> Result:
     """`asked`: questions since the last plan or card, for the cap. `quotes`: confirmed letter quotes."""
-    if medical:
+    if medical or any(facts.get(k) == v for k, v in BOUNDARY.items()):
         return Result("boundary")
     if facts.get("district") == "outside_vienna":
         return Result("out_of_scope")
@@ -72,7 +80,10 @@ def evaluate(
         return Result("general")
     if can_ask and (key := next_question(found, facts, corpus)):
         return Result("question", question=key)
-    return Result("plan", plan=build_plan(found, facts, corpus, quotes or {}))
+    plan = build_plan(found, facts, corpus, quotes or {}, today or date.today())
+    if not plan["services"] and not plan["dropped"]:
+        return Result("general")  # only hubs matched, and their answers led nowhere
+    return Result("plan", plan=plan)
 
 
 def eligibility(service: Service, facts: dict) -> tuple[str, list[dict]]:
@@ -115,8 +126,8 @@ def _step(service: Service, template: StepTemplate, institution_id: str | None, 
             institution_id if template.institution == "responsible" else template.institution
         ]
         step["institution"] = {"id": institution.id, "name": institution.name, "address": institution.address}
-        if template.type in ("call", "email"):
-            wanted = "phone" if template.type == "call" else "email"
+        if template.type in ("call", "email", "book"):
+            wanted = {"call": "phone", "email": "email", "book": "web"}[template.type]
             channel = next(
                 (c for c in institution.channels
                  if c.type == wanted and (template.channel is None or c.id == template.channel)),
@@ -131,7 +142,8 @@ def _step(service: Service, template: StepTemplate, institution_id: str | None, 
                 return step
             step["contact"] = channel.model_dump(mode="json", by_alias=True)
             step["contact"]["source_url"] = channel.source_url or institution.source_url
-            _must(step, template, facts)
+            if template.type != "book":
+                _must(step, template, facts)
     return step
 
 
@@ -158,9 +170,20 @@ def _order(steps: list[dict]) -> list[dict]:
     return ordered
 
 
-def build_plan(services: list[Service], facts: dict, corpus: Corpus, quotes: dict[str, str] | None = None) -> dict:
+def in_season(service: Service, today: date) -> bool:
+    day = today.strftime("%m-%d")
+    return not service.available or any(s.from_ <= day <= s.to for s in service.available)
+
+
+def build_plan(
+    services: list[Service], facts: dict, corpus: Corpus, quotes: dict[str, str] | None = None, today: date | None = None
+) -> dict:
     kept, dropped, steps = [], [], []
     for service in sorted(services, key=lambda s: s.priority):
+        if not in_season(service, today or date.today()):
+            seasons = ", ".join(s.label for s in service.available)
+            dropped.append({"id": service.id, "title": service.title, "reason": f"Gibt es nur {seasons}."})
+            continue
         state, criteria = eligibility(service, facts)
         if state == "not_met":
             failed = next(c["text"] for c in criteria if c["state"] == "not_met")

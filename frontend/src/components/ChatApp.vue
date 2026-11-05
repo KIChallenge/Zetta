@@ -214,9 +214,13 @@ function deliver(id: string, text: string, answer?: AnswerPayload) {
 function answer(key: string, chip: Chip, label = chip.label) {
   if (run.value || !activeId.value) return
   notice.value = ''
-  deliver(activeId.value, label, { fact_key: key, value: key === 'goal' && chip.value !== 'unknown' ? [chip.value] : chip.value })
+  deliver(activeId.value, label, { fact_key: key, value: chip.value })
 }
 const editFact = (f: Fact, chip: Chip) => answer(f.key, chip, `${f.label}: ${chip.label}`)
+function answerMany(key: string, chips: Chip[]) {
+  if (run.value || !activeId.value || !chips.length) return
+  deliver(activeId.value, chips.map((c) => c.label).join(', '), { fact_key: key, value: chips.map((c) => c.value) })
+}
 function confirmLetter(values: string[], labels: string[]) {
   if (run.value || !activeId.value) return
   const label = labels.length ? `Laut Ihrem Brief: ${labels.join(', ')}` : 'Keine der Empfehlungen stimmt'
@@ -438,7 +442,9 @@ async function confirmDelete() {
               :why="q(m).why"
               :chips="q(m).chips"
               :active="m === lastMsg && !run"
+              :multi="!!q(m).multi"
               @answer="(chip) => answer(q(m).fact_key, chip)"
+              @many="(chips) => answerMany(q(m).fact_key, chips)"
             />
             <NoticeCard v-else-if="m.kind === 'card'" :card="card(m)" :text="m.text" />
             <DocumentConfirm

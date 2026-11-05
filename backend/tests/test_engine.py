@@ -132,3 +132,23 @@ def test_after_a_hospital_stay_the_plan_asks_for_the_letter_until_it_is_confirme
     assert [s["id"] for s in plan["services"]] == ["rehab"]
     assert plan["services"][0]["quotes"] == ["Reha empfohlen"]
     assert "contact" not in next(s for s in plan["steps"] if s["id"] == "rehab.call_doctor")
+
+
+def test_seasonal_offers_are_dropped_outside_their_season():
+    from datetime import date
+
+    facts = {"subject": "self", "interests": ["exercise"], "district": "1100"}
+    winter = evaluate(facts, corpus, today=date(2026, 11, 5)).plan
+    assert winter["services"] == [] and winter["dropped"][0]["reason"] == "Gibt es nur von Juni bis September."
+    summer = evaluate(facts, corpus, today=date(2027, 6, 1)).plan
+    assert [s["id"] for s in summer["services"]] == ["bewegt_im_park"]
+    assert summer["steps"][0]["contact"]["value"] == "https://www.bewegt-im-park.at/"
+
+
+def test_an_acute_appointment_gets_the_boundary_card():
+    assert evaluate({"goal": ["doctor_appointment"], "appointment_reason": "acute"}, corpus).kind == "boundary"
+
+
+def test_broad_goals_ask_their_questions_first():
+    assert evaluate({"goal": ["health_promotion"], "subject": "self"}, corpus).question == "interests"
+    assert evaluate({"goal": ["child_offers"], "subject": "child"}, corpus).question == "district"

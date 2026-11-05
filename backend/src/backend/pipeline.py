@@ -31,6 +31,7 @@ OUTCOMES = {
     "wait": {"received": ("Erledigt", "done")},
     "info": {"read": ("Gelesen", "done")},
     "upload": {"uploaded": ("Hochgeladen", "done")},
+    "book": {"booked": ("Termin vereinbart", "done")},
 }  # fmt: skip
 
 
@@ -214,7 +215,7 @@ def question_message(chat_id: str, key: str, facts: dict, corpus: Corpus) -> Mes
         role="assistant",
         kind="question",
         text=text.replace("{subject.ihr}", subject_words(facts)[0]),
-        payload={"fact_key": key, "chips": options, "why": question.why_we_ask},
+        payload={"fact_key": key, "chips": options, "why": question.why_we_ask, "multi": question.multi},
         created_at=utcnow(),
     )
 

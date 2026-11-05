@@ -482,7 +482,7 @@ def test_the_question_loop_stops_at_the_cap(client, anna, llm):
 @pytest.mark.parametrize(
     "body",
     [{"fact_key": "favourite_colour", "value": "blue"}, {"fact_key": "district", "value": "9999"},
-     {"fact_key": "goal", "value": "apply_care_allowance"}, {"fact_key": "goal", "value": []}],
+     {"fact_key": "goal", "value": "no_such_goal"}, {"fact_key": "goal", "value": []}],
 )  # fmt: skip
 def test_answers_reject_unknown_facts_and_values(client, anna, body):
     chat = create_chat(client, anna)

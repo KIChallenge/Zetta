@@ -143,3 +143,86 @@
       hours: not_stated
   source_url: https://www.sozialministerium.gv.at/Themen/Gesundheit/eHealth/Gesundheitsberatung-1450.html
   verified_at: 2026-11-05
+
+# Phase 3
+- id: oegk_health_check
+  name: Österreichische Gesundheitskasse (ÖGK), Gesundheits-Check und Ärztesuche
+  kind: insurer
+  channels:
+    - id: phone
+      type: phone
+      value: 0800 501 522
+      label: Kostenlose Serviceline zur Vorsorgeuntersuchung
+      hours:
+        - {days: [mon, tue, wed, thu, fri], from: "08:00", to: "17:00"}
+    - id: doctor_search
+      type: web
+      value: https://www.oegk.at/vaso/
+      label: Vertragspartnersuche der ÖGK (Ärztinnen und Ärzte finden)
+      source_url: https://www.oegk.at/vaso/
+  source_url: https://www.oegk.at/cdscontent/?contentid=10007.912730&portal=oegkportal
+  verified_at: 2026-11-05
+
+- id: impfservice_wien
+  name: Impfservice der Stadt Wien
+  kind: authority
+  channels:
+    - id: phone
+      type: phone
+      value: "1450"
+      label: Impftermin telefonisch buchen
+      hours: not_stated
+    - id: booking
+      type: web
+      value: https://app.wien.gv.at/impfsys/mw/
+      label: Impftermin online buchen
+  source_url: https://www.wien.gv.at/gesundheit/impfen
+  verified_at: 2026-11-05
+
+- id: bewegt_im_park
+  name: Bewegt im Park
+  kind: provider
+  channels:
+    - id: web
+      type: web
+      value: https://www.bewegt-im-park.at/
+      label: Kurse und Termine
+  source_url: https://www.bewegt-im-park.at/
+  verified_at: 2026-11-05
+
+- id: ma11_service
+  name: Stadt Wien, Kinder- und Jugendhilfe (MA 11), Servicestelle
+  kind: counselling
+  channels:
+    - id: phone
+      type: phone
+      value: +43 1 4000-80 11
+      label: Servicetelefon
+      hours:
+        - {days: [mon, tue, wed, thu, fri], from: "08:00", to: "15:30"}
+    - id: email
+      type: email
+      value: service@ma11.wien.gv.at
+  source_url: https://www.wien.gv.at/zusammenleben/servicestelle-kinder-jugendhilfe
+  verified_at: 2026-11-05
+
+- id: ma40_service
+  name: Stadt Wien, Soziales, Sozial- und Gesundheitsrecht (MA 40)
+  kind: authority
+  channels:
+    - id: phone
+      type: phone
+      value: +43 1 4000-8040
+      label: Servicetelefon, telefonische Erstberatung (vertraulich und kostenlos)
+      hours:
+        - {days: [mon, tue, wed, thu, fri], from: "08:00", to: "18:00"}
+  source_url: https://www.wien.gv.at/zusammenleben/sozialhilfe-mindestsicherung-standorte-oeffnungszeiten
+  verified_at: 2026-11-05
+
+- id: tax_office
+  name: Finanzamt
+  kind: authority
+  # No contact data in the local sources: steps only name it.
+  channels: []
+  source_url: https://www.oesterreich.gv.at/de/themen/familie_und_partnerschaft/familienbeihilfe/Seite.450233
+  verified_at: 2026-11-05

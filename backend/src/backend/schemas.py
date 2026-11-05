@@ -83,6 +83,10 @@ class AnswerRequest(BaseModel):
 
     @model_validator(mode="after")
     def known(self):
+        # A single chip for a list fact (e.g. one goal) is a list of one.
+        fact = facts.FACTS.get(self.fact_key)
+        if fact and fact.multi and isinstance(self.value, str) and not facts.is_sentinel(self.value):
+            self.value = [self.value]
         if not facts.valid(self.fact_key, self.value):
             raise ValueError("unknown fact or value")
         return self

@@ -42,8 +42,9 @@ PROFILE = ProfileData(
 corpus = get_corpus()
 
 
-def load(name: str = "pflege") -> list[dict]:
-    return yaml.safe_load((SETS / f"{name}.yaml").read_text(encoding="utf-8"))["cases"]
+def load() -> list[dict]:
+    """All eval sets in this folder (one file per scenario)."""
+    return [c for f in sorted(SETS.glob("*.yaml")) for c in yaml.safe_load(f.read_text(encoding="utf-8"))["cases"]]
 
 
 def simulate(case: dict, facts: dict, medical: bool):
@@ -127,7 +128,7 @@ async def live(split: str | None) -> int:
         failures += len(bad)
         rows.append((case, ok, asked))
         print(f"{'ok  ' if ok else 'FAIL'} {case['id']}: {result.kind}, {asked} questions"
-              + (f", facts expected/got {wrong}" if wrong else "") + (f", NOT IN CORPUS {bad}" if bad else ""))  # fmt: skip
+              + (f", facts got/expected {wrong}" if wrong else "") + (f", NOT IN CORPUS {bad}" if bad else ""))  # fmt: skip
 
     code = 0
     for name in ("tuning", "held_out"):

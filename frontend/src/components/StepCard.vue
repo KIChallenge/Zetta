@@ -13,6 +13,7 @@ const KIND = {
   wait: ['clock', 'Abwarten'],
   documents: ['list-check', 'Unterlagen'],
   upload: ['file', 'Hochladen'],
+  book: ['ext', 'Online'],
 } as const
 
 const s = computed(() => props.step)
@@ -231,6 +232,13 @@ async function copy() {
                 </label>
               </li>
             </ul>
+          </template>
+
+          <template v-else-if="s.type === 'book' && s.contact">
+            <p v-if="s.text">{{ s.text }}</p>
+            <div class="actions">
+              <a class="btn btn-primary" :href="s.contact.href" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-ext" /></svg>{{ s.contact.label ?? 'Öffnen' }}</a>
+            </div>
           </template>
 
           <template v-else-if="s.type === 'upload'">
