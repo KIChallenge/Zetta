@@ -235,11 +235,21 @@ async function upload(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  const id = activeId.value
-  if (!file || !id || run.value) return
+  let id = activeId.value
+  if (!file || run.value || busy.value) return
   draftErr.value = ''
   uploading.value = true
   try {
+    // From the start view the letter is the first message: open a new chat for it, as start() does for text.
+    if (!id) {
+      const c = await createChat('Entlassungsbrief')
+      put(c)
+      messages.value = []
+      facts.value = []
+      plan.value = null
+      id = preset = String(c.id)
+      go(id, 'q')
+    }
     const added = await uploadDocument(id, file)
     if (activeId.value === id) messages.value.push(...added)
     scrollDown()
@@ -493,19 +503,16 @@ async function confirmDelete() {
             rows="2"
             maxlength="4000"
             :aria-invalid="!!draftErr"
-            aria-describedby="q-hint q-err"
+            aria-describedby="q-err"
             @input="draftErr = ''"
             @keydown.enter.ctrl.prevent="submit"
             @keydown.enter.meta.prevent="submit"
           ></textarea>
           <div class="cbox-row">
-            <template v-if="activeId">
-              <input ref="fileInput" type="file" accept="application/pdf" class="sr" tabindex="-1" @change="upload" />
-              <button type="button" class="btn btn-quiet" :aria-disabled="uploading || !!run" @click="!uploading && !run && fileInput?.click()">
-                <svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ uploading ? 'Brief wird gelesen …' : 'Entlassungsbrief (PDF)' }}
-              </button>
-            </template>
-            <span id="q-hint" class="hint">Senden mit Strg + Enter (Mac: ⌘ + Enter)</span>
+            <input ref="fileInput" type="file" accept="application/pdf" class="sr" tabindex="-1" @change="upload" />
+            <button type="button" class="btn btn-quiet" :aria-disabled="uploading || busy || !!run" @click="!uploading && !busy && !run && fileInput?.click()">
+              <svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ uploading ? 'Brief wird gelesen …' : 'Entlassungsbrief (PDF)' }}
+            </button>
             <button type="submit" class="btn btn-primary send" :aria-disabled="busy || !!run">
               {{ busy || run ? 'Einen Moment …' : 'Senden' }}<svg class="i" aria-hidden="true"><use href="#i-arrow" /></svg>
             </button>
@@ -667,11 +674,9 @@ async function confirmDelete() {
 .cbox textarea { border: 0; background: transparent; resize: none; min-height: 3rem; max-height: 14rem; field-sizing: content; padding: .55rem .9rem; }
 .navy-band .cbox textarea { min-height: 5rem; }
 .cbox textarea:focus-visible { outline: none; }
-.cbox-row { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .75rem; padding-left: .9rem; }
-.cbox-row .hint { font-size: var(--fs-small); }
+.cbox-row { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .75rem; padding-left: .3rem; }
 .cbox-row .send { margin-left: auto; }
 .navy-band .err { padding: .5rem .9rem; border-radius: var(--r-m); background: var(--sheet); }
-@media (pointer: coarse) { .cbox-row .hint { display: none; } }
 
 @container (min-width: 56rem) {
   .shell { grid-template-columns: 20rem minmax(0, 1fr); }
