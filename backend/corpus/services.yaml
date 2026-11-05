@@ -93,10 +93,33 @@
       title: Auf die Entscheidung warten
       why: Danach wissen Sie, ob und in welcher Stufe Pflegegeld ausgezahlt wird.
       after: [assessment]
-      done_label: Entscheidung erhalten
+      outcomes:
+        - {id: granted, label: Pflegegeld bewilligt, effect: done}
+        - {id: rejected, label: Abgelehnt, effect: done}
       text: >-
         Pflegegeld gebührt ab dem Monatsersten nach dem Antrag und wird monatlich im Nachhinein ausgezahlt.
         Wird der Pflegeaufwand später größer, kann eine Erhöhung schriftlich beantragt werden.
+
+    - id: clarify
+      type: call
+      title: Die Entscheidung mit der zuständigen Stelle besprechen
+      why: Dort erfahren Sie, warum abgelehnt wurde und welche Möglichkeiten es gibt.
+      institution: responsible
+      channel: phone
+      after: [decision]
+      unlocked_by: "decision:rejected"
+      script_facts: [subject]
+      have_ready: [subject.svnr]
+      slots: [user.name, user.phone, subject.relation, subject.name, subject.svnr]
+      must_ask:
+        - {id: reason, text: "Fragen, warum der Antrag auf Pflegegeld abgelehnt wurde"}
+        - {id: options, text: "Fragen, welche Möglichkeiten es jetzt gibt und bis wann"}
+      fallback_script:
+        opening: Guten Tag, mein Name ist {user.name}. Ich rufe wegen der Entscheidung über das Pflegegeld für {subject.relation} an.
+        points:
+          - {covers: reason, text: "Warum wurde der Antrag abgelehnt?"}
+          - {covers: options, text: "Welche Möglichkeiten gibt es jetzt, und bis wann muss ich etwas tun?"}
+        closing: Vielen Dank. Darf ich mir Ihren Namen notieren? Für Rückfragen erreichen Sie mich unter {user.phone}.
 
 - id: home_care_fsw
   title: Pflege und Betreuung zu Hause (FSW)
@@ -320,9 +343,20 @@
       title: Auf die Entscheidung warten
       why: Danach wissen Sie, ob und wo die Reha stattfindet.
       after: [submit]
-      done_label: Entscheidung erhalten
+      outcomes:
+        - {id: approved, label: Reha bewilligt, effect: done}
+        - {id: rejected, label: Abgelehnt, effect: done}
       text: >-
         Die Pensionsversicherung teilt die Entscheidung schriftlich mit. Warten Sie diese schriftliche Verständigung ab.
+    - id: rejected
+      type: info
+      title: Wenn die Reha abgelehnt wurde
+      why: Eine Ablehnung muss nicht endgültig sein.
+      after: [decision]
+      unlocked_by: "decision:rejected"
+      text: >-
+        Eine Ablehnung kann formelle oder medizinische Gründe haben. Ändert sich der Gesundheitszustand wesentlich, kann
+        ein neuer Antrag gestellt werden, der erneut geprüft wird. Besprechen Sie das mit Ihrer Ärztin oder Ihrem Arzt.
 
 - id: transport_cost_subsidy
   title: Zuschuss zu Fahrtkosten

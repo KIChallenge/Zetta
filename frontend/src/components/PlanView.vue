@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import type { Plan, StepUpdate } from '../chats'
 import StepCard from './StepCard.vue'
 
@@ -21,6 +21,15 @@ watch(nowId, (id) => id && open.value.add(id), { immediate: true })
 function toggle(id: string) {
   if (!open.value.delete(id)) open.value.add(id)
 }
+
+// Overview: one column per service, steps as stations; a click opens the step in the list.
+const view = ref<'list' | 'overview'>('list')
+const STATE = { done: 'Erledigt', skipped: 'Übersprungen', available: 'Offen', blocked: 'Danach' } as const
+function show(id: string) {
+  view.value = 'list'
+  open.value.add(id)
+  nextTick(() => document.getElementById(`t-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+}
 </script>
 
 <template>
@@ -28,10 +37,27 @@ function toggle(id: string) {
     <div class="plan-h">
       <h2 id="plan-h" tabindex="-1">Ihr Plan</h2>
       <p class="plan-n">{{ doneCount }} von {{ plan.steps.length }} Schritten erledigt</p>
+      <div class="seg-switch" role="group" aria-label="Ansicht">
+        <button type="button" :aria-pressed="view === 'list'" @click="view = 'list'">Liste</button>
+        <button type="button" :aria-pressed="view === 'overview'" @click="view = 'overview'">Übersicht</button>
+      </div>
+    </div>
+    <div v-if="view === 'overview'" class="overview">
+      <section v-for="{ svc, steps } in groups" :key="svc.id" class="ov-col" :aria-label="svc.title">
+        <h3 class="ov-h">{{ svc.title }}</h3>
+        <ol class="ov-steps">
+          <li v-for="s in steps" :key="s.id" class="ov-node" :data-status="s.id === nowId ? 'now' : s.status">
+            <button type="button" @click="show(s.id)">
+              <span class="ov-title">{{ s.title }}</span>
+              <span class="ov-state">{{ s.id === nowId ? 'Jetzt dran' : STATE[s.status] }}</span>
+            </button>
+          </li>
+        </ol>
+      </section>
     </div>
     <p v-if="error" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ error }}</span></p>
 
-    <section v-for="{ svc, steps } in groups" :key="svc.id" class="svc" :aria-labelledby="`svc-${svc.id}`">
+    <section v-for="{ svc, steps } in groups" v-show="view === 'list'" :key="svc.id" class="svc" :aria-labelledby="`svc-${svc.id}`">
       <div class="svc-h">
         <h3 :id="`svc-${svc.id}`">{{ svc.title }}</h3>
         <span class="pill" :data-tone="svc.eligibility === 'likely' ? 'ready' : 'wait'">
@@ -87,6 +113,26 @@ function toggle(id: string) {
 .plan-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .25rem 1rem; }
 .plan-h h2 { font-size: 1.5rem; }
 .plan-n { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.seg-switch { display: inline-flex; padding: .2rem; border-radius: 999px; background: var(--sunk); }
+.seg-switch button { min-height: 2.5rem; padding: .3rem .9rem; border: 0; border-radius: 999px; background: none; color: var(--ink-2); font: inherit; font-weight: 600; cursor: pointer; }
+.seg-switch button[aria-pressed="true"] { background: var(--sheet); color: var(--harbor); box-shadow: var(--lift); }
+.overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1rem; }
+.ov-col { display: grid; align-content: start; gap: .6rem; padding: .9rem; border-radius: var(--r-l); background: var(--sunk); }
+.ov-h { font-size: 1rem; }
+.ov-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: .9rem; }
+.ov-node { position: relative; }
+/* The line between stations stands for the "after" order inside a service. */
+.ov-node + .ov-node::before { content: ""; position: absolute; left: 1.1rem; top: -.9rem; height: .9rem; width: 2px; background: var(--rule-2); }
+.ov-node button { display: grid; gap: .15rem; width: 100%; padding: .6rem .8rem; border: 0; border-radius: var(--r-m); background: var(--sheet); color: var(--ink); font: inherit; text-align: left; cursor: pointer; box-shadow: 0 0 0 1px var(--rule); }
+.ov-node button:hover { box-shadow: 0 0 0 2px var(--harbor); }
+.ov-title { font-weight: 700; line-height: 1.3; }
+.ov-state { font-size: .85rem; color: var(--ink-3); }
+.ov-node[data-status="now"] button { box-shadow: 0 0 0 3px var(--turn-mark); }
+.ov-node[data-status="now"] .ov-state { color: var(--turn-ink); font-weight: 700; }
+.ov-node[data-status="done"] .ov-state, .ov-node[data-status="skipped"] .ov-state { color: var(--ready-ink); font-weight: 700; }
+.ov-node[data-status="blocked"] .ov-title { color: var(--ink-2); font-weight: 600; }
+/* Narrow: the overview would be one long column, so only the list is offered. */
+@container (max-width: 40rem) { .seg-switch, .overview { display: none; } .svc { display: grid !important; } }
 .svc { display: grid; gap: .6rem; }
 .svc-h { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem; }
 .svc-h h3 { font-size: 1.25rem; }

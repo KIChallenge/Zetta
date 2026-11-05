@@ -112,6 +112,10 @@ def _step(service: Service, template: StepTemplate, institution_id: str | None, 
         "text": template.text,
         "done_label": template.done_label,
     }
+    if template.outcomes:
+        step["outcomes"] = [o.model_dump() for o in template.outcomes]
+    if template.unlocked_by:
+        step["unlocked_by"] = f"{service.id}.{template.unlocked_by}"
     if template.type == "documents":
         step["documents"] = [corpus.documents[d].model_dump(mode="json") for d in service.documents]
     if template.form:
@@ -220,6 +224,12 @@ def build_plan(
         for s in steps:
             s["after"] = list(dict.fromkeys("documents" if a in old else a for a in s["after"]))
     return {"services": kept, "dropped": dropped, "steps": _order(steps)}
+
+
+def visible(steps: list[dict], outcomes: dict[str, str | None]) -> list[dict]:
+    """Steps of a branch appear only after the outcome that opens them (spec 7.3)."""
+    reached = {f"{step}:{outcome}" for step, outcome in outcomes.items() if outcome}
+    return [s for s in steps if s.get("unlocked_by", "") in reached or "unlocked_by" not in s]
 
 
 def statuses(steps: list[dict], stored: dict[str, str | None]) -> dict[str, str]:

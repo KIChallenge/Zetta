@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from backend import scripts
 from backend.corpus import Corpus, Institution, get_corpus
-from backend.engine import DONE, evaluate, statuses
+from backend.engine import DONE, evaluate, statuses, visible
 from backend.facts import FACTS, SENTINELS, VIENNA_POSTAL_CODE, merge, subject_words, value_label
 from backend.hours import now as vienna_now
 from backend.hours import reachable, summary
@@ -33,6 +33,17 @@ OUTCOMES = {
     "upload": {"uploaded": ("Hochgeladen", "done")},
     "book": {"booked": ("Termin vereinbart", "done")},
 }  # fmt: skip
+
+
+def outcomes_of(step: dict) -> dict[str, tuple[str, str]]:
+    """Outcome id -> (label, effect): from the corpus step, else the defaults for its type."""
+    if "outcomes" in step:
+        return {o["id"]: (o["label"], o["effect"]) for o in step["outcomes"]}
+    return OUTCOMES[step["type"]]
+
+
+def shown(plan: Plan, states: dict[str, StepState]) -> list[dict]:
+    return visible(plan.graph["steps"], {k: s.outcome for k, s in states.items()})
 
 
 def profile_of(db: Session, user_id: str) -> ProfileData:
@@ -156,26 +167,26 @@ def status_text(steps: list[dict], status: dict[str, str]) -> str:
 def chat_status(db: Session, chat_id: str) -> str | None:
     if plan := latest_plan(db, chat_id):
         states = step_states(db, chat_id)
-        steps = plan.graph["steps"]
+        steps = shown(plan, states)
         return status_text(steps, statuses(steps, {k: s.status for k, s in states.items()}))
     return "Frage offen" if pending_question(db, chat_id) else None
 
 
 def render_plan(plan: Plan, states: dict[str, StepState], profile: ProfileData, facts: dict, now: datetime) -> dict:
-    steps = plan.graph["steps"]
+    steps = shown(plan, states)
     status = statuses(steps, {k: s.status for k, s in states.items()})
     out = []
     for step in steps:
         state = states.get(step["id"])
         view = {
-            k: v for k, v in step.items() if k not in ("slots", "have_ready", "script_facts", "must")
+            k: v for k, v in step.items() if k not in ("slots", "have_ready", "script_facts", "must", "outcomes")
         }
         view["status"] = status[step["id"]]
         view["outcome"] = state.outcome if state else None
         view["note"] = state.note if state else None
         view["checks"] = state.checks if state else []
         view["updated_at"] = state.updated_at.strftime("%Y-%m-%dT%H:%M:%SZ") if state else None
-        labels = OUTCOMES[step["type"]]
+        labels = outcomes_of(step)
         view["outcomes"] = [{"id": k, "label": label} for k, (label, _) in labels.items()]
         if len(labels) == 1 and step.get("done_label"):
             view["outcomes"][0]["label"] = step["done_label"]

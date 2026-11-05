@@ -15,6 +15,7 @@ CARE_STEPS = [
     "care_allowance.submit",
     "care_allowance.assessment",
     "care_allowance.decision",
+    "care_allowance.clarify",  # hidden until the decision is "rejected"
 ]
 HOME_STEPS = ["home_care_fsw.call", "home_care_fsw.send_application", "home_care_fsw.assessment"]
 CARER_STEPS = ["carer_support.info", "carer_support.request_talk"]

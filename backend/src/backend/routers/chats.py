@@ -236,7 +236,7 @@ def update_step(step_id: str, body: StepUpdate, chat: OwnedChat, db: DbSession) 
         state = StepState(chat_id=chat.id, step_id=step_id, checks=[])
         db.add(state)
     if body.outcome is not None:
-        outcome = pipeline.OUTCOMES[step["type"]].get(body.outcome)
+        outcome = pipeline.outcomes_of(step).get(body.outcome)
         if outcome is None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Unknown outcome")
         state.outcome = body.outcome

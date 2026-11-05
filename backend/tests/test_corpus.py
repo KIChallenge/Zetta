@@ -46,6 +46,11 @@ def test_references_resolve():
         assert len(ids) == len(set(ids)), s.id
         for t in s.steps:
             assert set(t.after) <= set(ids), f"{s.id}.{t.id}"
+            if t.unlocked_by:
+                source, outcome = t.unlocked_by.split(":")
+                opener = next(o for o in s.steps if o.id == source)
+                assert outcome in [o.id for o in opener.outcomes], f"{s.id}.{t.id}"
+                assert source in t.after, f"{s.id}.{t.id}: comes after the step that opens it"
             assert set(t.script_facts) <= set(FACTS), f"{s.id}.{t.id}"
             assert not t.form or t.form in corpus.forms, f"{s.id}.{t.id}"
             if t.institution and t.institution != "responsible":

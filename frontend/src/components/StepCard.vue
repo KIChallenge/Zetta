@@ -250,9 +250,12 @@ async function copy() {
           <p v-else-if="s.text">{{ s.text }}</p>
 
           <div v-if="s.type !== 'call' && s.type !== 'upload'" class="outcome">
-            <button type="button" class="btn btn-secondary" @click="emit('update', { outcome: s.outcomes[0]!.id })">
-              <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ s.outcomes[0]?.label }}
-            </button>
+            <p v-if="s.outcomes.length > 1" class="field-l">Wie ist es ausgegangen?</p>
+            <div class="actions">
+              <button v-for="o in s.outcomes" :key="o.id" type="button" class="btn btn-secondary" @click="emit('update', { outcome: o.id })">
+                <svg class="i" aria-hidden="true"><use href="#i-check" /></svg>{{ o.label }}
+              </button>
+            </div>
           </div>
           <a v-if="s.contact?.source_url" class="src-link" :href="s.contact.source_url" target="_blank" rel="noopener noreferrer">Quelle der Kontaktdaten</a>
         </template>

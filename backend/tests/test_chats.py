@@ -600,3 +600,18 @@ def test_chat_endpoints_require_a_token(client):
     requests = [("GET", "/chats", None), ("POST", "/chats", {"title": "x"})]
     for method, url, body in requests + chat_requests("any"):
         assert_error(client.request(method, url, json=body), 401)
+
+
+def test_an_outcome_opens_its_branch(client, anna, llm):
+    chat = create_chat(client, anna)
+    plan = dict(to_plan(client, anna, llm, chat["id"]))["plan"]
+    assert "care_allowance.clarify" not in steps_of(plan)
+    url = f"/chats/{chat['id']}/steps/care_allowance.decision"
+    assert [o["id"] for o in steps_of(plan)["care_allowance.decision"]["outcomes"]] == ["granted", "rejected"]
+
+    plan = client.patch(url, json={"outcome": "rejected"}, headers=anna).json()
+
+    clarify = steps_of(plan)["care_allowance.clarify"]
+    assert (clarify["status"], clarify["contact"]["href"]) == ("available", "tel:+4350303")
+    assert clarify["script"]["opening"]  # written with the plan, shown once the branch opens
+    assert "care_allowance.clarify" not in steps_of(client.patch(url, json={"outcome": "granted"}, headers=anna).json())

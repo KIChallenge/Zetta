@@ -100,6 +100,12 @@ class EmailScript(Model):
     covers: list[str]
 
 
+class Outcome(Model):
+    id: str
+    label: str
+    effect: Literal["done", "keep"]  # keep: the step stays open, e.g. to call again
+
+
 class StepTemplate(Model):
     id: str
     type: Literal["call", "email", "form", "info", "wait", "documents", "upload", "book"]
@@ -118,6 +124,8 @@ class StepTemplate(Model):
     have_ready: list[str] = []
     script_facts: list[str] = []
     fallback_script: CallScript | EmailScript | None = None
+    outcomes: list[Outcome] = []  # empty: the defaults for the step type
+    unlocked_by: str | None = None  # "<template id>:<outcome id>": shown only after that outcome
 
 
 class Rule(Model):
