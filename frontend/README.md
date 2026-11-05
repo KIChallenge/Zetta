@@ -35,6 +35,12 @@ npm install
 npm run dev
 ```
 
+The dev server proxies `/auth/*` and `/me` to the backend at `http://localhost:8000`. Set `API_PROXY_TARGET` to use another address:
+
+```sh
+API_PROXY_TARGET=http://localhost:9000 npm run dev
+```
+
 ### Type-Check, Compile and Minify for Production
 
 ```sh
