@@ -1,2 +1,5 @@
+import uvicorn
+
+
 def main() -> None:
-    print("Hello from backend!")
+    uvicorn.run("backend.app:app")
