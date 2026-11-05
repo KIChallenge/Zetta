@@ -5,6 +5,7 @@ import ChatApp from './components/ChatApp.vue'
 import { ApiError, clearToken, getToken, me, type User } from './auth'
 import { locale, setLocale, t } from './i18n'
 import { LANGS } from './profile'
+import { view } from './view'
 
 const user = ref<User | null>(null)
 // Fully translated. Once signed in, the language is a setting of the profile.
@@ -32,6 +33,12 @@ function signOut() {
   logout()
 }
 
+// "Wie mein Gerät" follows the device, so the button needs the device's current scheme too.
+const deviceDark = matchMedia('(prefers-color-scheme: dark)')
+const osDark = ref(deviceDark.matches)
+deviceDark.addEventListener('change', (e) => (osDark.value = e.matches))
+const dark = computed(() => view.theme === 'dark' || (view.theme === 'auto' && osDark.value))
+
 // The screen swaps under the user, so move focus to the new content.
 watch(user, () => nextTick(() => main.value?.focus()))
 </script>
@@ -50,17 +57,22 @@ watch(user, () => nextTick(() => main.value?.focus()))
       <select v-if="!user" class="lang" :aria-label="t('Sprache')" :value="locale" @change="setLocale(($event.target as HTMLSelectElement).value)">
         <option v-for="code in ENTRY_LANGS" :key="code" :value="code">{{ LANGS[code] }}</option>
       </select>
-      <span v-if="user" class="me">
-        <a class="btn btn-quiet bar-btn bar-list" href="#gespraeche" :title="t('Alle Gespräche')">
-          <svg class="i" aria-hidden="true"><use href="#i-list" /></svg><span class="xs">{{ t('Alle Gespräche') }}</span>
-        </a>
-        <a class="btn btn-quiet bar-btn me-btn" href="#einstellungen" :title="t('Einstellungen')">
-          <span class="avatar" aria-hidden="true">{{ initials }}</span>
-          <span class="me-l"><b>{{ user.display_name }}</b><small>{{ t('Einstellungen') }}</small></span>
-        </a>
-        <button type="button" class="btn btn-quiet bar-btn" :title="t('Abmelden')" @click="signOut">
-          <svg class="i" aria-hidden="true"><use href="#i-logout" /></svg><span>{{ t('Abmelden') }}</span>
+      <span class="me">
+        <button type="button" class="btn btn-quiet bar-btn" :title="dark ? t('Hell') : t('Dunkel')" @click="view.theme = dark ? 'light' : 'dark'">
+          <svg class="i" aria-hidden="true"><use :href="dark ? '#i-sun' : '#i-moon'" /></svg><span>{{ dark ? t('Hell') : t('Dunkel') }}</span>
         </button>
+        <template v-if="user">
+          <a class="btn btn-quiet bar-btn bar-list" href="#gespraeche" :title="t('Alle Gespräche')">
+            <svg class="i" aria-hidden="true"><use href="#i-list" /></svg><span class="xs">{{ t('Alle Gespräche') }}</span>
+          </a>
+          <a class="btn btn-quiet bar-btn me-btn" href="#einstellungen" :title="t('Einstellungen')">
+            <span class="avatar" aria-hidden="true">{{ initials }}</span>
+            <span class="me-l"><b>{{ user.display_name }}</b><small>{{ t('Einstellungen') }}</small></span>
+          </a>
+          <button type="button" class="btn btn-quiet bar-btn" :title="t('Abmelden')" @click="signOut">
+            <svg class="i" aria-hidden="true"><use href="#i-logout" /></svg><span>{{ t('Abmelden') }}</span>
+          </button>
+        </template>
       </span>
     </div>
   </header>
@@ -129,8 +141,11 @@ main:focus-visible { outline: none; }
   .avatar { width: calc(1.2rem + .9rem + 2px); height: calc(1.2rem + .9rem + 2px); }
   .me-l small { font-size: inherit; }
 }
-/* Phone with large text: the list link shows only its icon, so the bar still fits one row. */
+/* Phone: the list link shows only its icon and the spacing tightens, so four buttons fit one row. */
 @container (max-width: 23.99rem) {
+  .top .wrap { padding-inline: .5rem; }
+  .me { gap: 0; }
+  .bar-btn { padding-inline: .1rem; }
   .xs { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 /* Phone at text size XL: the labels no longer fit under the icons, so screen readers keep them and the icons stay. */

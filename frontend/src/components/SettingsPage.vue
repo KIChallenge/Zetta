@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { nextTick, reactive, ref, watch } from 'vue'
+import { nextTick, reactive, ref } from 'vue'
 import { ApiError, GENERIC, UNREACHABLE, type User } from '../auth'
 import { k, t } from '../i18n'
+import { view } from '../view'
 import {
   changePassword, deleteAccount, fmtSvnr, getProfile, LANGS, LENGTHS, saveProfile, svnrDigits, svnrOk, type Profile,
 } from '../profile'
@@ -35,7 +36,6 @@ const RULES: Partial<Record<Field, (v: string) => string>> = {
 const TEXT = [['m', k('Normal')], ['l', k('Groß')], ['xl', k('Sehr groß')]] as const
 const THEME = [['auto', k('Wie mein Gerät')], ['light', k('Hell')], ['dark', k('Dunkel')]] as const
 const CONTRAST = [['normal', k('Standard')], ['high', k('Stark')]] as const
-const VIEW_KEY = 'lotse-ansicht' // read by applyView() in index.html
 
 const saved = ref<Profile | null>(null)
 const loadErr = ref('')
@@ -50,23 +50,6 @@ const showPw = ref(false)
 const delDlg = ref<HTMLDialogElement>()
 const delPw = ref('')
 const delErr = ref('')
-
-function stored() {
-  try {
-    return JSON.parse(localStorage.getItem(VIEW_KEY) ?? '{}') ?? {}
-  } catch {
-    return {}
-  }
-}
-const view = reactive({ text: 'm', theme: 'auto', contrast: 'normal', motion: false, ...stored() })
-watch(view, () => {
-  try {
-    localStorage.setItem(VIEW_KEY, JSON.stringify(view))
-  } catch {
-    // Private mode or storage blocked: the view still applies until reload.
-  }
-  applyView()
-})
 
 const focus = (id: string) => nextTick(() => document.getElementById(id)?.focus())
 
