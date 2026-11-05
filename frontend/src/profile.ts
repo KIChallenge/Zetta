@@ -1,4 +1,5 @@
 import { api } from './chats'
+import { fmtSvnr } from './fields'
 import { k } from './i18n'
 
 export const LANGS = {
@@ -25,16 +26,6 @@ export const saveProfile = (p: Profile) => api<Profile>('/me/profile', 'PUT', p)
 export const changePassword = (current_password: string, new_password: string) =>
   api<null>('/me/password', 'POST', { current_password, new_password })
 export const deleteAccount = (password: string) => api<null>('/me', 'DELETE', { password })
-
-// Same check as backend/schemas.py: the 4th digit is the check digit, so its own weight is 0.
-const WEIGHTS = [3, 7, 9, 0, 5, 8, 4, 2, 1, 6]
-export const svnrDigits = (v: string) => v.replace(/\s/g, '')
-export function svnrOk(v: string) {
-  const d = svnrDigits(v)
-  // A sum of 10 (mod 11) matches no digit, so such numbers are invalid.
-  return /^\d{10}$/.test(d) && [...d].reduce((sum, c, i) => sum + Number(c) * WEIGHTS[i]!, 0) % 11 === Number(d[3])
-}
-export const fmtSvnr = (d: string) => (d.length === 10 ? `${d.slice(0, 4)} ${d.slice(4)}` : d)
 
 /** The filled fields as label/value pairs: what the Lotse fills into call scripts and emails (never sent to the LLM). */
 export function facts(p: Profile): [string, string][] {
