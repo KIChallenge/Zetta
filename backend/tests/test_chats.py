@@ -58,6 +58,11 @@ def history(client, headers, chat_id):
     return [(m["role"], m["text"]) for m in messages]
 
 
+def chat_part(sent):
+    """The chat history the LLM got, without the system messages."""
+    return [m for m in sent if m["role"] != "system"]
+
+
 def assert_error(response, status, detail=None):
     assert response.status_code == status
     body = response.json()
@@ -224,7 +229,7 @@ def test_history_is_sent_oldest_first(client, anna, llm):
     send(client, anna, chat["id"], "eins")
     send(client, anna, chat["id"], "zwei")
 
-    assert llm.histories[-1] == [
+    assert chat_part(llm.histories[-1]) == [
         {"role": "user", "content": "eins"},
         {"role": "assistant", "content": "Hallo Anna!"},
         {"role": "user", "content": "zwei"},
@@ -242,7 +247,7 @@ def test_history_is_capped_at_the_last_40_messages(client, anna, llm):
     for i in range(21):
         send(client, anna, chat["id"], str(i))
 
-    sent = llm.histories[-1]
+    sent = chat_part(llm.histories[-1])
     assert len(sent) == 40
     assert sent[0] == {"role": "assistant", "content": "Hallo Anna!"}
     assert sent[-1] == {"role": "user", "content": "20"}

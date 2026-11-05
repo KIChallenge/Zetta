@@ -19,6 +19,27 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(100))
     password_hash: Mapped[str] = mapped_column(String(255))
 
+    # Deleted by the ORM with the user: SQLite does not enforce foreign keys by default.
+    profile: Mapped["Profile | None"] = relationship(cascade="all, delete-orphan")
+    chats: Mapped[list["Chat"]] = relationship(cascade="all, delete-orphan")
+
+
+class Profile(Base):
+    """Details the user entered about themselves. Own table, so existing databases need no migration."""
+
+    __tablename__ = "profiles"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    full_name: Mapped[str] = mapped_column(String(100))
+    street: Mapped[str] = mapped_column(String(100))
+    postal_code: Mapped[str] = mapped_column(String(4))
+    city: Mapped[str] = mapped_column(String(60))
+    svnr: Mapped[str] = mapped_column(String(10))
+    phone: Mapped[str] = mapped_column(String(30))
+    contact_email: Mapped[str] = mapped_column(String(320))
+    answer_language: Mapped[str] = mapped_column(String(3))
+    answer_length: Mapped[str] = mapped_column(String(10))
+
 
 class Chat(Base):
     __tablename__ = "chats"

@@ -8,6 +8,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&display=swap" rel="stylesheet">
+    <script>
+      // The saved view (Einstellungen > Ansicht) is applied before the first paint, so nothing flashes.
+      function applyView() {
+        var s = {}, r = document.documentElement, mm = function (q) { return matchMedia(q).matches }
+        try { s = JSON.parse(localStorage.getItem('lotse-ansicht')) || {} } catch (e) {}
+        r.dataset.text = s.text || 'm'
+        r.dataset.contrast = s.contrast || 'normal'
+        r.dataset.scheme = s.theme === 'light' || s.theme === 'dark' ? s.theme : mm('(prefers-color-scheme: dark)') ? 'dark' : 'light'
+        r.dataset.motion = s.motion || mm('(prefers-reduced-motion: reduce)') ? 'reduce' : 'full'
+      }
+      applyView()
+      matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyView)
+      matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', applyView)
+    </script>
   </head>
   <body>
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -23,6 +37,7 @@
       <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
       <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
       <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
       <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
     </svg>
     <div id="app"></div>

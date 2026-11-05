@@ -27,7 +27,7 @@ const init = (method: string, body?: object, signal?: AbortSignal): RequestInit 
   body: body && JSON.stringify(body),
   signal,
 })
-const api = <T>(path: string, method = 'GET', body?: object) => request<T>(path, init(method, body))
+export const api = <T>(path: string, method = 'GET', body?: object) => request<T>(path, init(method, body))
 
 // The id can come from the URL hash, so it is encoded before it becomes part of a path.
 const at = (id: string | number) => `/chats/${encodeURIComponent(id)}`

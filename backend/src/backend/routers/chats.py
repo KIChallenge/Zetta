@@ -10,9 +10,9 @@ from sqlalchemy import literal_column, select
 
 from backend.database import SessionLocal
 from backend.dependencies import CurrentUser, DbSession
-from backend.llm import Llm, LlmClient
-from backend.models import Chat, Message, utcnow
-from backend.schemas import ChatRequest, ChatResponse, MessageRequest, MessageResponse
+from backend.llm import Llm, LlmClient, build_messages
+from backend.models import Chat, Message, Profile, utcnow
+from backend.schemas import ChatRequest, ChatResponse, MessageRequest, MessageResponse, ProfileData
 
 HISTORY_LIMIT = 40
 
@@ -110,7 +110,10 @@ async def send_message(
         title = asyncio.create_task(generate_title(llm, body.text)) if first else None
         text = ""
         try:
-            context = [{"role": m.role, "content": m.text} for m in history]
+            # Read on every message, so the LLM always has the current profile.
+            row = db.get(Profile, chat.user_id)
+            profile = ProfileData.model_validate(row) if row else ProfileData()
+            context = build_messages(profile, [{"role": m.role, "content": m.text} for m in history])
             async with aclosing(llm.reply(context)) as deltas:
                 async for delta in deltas:
                     text += delta
