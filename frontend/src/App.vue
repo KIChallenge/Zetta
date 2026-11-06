@@ -65,15 +65,18 @@ watch(user, () => nextTick(() => main.value?.focus()))
     <template v-if="ready">
       <ChatApp v-if="user" :user="user" @expired="logout" @deleted="leave">
         <template #foot>
-          <a class="dock dock-me" href="#einstellungen" :title="t('Einstellungen')">
-            <span aria-hidden="true">{{ initials }}</span><span class="sr">{{ user.display_name }}, {{ t('Einstellungen') }}</span>
+          <a class="btn btn-quiet me-btn" href="#einstellungen">
+            <span class="avatar" aria-hidden="true">{{ initials }}</span>
+            <span class="me-l"><b>{{ user.display_name }}</b><small>{{ t('Einstellungen') }}</small></span>
           </a>
-          <button type="button" class="dock" :title="dark ? t('Hell') : t('Dunkel')" @click="view.theme = dark ? 'light' : 'dark'">
-            <svg class="i" aria-hidden="true"><use :href="dark ? '#i-sun' : '#i-moon'" /></svg><span class="sr">{{ dark ? t('Hell') : t('Dunkel') }}</span>
-          </button>
-          <button type="button" class="dock dock-out" :title="t('Abmelden')" @click="signOut">
-            <svg class="i" aria-hidden="true"><use href="#i-logout" /></svg><span class="sr">{{ t('Abmelden') }}</span>
-          </button>
+          <span class="foot-row">
+            <button type="button" class="btn btn-quiet" @click="view.theme = dark ? 'light' : 'dark'">
+              <svg class="i" aria-hidden="true"><use :href="dark ? '#i-sun' : '#i-moon'" /></svg>{{ dark ? t('Hell') : t('Dunkel') }}
+            </button>
+            <button type="button" class="btn btn-quiet" @click="signOut">
+              <svg class="i" aria-hidden="true"><use href="#i-logout" /></svg>{{ t('Abmelden') }}
+            </button>
+          </span>
         </template>
       </ChatApp>
       <template v-else>
@@ -127,14 +130,13 @@ main:focus-visible { outline: none; }
   .entry { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-content: stretch; }
 }
 
-/* Sidebar dock (slot content of ChatApp): round icon buttons, the avatar first. */
-.dock { width: 2.75rem; height: 2.75rem; flex: none; display: grid; place-items: center; padding: 0; border: 1px solid var(--rule); border-radius: 50%; background: var(--sheet); color: var(--action); font: inherit; text-decoration: none; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s, transform .12s cubic-bezier(.23, 1, .32, 1); }
-.dock:hover { background: var(--band); border-color: var(--action); }
-.dock:active { transform: scale(.94); }
-.dock-me { border: 0; background: linear-gradient(135deg, var(--accent), var(--head)); color: var(--on-action); font-weight: 700; font-size: var(--fs-small); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent); }
-.dock-me:hover { background: linear-gradient(135deg, var(--accent), var(--head)); filter: brightness(1.1); }
-.dock-out:hover { color: var(--danger); border-color: var(--danger); }
-[data-contrast="high"] .dock { border: 2px solid var(--ink); }
+/* Sidebar foot (slot content of ChatApp): who is signed in, then theme and logout, all with words. */
+.me-btn { justify-content: flex-start; padding-inline: .35rem .9rem; }
+.avatar { width: 2.25rem; height: 2.25rem; flex: none; border-radius: 50%; background: var(--accent); color: var(--paper); display: grid; place-items: center; font-weight: 700; font-size: var(--fs-small); }
+.me-l { min-width: 0; overflow-wrap: anywhere; }
+.me-l b { display: block; color: var(--ink); }
+.me-l small { display: block; font-size: var(--fs-small); font-weight: 600; }
+.foot-row { display: flex; flex-wrap: wrap; gap: .25rem; }
 
 @container (min-width: 56rem) { .top.signed { display: none; } }
 .top.signed .me { margin-inline: auto 0; }

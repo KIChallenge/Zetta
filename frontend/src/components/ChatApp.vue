@@ -611,7 +611,7 @@ async function confirmDelete() {
 /* Sidebar: a plain list of rows, the open one on the lavender band. */
 .side { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: .75rem; padding: 1.25rem 1rem 0; border-right: var(--hair); background: var(--paper); }
 /* Settings, theme and logout: pinned to the bottom edge while the list scrolls. */
-.side-foot { position: sticky; bottom: 0; margin-top: auto; display: flex; align-items: center; gap: .6rem; padding: .9rem .5rem 1.1rem; border-top: var(--hair); background: var(--paper); }
+.side-foot { position: sticky; bottom: 0; margin-top: auto; display: grid; gap: .25rem; padding: .75rem 0 1rem; border-top: var(--hair); background: var(--paper); }
 .side-h-row { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; margin-top: .75rem; padding-inline: .75rem; }
 .side-h-row .muted { font-size: var(--fs-small); }
 .side .btn-secondary { align-self: start; }
@@ -635,8 +635,8 @@ async function confirmDelete() {
 
 .pane { --gut: max(1.25rem, calc((100% - 48rem) / 2)); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 
-/* Home: one blue gradient behind greeting, composer and what the Lotse knows. */
-.is-home { --gut: max(1.25rem, calc((100% - 44rem) / 2)); overflow-y: auto; background: var(--grad); }
+/* Home: one navy pane behind greeting, composer and what the Lotse knows. */
+.is-home { --gut: max(1.25rem, calc((100% - 44rem) / 2)); overflow-y: auto; }
 .home { display: grid; gap: .5rem; padding: clamp(1.75rem, 6vh, 3rem) var(--gut) 1.5rem; }
 .home h1 { font-size: clamp(var(--fs-h2), 5cqi, var(--fs-h1)); }
 .lead { font-size: var(--fs-lead); color: var(--on-navy-2); }
@@ -650,11 +650,11 @@ async function confirmDelete() {
 .msgs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
 .msg { display: flex; justify-content: flex-end; }
 .msg.assistant { justify-content: flex-start; }
-/* Rectangular speech bubbles: the user's lavender with a tail on the right, the Lotse's on the blue gradient with a tail on the left. */
+/* Rectangular speech bubbles: the user's lavender with a tail on the right, the Lotse's on navy with a tail on the left. */
 .bubble { position: relative; max-width: min(34rem, 85%); display: grid; gap: .4rem; justify-items: start; padding: .75rem 1.1rem; border-radius: var(--r-s); background: var(--band); color: var(--ink); }
 .bubble::after { content: ""; position: absolute; right: 1.25rem; bottom: -.7rem; width: 1.1rem; height: .75rem; background: var(--band); clip-path: polygon(0 0, 100% 0, 100% 100%); }
-.assistant .bubble { max-width: min(40rem, 92%); background: var(--grad); color: var(--on-navy); box-shadow: 0 14px 30px -18px rgba(0, 30, 80, .7); --focus: var(--on-navy); }
-.assistant .bubble::after { right: auto; left: 1.25rem; background: var(--grad-end); clip-path: polygon(0 0, 100% 0, 0 100%); }
+.assistant .bubble { max-width: min(40rem, 92%); background: var(--navy); color: var(--on-navy); --focus: var(--on-navy); }
+.assistant .bubble::after { right: auto; left: 1.25rem; background: var(--navy); clip-path: polygon(0 0, 100% 0, 0 100%); }
 .assistant .bubble .meta { color: var(--on-navy-2); }
 [data-contrast="high"] .bubble { box-shadow: inset 0 0 0 2px var(--ink); }
 @media (forced-colors: active) { .bubble { border: 1px solid CanvasText; } }
@@ -702,18 +702,17 @@ async function confirmDelete() {
 .composer { flex: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: .65rem; padding: .75rem var(--gut) 1rem; border-top: var(--hair); }
 .is-home .composer { padding: .5rem var(--gut) clamp(1.75rem, 6vh, 3rem); border: 0; }
 .q-label { font-size: var(--fs-h3); font-weight: 600; }
-/* Composer: a rectangular speech bubble with a tail on the left; the drop shadows follow the tail too. */
-.cbox { position: relative; margin-bottom: .75rem; padding: .4rem; border-radius: var(--r-s); background: var(--sheet); color: var(--ink); --focus: var(--action); filter: drop-shadow(0 0 1px rgba(0, 30, 80, .55)) drop-shadow(0 10px 16px rgba(0, 30, 80, .14)); }
+/* Composer: a rectangular speech bubble with a tail on the left; a 1px drop shadow draws its edge around the tail too. */
+.cbox { position: relative; margin-bottom: .75rem; padding: .4rem; border-radius: var(--r-s); background: var(--sheet); color: var(--ink); --focus: var(--action); filter: drop-shadow(0 0 1px var(--rule-2)); }
 .cbox::after { content: ""; position: absolute; left: 2rem; bottom: -.75rem; width: 1.3rem; height: .8rem; background: var(--sheet); clip-path: polygon(0 0, 100% 0, 0 100%); }
-[data-scheme="dark"] .cbox { filter: drop-shadow(0 0 1px rgba(255, 255, 255, .6)); }
 [data-contrast="high"] .cbox { filter: none; border: 2px solid var(--ink); }
 .cbox:has(textarea:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
 .navy-band .cbox:has(textarea:focus-visible) { outline-color: var(--on-navy); }
 .cbox:has([aria-invalid="true"]) { box-shadow: inset 0 0 0 2px var(--danger); }
 .cbox textarea { border: 0; background: transparent; resize: none; min-height: 3rem; max-height: 14rem; field-sizing: content; padding: .55rem .9rem; }
 .navy-band .cbox textarea { min-height: 6rem; font-size: var(--fs-lead); }
-/* Home composer: a rectangular speech bubble with a tail, floating on the gradient. */
-.navy-band .cbox { margin-bottom: 1rem; padding: .6rem; border: 0; filter: none; box-shadow: 0 0 0 5px rgba(255, 255, 255, .14), 0 24px 48px -20px rgba(0, 0, 0, .6); }
+/* Home composer: the same speech bubble, white on the navy pane. */
+.navy-band .cbox { margin-bottom: 1rem; padding: .6rem; border: 0; }
 .navy-band .cbox::after { bottom: -1rem; width: 1.6rem; height: 1.05rem; }
 [data-contrast="high"] .navy-band .cbox { box-shadow: 0 0 0 3px var(--on-navy); }
 @media (forced-colors: active) { .navy-band .cbox { border: 2px solid CanvasText; } }

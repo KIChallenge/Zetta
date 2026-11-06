@@ -9,13 +9,13 @@ The Lotse should look like a public health service: calm, white, institutional b
 | Ink | `--ink`, `--ink-2`, `--ink-3` | `#001E50` navy | Text. `--ink-3` is the lowest text tone (4.5:1 on every ground). |
 | Heading blue | `--head` | `#05498C` | Page titles, card titles, links. |
 | Action | `--action`, `--action-hi`, `--on-action` | `#05498C`, hover `#001E50` | Buttons, pressed chips, selection. |
-| Green accent | `--accent`, `--accent-bg` | `#1F806A`, mint `#E5F7F0` | App bar line, meta labels, avatar, the open chat ("you are here" dot on mint), user messages (mint), "Verstanden", plan progress bar, call script numbers, checklist ticks, the entry page band. |
+| Green accent | `--accent`, `--accent-bg` | `#1F806A`, mint `#E5F7F0` | App bar line, meta labels, avatar, the open chat ("you are here" dot on mint), "Verstanden", plan progress bar, call script numbers, checklist ticks, the entry page band. |
 | Positive | `--ready-ink`, `--ready-bg`, `--ready-mark` | green on mint | Done, open now, "Kommt in Frage". |
 | Your turn | `--turn-ink`, `--turn-bg`, `--turn-mark` | the same green and mint | The current step, gaps to fill in, the plan bar. There is no amber or gold. |
 | Open item | `--todo-bg`, `--todo-ink` | signal yellow `#FFE680`, navy text | Only the small status pills that need the user: "Frage offen", "N offene Schritte", "Jetzt dran". Never a surface, border or button. |
 | Waiting | `--wait-*` | lavender | Steps that wait on someone else. |
 | Danger | `--danger` | `#B3261E` | Real problems only: errors, deleting. |
-| Grounds | `--paper`, `--sheet`, `--sunk`, `--band`, `--navy` | white, white, grey `#F2F5F5`, lavender `#E9EBF8`, navy | Page, cards, quiet zones, selection and user messages, the dark band. |
+| Grounds | `--paper`, `--sheet`, `--sunk`, `--band`, `--navy` | white, white, grey `#F2F5F5`, lavender `#E9EBF8`, navy | Page, cards, quiet zones, selection and user messages, the home pane and the Lotse's messages. |
 | Lines | `--rule`, `--rule-2`, `--hair` | hairline, edge `#7D8BA6` | `--hair` separates surfaces; `--rule-2` outlines controls (3:1). |
 | Focus | `--focus` | `#0B63CE` | 3px ring. Inside `.navy-band` it turns white. |
 
@@ -42,8 +42,8 @@ Text size M/L/XL scales the root (18/21/24px), so everything is in rem.
 
 ## Shape and space
 
-- Radius: `--r-s` 8px (small insets), `--r-m` 12px (cards, check rows), `--r-l` 16px (dialogs, bubbles), `--r-pill` (buttons, chips, inputs, status pills).
-- Depth: flat. Cards are white with a hairline (`border: var(--hair)`). Only dialogs float (`--float`). Quiet areas sit on a grey or lavender ground without a border.
+- Radius: `--r-s` 8px (small insets, speech bubbles, the composer), `--r-m` 12px (cards, check rows), `--r-l` 16px (dialogs), `--r-pill` (buttons, chips, inputs, status pills).
+- Depth: flat. Cards are white with a hairline (`border: var(--hair)`). Only dialogs float (`--float`). Quiet areas sit on a grey or lavender ground without a border. The composer's edge is a 1px drop shadow in `--rule-2`, so it runs around its tail too.
 - Spacing in rem: .25, .5, .75, 1, 1.5, 2, 3. Cards pad 1.25 to 1.4rem.
 - Icons: the line sprite in `index.html`, 24px grid, stroke 2, round caps. No icon in a tinted square.
 - Targets at least 2.75rem (49px at M).
@@ -53,7 +53,10 @@ Text size M/L/XL scales the root (18/21/24px), so everything is in rem.
 - Buttons: primary is a filled blue pill, secondary a blue outlined pill, quiet is blue text. One primary per card.
 - Chips: white pills with a thin edge; hover lavender; pressed filled blue.
 - Plan: a wayfinding line. Done stations are filled green with a tick and say "Erledigt"; the current one is a green ring with a dot, its card has a green border and says "Jetzt dran"; later ones are hollow. Shape and word tell now from done, not colour.
-- Navy band (`.navy-band`): one per screen at most (the home greeting and composer).
+- Navy (`.navy-band`, `--navy`): solid, never a gradient. The home pane (greeting, composer, what the Lotse knows) and, in a chat, the Lotse's messages.
+- Speech bubbles: rectangular (`--r-s`), flat, with a small tail. The user's own words sit on lavender with the tail on the right. The Lotse's text replies and its open question sit on navy with white text and the tail on the left; its chips stay white, a pressed one turns blue with a white edge. The composer is a white bubble with the tail on the left.
+- Home: the composer is the one white surface on the navy pane, so it leads. What the Lotse knows sits below it right on the navy, without a card: a filled-in form, since these details go into the forms. One field per detail with its line icon and label; the value sits on a form line (`--rule-2`). An empty field is a dashed line with "Ergänzen", which opens the settings. In a chat it is one line that opens on demand.
+- Sidebar foot: the avatar with the name and "Einstellungen", then "Dunkel"/"Hell" and "Abmelden" as quiet buttons with words. Wide screens have no app bar; on narrow ones the bar only leads back to the list.
 - Brand mark: a navy disc with a white ring and a green dot, a "you are here" marker. Also the favicon.
 
 ## Do
@@ -65,7 +68,7 @@ Text size M/L/XL scales the root (18/21/24px), so everything is in rem.
 ## Don't
 
 - No gradients, emoji, stock images, glow or soft card shadows.
-- No coloured side stripes on cards, no decorative numbering (number real sequences only).
+- No coloured side stripes on cards, no decorative numbering (number real sequences only), no progress rings or scores for filling in the profile.
 - No uppercase outside `.caps`, no accent colour on single headline words.
 - No other fonts, and never Inter or the system font alone.
 - No ÖGK logo, wordmark, name or layout copied one to one.
