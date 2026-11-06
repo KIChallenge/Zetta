@@ -94,6 +94,7 @@ class FormField(Model):
     field: str  # the field's name in the PDF
     value: str  # text with placeholders like {user.last_name}, or the state of a checkbox or radio button
     when: Condition | None = None  # filled only when known to be true
+    map: dict[str, str] = {}  # for a checkbox or radio button: the person's choice -> its state, e.g. female: /w
 
 
 class Form(Model):

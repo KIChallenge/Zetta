@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { when, type Step, type StepUpdate } from '../chats'
+import { when, type FormBody, type Step, type StepUpdate } from '../chats'
+import FormFill from './FormFill.vue'
 import { hours, k, locale, t, translating } from '../i18n'
 
 const props = defineProps<{ step: Step; now: boolean; open: boolean; forServices: string[] }>()
-const emit = defineEmits<{ toggle: []; update: [body: StepUpdate]; upload: []; form: [] }>()
+const emit = defineEmits<{ toggle: []; update: [body: StepUpdate]; upload: []; form: [body?: FormBody] }>()
 
 const KIND = {
   call: ['phone', k('Anrufen')],
@@ -270,9 +271,8 @@ async function copy() {
           <!-- Form -->
           <template v-else-if="s.type === 'form' && s.form">
             <p v-if="s.text">{{ t(s.text) }}</p>
+            <FormFill v-if="s.form.prefill" :prefill="s.form.prefill" :title="s.form.title" @submit="(body) => emit('form', body)" />
             <p v-if="s.form.prefill" class="hint">
-              <template v-if="s.form.prefill.filled.length">{{ t('Schon eingetragen:') }} {{ s.form.prefill.filled.map((l) => t(l)).join(', ') }}. </template>
-              <template v-if="s.form.prefill.missing.length">{{ t('Im Profil fehlt noch:') }} {{ s.form.prefill.missing.map((l) => t(l)).join(', ') }}. <a href="#einstellungen">{{ t('In den Einstellungen ergänzen') }}</a>. </template>
               {{ t('Bitte prüfen, den Rest ergänzen und unterschreiben.') }} <a :href="s.form.url" target="_blank" rel="noopener noreferrer">{{ t('Leeres Formular') }}</a>
             </p>
             <div v-if="s.form.online_url" class="actions">

@@ -22,6 +22,7 @@ from backend.schemas import (
     AnswerRequest,
     ChatRequest,
     ChatResponse,
+    FormRequest,
     MessageRequest,
     MessageResponse,
     StepUpdate,
@@ -278,18 +279,38 @@ def update_step(step_id: str, body: StepUpdate, chat: OwnedChat, db: DbSession) 
     return pipeline.current_plan(db, chat)
 
 
-@router.get("/{chat_id}/steps/{step_id}/form", response_class=Response)
-def download_form(step_id: str, chat: OwnedChat, db: DbSession) -> Response:
-    """The step's form as a PDF, filled in with the user's details. Built on request, never stored."""
+def step_form(db: Session, chat: Chat, step_id: str):
     plan = pipeline.latest_plan(db, chat.id)
     step = next((s for s in plan.graph["steps"] if s["id"] == step_id), None) if plan else None
     form = get_corpus().forms.get(step.get("form", {}).get("id")) if step else None
     if form is None or not (form.file and form.fields):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Form not found")
-    facts = {k: r.value for k, r in pipeline.fact_rows(db, chat.id).items()}
-    data = forms.fill(form, pipeline.profile_of(db, chat.user_id), facts)
+    return form
+
+
+def pdf(form, data: bytes) -> Response:
     return Response(
         data,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{form.id}.pdf"', "Cache-Control": "no-store"},
     )
+
+
+@router.get("/{chat_id}/steps/{step_id}/form", response_class=Response)
+def download_form(step_id: str, chat: OwnedChat, db: DbSession) -> Response:
+    """The step's form as a PDF, filled in with the user's details. Built on request, never stored."""
+    form = step_form(db, chat, step_id)
+    facts = {k: r.value for k, r in pipeline.fact_rows(db, chat.id).items()}
+    return pdf(form, forms.fill(form, *pipeline.people_of(db, chat.user_id, facts), facts))
+
+
+@router.post("/{chat_id}/steps/{step_id}/form", response_class=Response)
+def complete_form(step_id: str, body: FormRequest, chat: OwnedChat, db: DbSession) -> Response:
+    """The form with the details just typed into its card as well. With "remember", they are kept for later forms."""
+    form = step_form(db, chat, step_id)
+    facts = {k: r.value for k, r in pipeline.fact_rows(db, chat.id).items()}
+    new = pipeline.entered(body, facts)
+    people = pipeline.with_entered(*pipeline.people_of(db, chat.user_id, facts), new, facts)
+    if body.remember:
+        pipeline.remember(db, chat.user_id, new)
+    return pdf(form, forms.fill(form, *people, facts))

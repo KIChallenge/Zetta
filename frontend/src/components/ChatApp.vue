@@ -4,7 +4,7 @@ import { ApiError, UNREACHABLE, type User } from '../auth'
 import {
   createChat, deleteChat, getState, listChats, listMessages, NOT_FOUND, renameChat, say, sendMessage, titleFrom,
   downloadForm, updateStep, uploadDocument, when,
-  type AnswerPayload, type CardPayload, type Chat, type Chip, type ConfirmPayload, type Fact, type Message, type Plan,
+  type AnswerPayload, type CardPayload, type Chat, type Chip, type ConfirmPayload, type Fact, type FormBody, type Message, type Plan,
   type PlanPayload,
   type QuestionPayload, type StepUpdate,
 } from '../chats'
@@ -330,12 +330,19 @@ async function retry(id: string, m: Bubble) {
   else if (done || (m.state === 'failed' && messages.value.at(-1) === m)) scrollDown()
 }
 
-async function getForm(step: string) {
+async function getForm(step: string, body?: FormBody) {
   const id = activeId.value
   if (!id) return
   planErr.value = ''
   try {
-    await downloadForm(id, step)
+    await downloadForm(id, step, body)
+    // Kept details count for every form now: the cards show what is filled in.
+    if (body?.remember) {
+      const next = (await getState(id)).plan
+      if (activeId.value === id) plan.value = next
+      // The user's own name and contact details went to the profile.
+      if (Object.keys(body.user).length) profile.value = await getProfile()
+    }
   } catch (e) {
     planErr.value = fail(e)
   }

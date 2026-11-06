@@ -10,6 +10,7 @@ from backend import forms, scripts
 from backend.corpus import Not, get_corpus
 from backend.engine import _order, _step
 from backend.facts import FACTS, SENTINELS
+from backend.schemas import CHOICES
 
 corpus = get_corpus()
 MAX_AGE_DAYS = int(os.environ.get("CORPUS_MAX_AGE_DAYS", "90"))
@@ -174,7 +175,13 @@ def test_form_fields_exist_in_the_pdf_and_use_known_details(form):
     pdf = PdfReader(forms.FORMS_DIR / form.file).get_fields()
     for field in form.fields:
         assert field.field in pdf, field.field
-        if pdf[field.field].get("/FT") == "/Btn":
+        if pdf[field.field].get("/FT") == "/Btn" and field.map:
+            # A choice of the person: one placeholder, and only states the button has.
+            (slot,) = scripts.SLOT.findall(field.value)
+            assert slot in forms.DETAILS and slot.split(".")[1] in CHOICES, field.field
+            assert set(field.map) <= set(CHOICES[slot.split(".")[1]]), field.field
+            assert set(field.map.values()) <= states(PdfReader(forms.FORMS_DIR / form.file), field.field), field.field
+        elif pdf[field.field].get("/FT") == "/Btn":
             assert field.value in states(PdfReader(forms.FORMS_DIR / form.file), field.field), field.field
         else:
             assert set(scripts.SLOT.findall(field.value)) <= forms.DETAILS, field.field

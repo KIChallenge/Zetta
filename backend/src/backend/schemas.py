@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -128,8 +128,8 @@ def check_svnr(value: str) -> str:
     return digits
 
 
-class ProfileData(BaseModel):
-    """The user's own details. Never sent to the LLM: they only fill placeholders after it. "" when unset."""
+class Contact(BaseModel):
+    """A person's name and contact details. Never sent to the LLM: they only fill placeholders after it. "" when unset."""
 
     model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)
 
@@ -140,8 +140,64 @@ class ProfileData(BaseModel):
     svnr: Annotated[str, AfterValidator(check_svnr)] = ""
     phone: str = Field("", max_length=30, pattern="^[0-9 +()-]*$")
     contact_email: Email | Literal[""] = ""
+
+
+class ProfileData(Contact):
+    """The user's own details and settings."""
+
     answer_language: Literal["de", "en", "fr", "cs", "sk", "sl", "tr", "bks", "ro", "pl", "hu", "uk", "ar"] = "de"
     answer_length: Literal["short", "detailed"] = "short"
+
+
+# Choices of the form details: value -> how it is written on a form.
+SEX = {"female": "weiblich", "male": "männlich", "diverse": "divers"}
+MARITAL_STATUS = {
+    "single": "ledig", "married": "verheiratet", "widowed": "verwitwet", "divorced": "geschieden",
+    "partnership": "eingetragene Partnerschaft", "former_partnership": "ehemalige eingetragene Partnerschaft",
+}  # fmt: skip
+CITIZENSHIP = {"austria": "Österreich", "other": "Andere"}
+HEALTH_INSURER = {"oegk": "Österreichische Gesundheitskasse", "bvaeb": "BVAEB", "svs": "SVS", "kfa": "KFA Wien"}
+CHOICES = {"sex": SEX, "marital_status": MARITAL_STATUS, "citizenship": CITIZENSHIP, "health_insurer": HEALTH_INSURER}
+
+
+def past_date(value: str) -> str:
+    if value and not (date(1900, 1, 1) <= date.fromisoformat(value) <= date.today()):
+        raise ValueError("must be a date in the past")
+    return value
+
+
+def choice(values: dict[str, str]):
+    def known(value: str) -> str:
+        if value and value not in values:
+            raise ValueError("unknown value")
+        return value
+
+    return Annotated[str, AfterValidator(known)]
+
+
+class FormDetails(BaseModel):
+    """Further details some application forms ask for. Never medical: no diagnoses, care needs or aids."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    title: str = Field("", max_length=30)
+    birth_date: Annotated[str, Field(pattern=r"^(\d{4}-\d{2}-\d{2})?$"), AfterValidator(past_date)] = ""
+    sex: choice(SEX) = ""
+    marital_status: choice(MARITAL_STATUS) = ""
+    citizenship: choice(CITIZENSHIP) = ""
+    health_insurer: choice(HEALTH_INSURER) = ""
+
+
+class PersonData(Contact, FormDetails):
+    """Everything known about one person for the forms: the user, or a relative the user applies for."""
+
+
+class FormRequest(BaseModel):
+    """Details typed into a form card. Only the ones entered are sent; "remember" keeps them for later forms."""
+
+    user: PersonData = PersonData()
+    subject: PersonData = PersonData()
+    remember: bool = True
 
 
 class PasswordChangeRequest(BaseModel):
