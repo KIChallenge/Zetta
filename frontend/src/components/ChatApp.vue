@@ -15,6 +15,7 @@ import DocumentConfirm from './DocumentConfirm.vue'
 import FactChips from './FactChips.vue'
 import NoticeCard from './NoticeCard.vue'
 import PlanView from './PlanView.vue'
+import NextUpList from './NextUpList.vue'
 import ProfileCard from './ProfileCard.vue'
 import QuestionCard from './QuestionCard.vue'
 import SettingsPage from './SettingsPage.vue'
@@ -158,7 +159,8 @@ watch(activeId, async (id, _, onCleanup) => {
   messages.value = []
   facts.value = []
   plan.value = null
-  if (!id) return
+  // Back home: refresh what each chat waits for, since steps may have been done in the chat just left.
+  if (!id) return void (initial || loadList())
   loading.value = true
   try {
     const [list, state] = await Promise.all([listMessages(id), getState(id)])
@@ -461,7 +463,7 @@ async function confirmDelete() {
     </nav>
 
     <SettingsPage v-if="hash === SETTINGS" :user="user" @expired="emit('expired')" @saved="profileSaved" @deleted="emit('deleted')" />
-    <section v-else class="pane" :class="activeId ? 'is-chat' : 'is-home navy-band'" aria-labelledby="view-h">
+    <section v-else class="pane" :class="activeId ? 'is-chat' : 'is-home'" aria-labelledby="view-h">
       <div v-if="activeId" ref="scroller" class="view">
         <button v-if="plan" type="button" class="plan-pin" @click="toPlan">
           <svg class="i" aria-hidden="true"><use href="#i-route" /></svg><span>{{ t('Ihr Plan') }} · {{ t(plan.status) }}</span><span class="pin-go">{{ t('Zum Plan') }}</span>
@@ -517,41 +519,45 @@ async function confirmDelete() {
           </li>
         </ol>
       </div>
-      <div v-else class="home">
-        <h1 id="view-h" tabindex="-1">{{ t('Guten Tag, {name}.', { name: user.display_name }) }}</h1>
-        <p class="lead">{{ t('Beschreiben Sie Ihr Anliegen in eigenen Worten.') }}</p>
-        <p v-if="notice" class="notice" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ notice }}</span></p>
-      </div>
-
-      <p class="sr" aria-live="polite">{{ announce }}</p>
-      <form class="composer" novalidate @submit.prevent="submit">
-        <label class="q-label" :class="{ sr: activeId }" for="q">{{ activeId ? t('Ihre Nachricht') : t('Worum geht es?') }}</label>
-        <div class="cbox">
-          <textarea
-            id="q"
-            v-model="draft"
-            class="input"
-            rows="2"
-            maxlength="4000"
-            :aria-invalid="!!draftErr"
-            aria-describedby="q-err"
-            @input="draftErr = ''"
-            @keydown.enter.ctrl.prevent="submit"
-            @keydown.enter.meta.prevent="submit"
-          ></textarea>
-          <div class="cbox-row">
-            <input ref="fileInput" type="file" accept="application/pdf" class="sr" tabindex="-1" @change="upload" />
-            <button type="button" class="btn btn-quiet" :aria-disabled="uploading || busy || !!run" @click="!uploading && !busy && !run && fileInput?.click()">
-              <svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ uploading ? t('Dokument wird gelesen …') : t('Dokument (PDF)') }}
-            </button>
-            <button type="submit" class="btn btn-primary send" :aria-disabled="busy || !!run">
-              {{ busy || run ? t('Einen Moment …') : t('Senden') }}<svg class="i" aria-hidden="true"><use href="#i-arrow" /></svg>
-            </button>
-          </div>
+      <!-- Home: the navy band is for starting something new; what is under way sits below on the page. In a chat
+           this wrapper is display: contents, so the composer stays the pane's last row. -->
+      <div class="lead-area" :class="{ 'navy-band': !activeId }">
+        <div v-if="!activeId" class="home">
+          <h1 id="view-h" tabindex="-1">{{ t('Guten Tag, {name}.', { name: user.display_name }) }}</h1>
+          <p v-if="notice" class="notice" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ notice }}</span></p>
         </div>
-        <p v-if="draftErr" id="q-err" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ draftErr }}</span></p>
-      </form>
-      <ProfileCard v-if="!activeId" :profile="profile" :failed="profileFailed" />
+
+        <p class="sr" aria-live="polite">{{ announce }}</p>
+        <form class="composer" novalidate @submit.prevent="submit">
+          <label class="q-label" :class="{ sr: activeId }" for="q">{{ activeId ? t('Ihre Nachricht') : t('Worum geht es?') }}</label>
+          <div class="cbox">
+            <textarea
+              id="q"
+              v-model="draft"
+              class="input"
+              rows="2"
+              maxlength="4000"
+              :aria-invalid="!!draftErr"
+              aria-describedby="q-err"
+              @input="draftErr = ''"
+              @keydown.enter.ctrl.prevent="submit"
+              @keydown.enter.meta.prevent="submit"
+            ></textarea>
+            <div class="cbox-row">
+              <input ref="fileInput" type="file" accept="application/pdf" class="sr" tabindex="-1" @change="upload" />
+              <button type="button" class="btn btn-quiet" :aria-disabled="uploading || busy || !!run" @click="!uploading && !busy && !run && fileInput?.click()">
+                <svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ uploading ? t('Dokument wird gelesen …') : t('Dokument (PDF)') }}
+              </button>
+              <button type="submit" class="btn btn-primary send" :aria-disabled="busy || !!run">
+                {{ busy || run ? t('Einen Moment …') : t('Senden') }}<svg class="i" aria-hidden="true"><use href="#i-arrow" /></svg>
+              </button>
+            </div>
+          </div>
+          <p v-if="draftErr" id="q-err" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ draftErr }}</span></p>
+        </form>
+      </div>
+      <NextUpList v-if="!activeId" class="below" :chats="chats" />
+      <ProfileCard v-if="!activeId" class="known-home navy-band" :profile="profile" :failed="profileFailed" />
     </section>
 
     <dialog ref="renameDlg" class="small" aria-labelledby="rn-h">
@@ -639,14 +645,34 @@ async function confirmDelete() {
 
 .pane { --gut: max(1.25rem, calc((100% - 48rem) / 2)); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 
-/* Home: one navy pane behind greeting, composer and what the Lotse knows. */
-.is-home { --gut: max(1.25rem, calc((100% - 44rem) / 2)); overflow-y: auto; }
-.home { display: grid; gap: .5rem; padding: clamp(1.75rem, 6vh, 3rem) var(--gut) 1.5rem; }
+/* Home: the navy column starts something new (greeting, composer, what the Lotse knows); "Was jetzt ansteht"
+   sits beside it on the page. Narrow, they stack: navy, the list, then the details on navy again. */
+.is-home { --gut: max(1.25rem, calc((100% - 60rem) / 2)); overflow-y: auto; }
+.is-chat .lead-area { display: contents; }
+.lead-area.navy-band { flex: none; }
+.home > *, .is-home .composer > * { max-width: 44rem; }
+.below { flex: none; padding: 2rem var(--gut) 2.5rem; }
+.known-home { flex: none; padding: 1.5rem var(--gut) 2.5rem; }
+/* Wide, with something under way: two columns that each fit the screen. A column that is too long scrolls on its
+   own; the page never does. */
+@container (min-width: 64rem) {
+  .is-home:has(> .below) {
+    --gut: clamp(1.25rem, 2cqi, 2.25rem);
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "lead list" "known list"; overflow: hidden;
+  }
+  .is-home:has(> .below) .lead-area { grid-area: lead; }
+  /* margin-top: -1px closes the sub-pixel seam between the two navy boxes. */
+  .is-home:has(> .below) .known-home { grid-area: known; overflow-y: auto; gap: .75rem; margin-top: -1px; padding-top: calc(.25rem + 1px); padding-bottom: .75rem; }
+  .is-home:has(> .below) .known-home :deep(.kv) { row-gap: .75rem; }
+  .is-home:has(> .below) .home h1 { font-size: var(--fs-h2); }
+  .is-home:has(> .below) .cbox textarea { min-height: 3rem; }
+  .is-home:has(> .below) .below { grid-area: list; overflow-y: auto; padding-top: clamp(1.25rem, 4vh, 2.25rem); }
+}
+.home { display: grid; gap: .5rem; padding: clamp(1.25rem, 4vh, 2.25rem) var(--gut) 1rem; }
 .home h1 { font-size: clamp(var(--fs-h2), 5cqi, var(--fs-h1)); }
-.lead { font-size: var(--fs-lead); color: var(--on-navy-2); }
 .notice { display: flex; gap: .55em; align-items: flex-start; margin-top: .5rem; padding: .75rem 1rem; border-radius: var(--r-m); background: var(--sheet); color: var(--danger); font-weight: 600; }
 .notice .i { margin-top: .15em; }
-.is-home > :deep(.known) { margin: .5rem var(--gut) 2.5rem; }
 
 .view { flex: 1; min-height: 0; overflow-y: auto; padding: 2rem var(--gut) 1.5rem; }
 .chat-h { font-size: var(--fs-h1); margin-bottom: 1.5rem; hyphens: auto; overflow-wrap: anywhere; }
@@ -704,7 +730,7 @@ async function confirmDelete() {
 .failed .state { color: var(--danger); }
 
 .composer { flex: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: .65rem; padding: .75rem var(--gut) 1rem; border-top: var(--hair); }
-.is-home .composer { padding: .5rem var(--gut) clamp(1.75rem, 6vh, 3rem); border: 0; }
+.is-home .composer { padding: .5rem var(--gut) clamp(1.5rem, 4vh, 2.25rem); border: 0; }
 .q-label { font-size: var(--fs-h3); font-weight: 600; }
 /* Composer: a rectangular speech bubble with a tail on the left; a 1px drop shadow draws its edge around the tail too. */
 .cbox { position: relative; margin-bottom: .75rem; padding: .4rem; border-radius: var(--r-s); background: var(--sheet); color: var(--ink); --focus: var(--action); filter: drop-shadow(0 0 1px var(--rule-2)); }
@@ -714,7 +740,7 @@ async function confirmDelete() {
 .navy-band .cbox:has(textarea:focus-visible) { outline-color: var(--on-navy); }
 .cbox:has([aria-invalid="true"]) { box-shadow: inset 0 0 0 2px var(--danger); }
 .cbox textarea { border: 0; background: transparent; resize: none; min-height: 3rem; max-height: 14rem; field-sizing: content; padding: .55rem .9rem; }
-.navy-band .cbox textarea { min-height: 6rem; font-size: var(--fs-lead); }
+.navy-band .cbox textarea { min-height: 4rem; font-size: var(--fs-lead); }
 /* Home composer: the same speech bubble, white on the navy pane. */
 .navy-band .cbox { margin-bottom: 1rem; padding: .6rem; border: 0; }
 .navy-band .cbox::after { bottom: -1rem; width: 1.6rem; height: 1.05rem; }

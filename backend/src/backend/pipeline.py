@@ -234,6 +234,37 @@ def chat_status(db: Session, chat_id: str) -> str | None:
     return "Frage offen" if pending_question(db, chat_id) else None
 
 
+def chat_next(db: Session, chat_id: str) -> dict | None:
+    """What the chat waits for, for the home page: the next step to do, the open question, waiting, or done.
+
+    Same order as chat_status, so the home page and the sidebar never disagree.
+    """
+    if plan := latest_plan(db, chat_id):
+        states = step_states(db, chat_id)
+        steps = shown(plan, states)
+        status = statuses(steps, {k: s.status for k, s in states.items()})
+        open_ = [s for s in steps if status[s["id"]] not in DONE]
+        if not open_:
+            return {"kind": "done"}
+        available = [s for s in open_ if status[s["id"]] == "available"]
+        todo = next((s for s in available if s["type"] != "wait"), None)
+        step = todo or (available or open_)[0]
+        reach = None
+        if step["type"] == "call" and step.get("contact"):
+            reach = contact_view(step["contact"], vienna_now()).get("reachable")
+        return {
+            "kind": "step" if todo else "waiting",
+            "text": step["title"],
+            "type": step["type"],
+            "institution": (step.get("institution") or {}).get("name"),
+            "reachable": reach,
+            "open_steps": len(open_),
+        }
+    if question := pending_question(db, chat_id):
+        return {"kind": "question", "text": question.text}
+    return None
+
+
 def render_plan(
     plan: Plan, states: dict[str, StepState], profile: ProfileData, kept: dict[str, dict], facts: dict, now: datetime
 ) -> dict:

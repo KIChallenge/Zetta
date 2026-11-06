@@ -7,6 +7,17 @@ export interface Chat {
   created_at: string
   updated_at: string
   status?: string | null // e.g. "3 offene Schritte", "Frage offen"
+  next?: NextUp | null
+}
+
+/** What a chat waits for: the open question, the next step to do, or that it waits or is done. */
+export interface NextUp {
+  kind: 'question' | 'step' | 'waiting' | 'done'
+  text?: string | null
+  type?: string | null
+  institution?: string | null
+  reachable?: { open: boolean; text: string } | null
+  open_steps?: number
 }
 
 export interface Chip {

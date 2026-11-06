@@ -75,8 +75,8 @@ def test_create_chat(client, anna):
 
     assert response.status_code == 201
     body = response.json()
-    assert set(body) == {"id", "title", "created_at", "updated_at", "status"}
-    assert body["status"] is None
+    assert set(body) == {"id", "title", "created_at", "updated_at", "status", "next"}
+    assert body["status"] is None and body["next"] is None
     assert body["title"] == "Hilfe für meine Mutter"
     assert TIMESTAMP.match(body["created_at"])
     assert body["updated_at"] == body["created_at"]
@@ -238,6 +238,23 @@ def test_first_message_streams_facts_and_one_question(client, anna, llm):
     assert llm.calls[0] == ("extract", {"text": QUESTION, "question": None})
     assert client.get(f"/chats/{chat['id']}/messages", headers=anna).json() == [message, question]
     assert client.get("/chats", headers=anna).json()[0]["status"] == "Frage offen"
+    assert client.get("/chats", headers=anna).json()[0]["next"] == {
+        "kind": "question", "text": question["text"], "type": None, "institution": None, "reachable": None, "open_steps": 0,
+    }  # fmt: skip
+
+
+def test_the_chat_list_names_the_next_step_of_a_plan(client, anna, llm):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+
+    up = client.get("/chats", headers=anna).json()[0]["next"]
+
+    plan = client.get(f"/chats/{chat['id']}/state", headers=anna).json()["plan"]
+    first = next(s for s in plan["steps"] if s["status"] == "available" and s["type"] != "wait")
+    assert (up["kind"], up["text"], up["type"], up["open_steps"]) == ("step", first["title"], first["type"], 11)
+    assert up["institution"] == (first.get("institution") or {}).get("name")
+    if first["type"] == "call":
+        assert up["reachable"] == first["contact"]["reachable"]
 
 
 def test_first_message_sets_a_generated_title(client, anna):

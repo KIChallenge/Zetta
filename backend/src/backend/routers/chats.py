@@ -25,6 +25,7 @@ from backend.schemas import (
     FormRequest,
     MessageRequest,
     MessageResponse,
+    NextUp,
     StepUpdate,
 )
 
@@ -58,7 +59,12 @@ UploadBudget = Annotated[None, Depends(count_upload)]
 
 
 def chat_response(db: Session, chat: Chat) -> ChatResponse:
-    return ChatResponse.model_validate(chat).model_copy(update={"status": pipeline.chat_status(db, chat.id)})
+    return ChatResponse.model_validate(chat).model_copy(
+        update={
+            "status": pipeline.chat_status(db, chat.id),
+            "next": NextUp(**up) if (up := pipeline.chat_next(db, chat.id)) else None,
+        }
+    )
 
 
 @router.get("")

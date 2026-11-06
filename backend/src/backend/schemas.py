@@ -64,6 +64,17 @@ class ChatRequest(BaseModel):
     title: ChatTitle
 
 
+class NextUp(BaseModel):
+    """What a chat waits for, for the home page."""
+
+    kind: Literal["question", "step", "waiting", "done"]
+    text: str | None = None  # the open question, or the step's title
+    type: str | None = None  # the step's type: call, email, form, ...
+    institution: str | None = None
+    reachable: dict | None = None  # a call's {"open", "text"}, e.g. "Jetzt erreichbar bis 15:30 Uhr"
+    open_steps: int = 0
+
+
 class ChatResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -72,6 +83,7 @@ class ChatResponse(BaseModel):
     created_at: Timestamp
     updated_at: Timestamp
     status: str | None = None  # computed: "3 offene Schritte", "Frage offen", ...
+    next: NextUp | None = None  # computed
 
 
 class MessageRequest(BaseModel):

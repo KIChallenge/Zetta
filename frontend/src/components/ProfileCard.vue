@@ -38,7 +38,7 @@ const ICONS: Record<string, string> = { [k('Name')]: 'i-user', [k('Adresse')]: '
 </template>
 
 <style scoped>
-.known { display: grid; grid-template-columns: minmax(0, 1fr); }
+.known { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; } /* stretched to a tall column, the rows stay together */
 .known-h { display: flex; gap: .5em; align-items: center; line-height: 1.25; }
 .kv { margin: 0; display: grid; }
 .kv dd { min-width: 0; margin: 0; font-weight: 600; overflow-wrap: anywhere; }
@@ -50,7 +50,7 @@ const ICONS: Record<string, string> = { [k('Name')]: 'i-user', [k('Adresse')]: '
    an empty field is a dashed blank line that links to the settings. */
 .start { gap: 1rem; color: var(--on-navy); }
 .start .known-h { font-size: 1rem; font-weight: 700; }
-.start .kv { grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); gap: 1rem 1.5rem; }
+.start .kv { grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr)); gap: 1rem 1.5rem; }
 .start .kv div { display: grid; align-content: space-between; gap: .2rem; padding-bottom: .4rem; border-bottom: 1px solid var(--rule-2); }
 .start .kv .empty { border-bottom-style: dashed; }
 .start .kv dt { display: flex; align-items: center; gap: .4em; font-size: var(--fs-small); color: var(--on-navy-2); }
