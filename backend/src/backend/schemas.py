@@ -212,6 +212,20 @@ class FormRequest(BaseModel):
     remember: bool = True
 
 
+class AnswersRequest(BaseModel):
+    """Answers typed into a form wizard: question id -> answer, "" to clear one. Checked by forms.clean."""
+
+    answers: dict[Annotated[str, Field(max_length=60)], Annotated[str, Field(max_length=1000)]] = Field(max_length=100)
+
+
+class FormHelpRequest(BaseModel):
+    """The optional LLM help in a form wizard: explain or draft one question, answer a question, check the answers."""
+
+    kind: Literal["explain", "suggest", "ask", "check"]
+    question: str = Field("", max_length=60)  # explain, suggest: the question's id
+    text: str = Field("", max_length=500)  # ask: what the user wants to know
+
+
 class PasswordChangeRequest(BaseModel):
     current_password: str = Field(max_length=128)
     new_password: Password

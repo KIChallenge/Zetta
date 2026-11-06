@@ -5,7 +5,7 @@ import FormFill from './FormFill.vue'
 import { hours, k, locale, t, translating } from '../i18n'
 
 const props = defineProps<{ step: Step; now: boolean; open: boolean; forServices: string[] }>()
-const emit = defineEmits<{ toggle: []; update: [body: StepUpdate]; upload: []; form: [body?: FormBody] }>()
+const emit = defineEmits<{ toggle: []; update: [body: StepUpdate]; upload: []; form: [body?: FormBody]; wizard: [] }>()
 
 const KIND = {
   call: ['phone', k('Anrufen')],
@@ -26,6 +26,10 @@ const stateLabel = computed(
 )
 const outcomeLabel = computed(() => t(s.value.outcomes.find((o) => o.id === s.value.outcome)?.label ?? 'Erledigt'))
 const docs = computed(() => s.value.documents ?? [])
+const meter = computed(() => {
+  const w = s.value.form?.wizard
+  return w && w.total ? Math.round((100 * w.done) / w.total) : 100
+})
 
 // Collapsed, a card shows one line (who, or the result) and the one thing to do now; the rest opens on demand.
 const line = computed(() => {
@@ -170,6 +174,7 @@ async function copy() {
             <a class="btn btn-primary" :href="mailto"><svg class="i" aria-hidden="true"><use href="#i-mail" /></svg>{{ t('E-Mail öffnen') }}</a>
             <button type="button" class="btn btn-quiet" :aria-expanded="open" :aria-controls="`b-${s.id}`" @click="emit('toggle')">{{ t('E-Mail ansehen') }}</button>
           </template>
+          <button v-else-if="s.type === 'form' && s.form?.wizard" type="button" class="btn btn-primary" @click="emit('wizard')"><svg class="i" aria-hidden="true"><use href="#i-pencil" /></svg>{{ t('Formular ausfüllen') }}</button>
           <button v-else-if="s.type === 'form' && s.form?.prefill" type="button" class="btn btn-primary" @click="emit('form')"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ s.form.title }} (PDF, {{ t('vorausgefüllt') }})</button>
           <a v-else-if="s.type === 'form' && s.form" class="btn btn-primary" :href="s.form.url" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ s.form.title }} (PDF)</a>
           <a v-else-if="s.type === 'book' && s.contact" class="btn btn-primary" :href="s.contact.href" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-ext" /></svg>{{ t(s.contact.label ?? 'Öffnen') }}</a>
@@ -271,8 +276,15 @@ async function copy() {
           <!-- Form -->
           <template v-else-if="s.type === 'form' && s.form">
             <p v-if="s.text">{{ t(s.text) }}</p>
-            <FormFill v-if="s.form.prefill" :prefill="s.form.prefill" :title="s.form.title" @submit="(body) => emit('form', body)" />
-            <p v-if="s.form.prefill" class="hint">
+            <div v-if="s.form.wizard" class="wz-meter">
+              <p><b>{{ t('{done} von {total} Pflichtangaben', { done: s.form.wizard.done, total: s.form.wizard.total }) }}</b> · {{ s.form.title }}</p>
+              <div class="bar" role="progressbar" :aria-valuenow="meter" aria-valuemin="0" aria-valuemax="100" :aria-label="t('Schon ausgefüllt')"><span :style="{ width: `${meter}%` }" /></div>
+              <p class="hint">{{ t('Vorausgefüllt aus Ihrem Profil, den gemerkten Angaben und dem Gespräch. Den Rest fragt der Lotse Schritt für Schritt.') }}</p>
+              <!-- Above, the card shows this button once the step is due; it can be filled in before. -->
+              <div v-if="!act" class="actions"><button type="button" class="btn btn-primary" @click="emit('wizard')"><svg class="i" aria-hidden="true"><use href="#i-pencil" /></svg>{{ t('Formular ausfüllen') }}</button></div>
+            </div>
+            <FormFill v-else-if="s.form.prefill" :prefill="s.form.prefill" :title="s.form.title" @submit="(body) => emit('form', body)" />
+            <p v-if="s.form.wizard || s.form.prefill" class="hint">
               {{ t('Bitte prüfen, den Rest ergänzen und unterschreiben.') }} <a :href="s.form.url" target="_blank" rel="noopener noreferrer">{{ t('Leeres Formular') }}</a>
             </p>
             <div v-if="s.form.online_url" class="actions">
@@ -365,6 +377,9 @@ async function copy() {
 .kv dt { flex: 0 1 13rem; min-width: 0; color: var(--ink-3); }
 .kv dd { min-width: 0; margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .outcome { display: grid; gap: .9rem; justify-items: start; padding-top: 1.1rem; border-top: var(--hair); }
+.wz-meter { display: grid; gap: .4rem; padding: 1rem 1.1rem; border-radius: var(--r-m); background: var(--sunk); }
+.wz-meter .bar { height: .55rem; border-radius: var(--r-pill); background: var(--accent-bg); box-shadow: inset 0 0 0 1px var(--accent); overflow: hidden; }
+.wz-meter .bar span { display: block; height: 100%; background: var(--accent); }
 .outcome-form { width: 100%; display: grid; gap: 1rem; padding: 1rem 1.1rem; border-radius: var(--r-m); background: var(--sunk); }
 .outcome-form fieldset { margin: 0; padding: 0; border: 0; display: grid; gap: .5rem; }
 .seg { display: flex; flex-wrap: wrap; gap: .5rem; }

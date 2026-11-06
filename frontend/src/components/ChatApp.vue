@@ -14,6 +14,7 @@ import { getProfile, saveProfile, type Profile } from '../profile'
 import DocumentConfirm from './DocumentConfirm.vue'
 import FactChips from './FactChips.vue'
 import NoticeCard from './NoticeCard.vue'
+import FormWizard from './FormWizard.vue'
 import PlanView from './PlanView.vue'
 import NextUpList from './NextUpList.vue'
 import ProfileCard from './ProfileCard.vue'
@@ -354,6 +355,25 @@ async function getForm(step: string, body?: FormBody) {
   }
 }
 
+// The form wizard of a form step. After it, the card shows the new count and the settings any kept details.
+const wizard = ref<{ chat: string | number; step: string; title: string } | null>(null)
+function openWizard(step: string) {
+  const form = plan.value?.steps.find((s) => s.id === step)?.form
+  if (activeId.value && form) wizard.value = { chat: activeId.value, step, title: form.title }
+}
+async function wizardClosed(changed: { saved: boolean; remembered: boolean }) {
+  const id = wizard.value?.chat
+  wizard.value = null
+  if (!id || !(changed.saved || changed.remembered)) return
+  try {
+    const next = (await getState(id)).plan
+    if (activeId.value === id) plan.value = next
+    if (changed.remembered) profile.value = await getProfile()
+  } catch (e) {
+    planErr.value = fail(e)
+  }
+}
+
 async function patchStep(step: string, body: StepUpdate) {
   const id = activeId.value
   if (!id) return
@@ -500,7 +520,7 @@ async function confirmDelete() {
             />
             <div v-else-if="m.kind === 'plan'" class="plan-msg">
               <div class="bubble"><p>{{ t(m.text) }}</p></div>
-              <PlanView v-if="isCurrent(m)" :plan="plan!" :error="planErr" @update="patchStep" @upload="fileInput?.click()" @form="getForm" />
+              <PlanView v-if="isCurrent(m)" :plan="plan!" :error="planErr" @update="patchStep" @upload="fileInput?.click()" @form="getForm" @wizard="openWizard" />
               <p v-else class="muted">{{ t('Dieser Plan wurde später angepasst. Der aktuelle Plan steht weiter unten.') }}</p>
             </div>
             <div v-else class="bubble" :class="m.state">
@@ -611,6 +631,8 @@ async function confirmDelete() {
         </button>
       </div>
     </dialog>
+
+    <FormWizard v-if="wizard" :chat="wizard.chat" :step="wizard.step" :title="wizard.title" @close="wizardClosed" />
   </div>
 </template>
 

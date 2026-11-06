@@ -88,6 +88,7 @@ class Chat(Base):
     facts: Mapped[list["ChatFact"]] = relationship(cascade="all, delete-orphan")
     plans: Mapped[list["Plan"]] = relationship(cascade="all, delete-orphan")
     step_states: Mapped[list["StepState"]] = relationship(cascade="all, delete-orphan")
+    form_answers: Mapped[list["FormAnswer"]] = relationship(cascade="all, delete-orphan")
 
 
 class Message(Base):
@@ -137,4 +138,15 @@ class StepState(Base):
     note: Mapped[str | None] = mapped_column(Text, default=None)
     checks: Mapped[list] = mapped_column(JSON, default=list)  # ticked checklist items
     script: Mapped[dict | None] = mapped_column(JSON, default=None)  # with placeholders, filled on render
+    updated_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class FormAnswer(Base):
+    """What was typed into a form wizard, so it can be resumed. Never the parts filled in by hand on paper."""
+
+    __tablename__ = "form_answers"
+
+    chat_id: Mapped[str] = mapped_column(ForeignKey("chats.id"), primary_key=True)
+    form_id: Mapped[str] = mapped_column(String(60), primary_key=True)
+    answers: Mapped[dict] = mapped_column(JSON)  # question id -> answer
     updated_at: Mapped[datetime] = mapped_column(DateTime)

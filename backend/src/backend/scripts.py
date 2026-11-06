@@ -50,7 +50,10 @@ MEDICAL = re.compile(
     r"infektion|fieber|therapie",
     re.I,
 )
-LIMITS = {"opening": 300, "point": 300, "closing": 300, "subject": 150, "body": 2000, "intro": 120, "title": 100}
+LIMITS = {
+    "opening": 300, "point": 300, "closing": 300, "subject": 150, "body": 2000, "intro": 120, "title": 100,
+    "explain": 600, "draft": 400, "answer": 700, "hint": 300,
+}  # fmt: skip
 
 
 def slot_values(profile: ProfileData, facts: dict) -> dict[str, str | None]:

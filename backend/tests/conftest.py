@@ -33,6 +33,8 @@ class FakeLlm:
         self.hang = False
         self.calls = []  # (method, input) in call order
         self.letter_items = []  # what recommendations() finds in an uploaded letter
+        self.form_text = "Gemeint ist, ob jemand bei der Pflege hilft."  # form_help: explain, suggest, ask
+        self.hints = []  # form_help: check
 
     async def _call(self, method, value):
         self.calls.append((method, value))
@@ -56,6 +58,12 @@ class FakeLlm:
     async def recommendations(self, letter):
         await self._call("recommendations", letter)
         return self.letter_items
+
+    async def form_help(self, task, data, language):
+        await self._call("form_help", {"task": task, **data, "language": language})
+        if task == "check":
+            return self.hints
+        return self.form_text
 
     async def title(self, text):
         if self.title_text is None:

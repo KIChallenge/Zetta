@@ -16,7 +16,7 @@ from backend.facts import FACTS, SENTINELS, VIENNA_POSTAL_CODE, merge, subject_w
 from backend.hours import now as vienna_now
 from backend.hours import reachable, summary
 from backend.llm import Llm, redact
-from backend.models import Chat, ChatFact, Message, Person, Plan, Profile, StepState, utcnow
+from backend.models import Chat, ChatFact, FormAnswer, Message, Person, Plan, Profile, StepState, utcnow
 from backend.schemas import Contact, FormDetails, FormRequest, MessageResponse, PersonData, ProfileData
 
 logger = logging.getLogger(__name__)
@@ -265,8 +265,19 @@ def chat_next(db: Session, chat_id: str) -> dict | None:
     return None
 
 
+def form_answers_of(db: Session, chat_id: str) -> dict[str, dict]:
+    """Form id -> the answers typed into its wizard in this chat."""
+    return {a.form_id: a.answers for a in db.scalars(select(FormAnswer).where(FormAnswer.chat_id == chat_id))}
+
+
 def render_plan(
-    plan: Plan, states: dict[str, StepState], profile: ProfileData, kept: dict[str, dict], facts: dict, now: datetime
+    plan: Plan,
+    states: dict[str, StepState],
+    profile: ProfileData,
+    kept: dict[str, dict],
+    facts: dict,
+    now: datetime,
+    answers: dict[str, dict],
 ) -> dict:
     steps = shown(plan, states)
     status = statuses(steps, {k: s.status for k, s in states.items()})
@@ -285,7 +296,12 @@ def render_plan(
         view["outcomes"] = [{"id": k, "label": label} for k, (label, _) in labels.items()]
         if len(labels) == 1 and step.get("done_label"):
             view["outcomes"][0]["label"] = step["done_label"]
-        if (form := get_corpus().forms.get(step.get("form", {}).get("id"))) and form.file and form.fields:
+        form = get_corpus().forms.get(step.get("form", {}).get("id"))
+        if form and form.file and form.sections:
+            # The whole form, in a wizard (GET /chats/{id}/steps/{step_id}/form/wizard): the card shows how far it is.
+            found = forms.rows(form, profile, kept, facts, answers.get(form.id, {}))
+            view["form"] = {**step["form"], "wizard": forms.progress(found)}
+        elif form and form.file and form.fields:
             # The PDF itself is filled in on download (GET /chats/{id}/steps/{step_id}/form).
             user, subject = forms.people(profile, kept, facts)
             view["form"] = {**step["form"], "prefill": forms.summary(form, user, subject, facts)}
@@ -315,7 +331,13 @@ def current_plan(db: Session, chat: Chat) -> dict | None:
         return None
     facts = {k: r.value for k, r in fact_rows(db, chat.id).items()}
     return render_plan(
-        plan, step_states(db, chat.id), profile_of(db, chat.user_id), kept_of(db, chat.user_id), facts, vienna_now()
+        plan,
+        step_states(db, chat.id),
+        profile_of(db, chat.user_id),
+        kept_of(db, chat.user_id),
+        facts,
+        vienna_now(),
+        form_answers_of(db, chat.id),
     )
 
 
@@ -482,7 +504,9 @@ async def respond(
         for step in todo:
             states[step["id"]].script = {**written[step["id"]], "hash": scripts.inputs_hash(step, detail)}
         db.commit()
-        yield ServerSentEvent(event="plan", data=render_plan(plan, states, profile, kept_of(db, chat.user_id), facts, vienna_now()))
+        yield ServerSentEvent(event="plan", data=render_plan(
+            plan, states, profile, kept_of(db, chat.user_id), facts, vienna_now(), form_answers_of(db, chat.id)
+        ))
 
     if reply not in db:
         db.add(reply)

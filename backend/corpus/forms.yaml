@@ -1,43 +1,308 @@
-# Application forms. `file` is the blank PDF in corpus/forms. `fields` say which PDF field gets which of the user's
-# details (src/backend/forms.py): {user.*} are the user's, {subject.*} the ones of the person the chat is about, from
-# the profile and the details kept from form cards. `map` gives a checkbox or radio button its state for a choice.
-# Never medical details, signatures, application dates, consents or choices the user has to make.
+# Application forms. `file` is the blank PDF in corpus/forms (src/backend/forms.py).
+#
+# `fields` (the form card): which PDF field gets which of the person's details. {user.*} are the user's, {subject.*}
+# the ones of the person the chat is about, from the profile and the details kept from form cards. `map` gives a
+# checkbox or radio button its state for a choice. Never medical details, signatures, application dates, consents or
+# choices the user has to make.
+#
+# `sections` (the wizard): the whole form, one section per screen. A section whose questions are all `manual` gets no
+# screen. Question:
+#   id        unique in the form and never a fact key: both share one namespace in `when` and `checks`
+#   label     the form's own German wording
+#   kind      text (default) | multiline | date | number | choice | yes_no | checkbox
+#   pdf       the PDF field, or a list: a long answer is split over the lines of the paper form
+#   options   choice: answer -> label. yes_no answers "yes" or "no", a checkbox "yes"
+#   map       answer -> state of a checkbox or radio button; without it a choice writes its label
+#   value     the prefill: "{subject.last_name}" (profile or kept details), {fact: ..., map: ...} (a chat fact mapped
+#             to an answer) or a constant
+#   when      shown and filled in only when true, over chat facts and earlier answers; a list means any of them. An
+#             unanswered question counts as "empty"
+#   required  listed in the review until answered
+#   help      short, from the form's own instructions; `source_url` when it comes from elsewhere
+#   suggest   the LLM may draft it ("Vorschlag")
+#   manual    always on paper: listed in the review, never prefilled, stored or sent to the LLM. Everything medical,
+#             consents, the date and the signature
+# `checks`: hints for the review, over chat facts and answers, before any LLM hint.
+# Field names and radio states are read from the PDF with pypdf (tests/test_forms.py checks them). Quote "yes" and
+# "no": YAML reads them as booleans otherwise.
 
 - id: care_allowance_form
   title: Antrag auf Pflegegeld (PAL 080)
   url: https://www.pv.at/cdscontent/load?contentid=10008.781956&version=1783516198
   online_url: https://www.sozialversicherung.gv.at/formgen/?contentid=10007.892452&portal=pvportal&LO=1&layout=withNav&svtcode=02
   file: PAL080_0125_Mpfl_052026.pdf
-  fields:
-    - {field: VSNR_1, value: "{subject.svnr}"}
-    - {field: Fam.Name, value: "{subject.last_name}"}
-    - {field: Vorname, value: "{subject.first_name}"}
-    - {field: Titel, value: "{subject.title}"}
-    - {field: Geburtsdatum, value: "{subject.birth_date}"}
-    - {field: Geschlecht, value: "{subject.sex}"}
-    - {field: Stabü, value: "{subject.citizenship}", map: {austria: /01, other: /02}}
-    - field: Personenstand
-      value: "{subject.marital_status}"
-      map: {single: /01, married: /02, widowed: /03, divorced: /04, partnership: /05, former_partnership: /08}
-    - {field: Adresse Straße, value: "{subject.street}"}
-    - {field: "Hausnummer, Stiege, Tür", value: "{subject.house}"}
-    - {field: PLZ, value: "{subject.postal_code}"}
-    - {field: Ort, value: "{subject.city}"}
-    - {field: Telefon, value: "{subject.phone}"}
-    - {field: Email, value: "{subject.email}"}
-    # Section 2: the person filling in the form for someone else. Whether they are a representative stays open.
-    - {field: Familienname andere, value: "{user.last_name}", when: {subject: {not: [self]}}}
-    - {field: Vorname andere Person, value: "{user.first_name}", when: {subject: {not: [self]}}}
-    - {field: Titel2, value: "{user.title}", when: {subject: {not: [self]}}}
-    - {field: Adresse Straße 1, value: "{user.street}", when: {subject: {not: [self]}}}
-    - {field: "Hausnummer, Stiege, Tür2", value: "{user.house}", when: {subject: {not: [self]}}}
-    - {field: PLZ 1, value: "{user.postal_code}", when: {subject: {not: [self]}}}
-    - {field: Ort 1, value: "{user.city}", when: {subject: {not: [self]}}}
-    - {field: Telefon 1, value: "{user.phone}", when: {subject: {not: [self]}}}
-    - {field: Email2, value: "{user.email}", when: {subject: {not: [self]}}}
   submit_to: pva_vienna
   source_url: https://www.pv.at/web/pflegegeld
   verified_at: 2026-11-05
+  sections:
+    - id: person
+      title: Person
+      heading: Persönliche Angaben
+      page: 1
+      point: 1
+      questions:
+        - id: application_type
+          label: Antrag auf Pflegegeld
+          kind: choice
+          options: {new: Zuerkennung, increase: Erhöhung, extension: Weitergewährung nach Befristung}
+          pdf: Antrag Pflg
+          map: {new: /01, increase: /02, extension: /03}
+          required: true
+          help: >-
+            Zuerkennung beim ersten Antrag. Erhöhung, wenn schon Pflegegeld bezogen wird und mehr Pflege nötig ist.
+            Weitergewährung, wenn das Pflegegeld befristet war.
+          source_url: https://www.pv.at/web/pflegegeld
+        - {id: svnr, label: Versicherungsnummer, pdf: VSNR_1, value: "{subject.svnr}", required: true}
+        - {id: last_name, label: Familienname, pdf: Fam.Name, value: "{subject.last_name}", required: true}
+        - {id: first_name, label: Vorname, pdf: Vorname, value: "{subject.first_name}", required: true}
+        - {id: title, label: Titel, pdf: Titel, value: "{subject.title}"}
+        - {id: former_names, label: Frühere Namen, pdf: frühere Namen}
+        - {id: birth_date, label: Geburtsdatum, kind: date, pdf: Geburtsdatum, value: "{subject.birth_date}", required: true}
+        - {id: sex, label: Geschlecht, kind: choice, pdf: Geschlecht, value: "{subject.sex}", required: true}
+        - {id: citizenship, label: Staatsbürgerschaft, kind: choice, pdf: Stabü, map: {austria: /01, other: /02}, value: "{subject.citizenship}", required: true}
+        - id: other_citizenship
+          label: andere Staatsbürgerschaft
+          pdf: andere Staatsbürgerschaft
+          when: {citizenship: [other]}
+          required: true
+          help: Bitte geben Sie den Staat an und legen Sie einen Nachweis über die Aufenthaltsberechtigung bei.
+        - id: marital_status
+          label: Personenstand
+          kind: choice
+          pdf: Personenstand
+          value: "{subject.marital_status}"
+          map: {single: /01, married: /02, widowed: /03, divorced: /04, partnership: /05, former_partnership: /08}
+        - {id: marital_status_since, label: Personenstand seit, kind: date, pdf: Personenstand seit}
+        - {id: street, label: Straße / Gasse / Platz, pdf: Adresse Straße, value: "{subject.street}", required: true}
+        - {id: house, label: Hausnr. / Stiege / Tür, pdf: "Hausnummer, Stiege, Tür", value: "{subject.house}", required: true}
+        - {id: postal_code, label: Postleitzahl, pdf: PLZ, value: "{subject.postal_code}", required: true}
+        - {id: city, label: Ort, pdf: Ort, value: "{subject.city}", required: true}
+        - {id: country, label: Land, pdf: Land}
+        - id: temporary_address
+          label: Vorübergehender Aufenthaltsort
+          pdf: voruebergehend
+          help: z.B. Heim, Krankenhaus, bei Familienangehörigen. Bitte geben Sie die genaue Adresse bekannt.
+        - {id: phone, label: Telefonnummer, pdf: Telefon, value: "{subject.phone}", help: Mit Vorwahl.}
+        - {id: email, label: E-Mail, pdf: Email, value: "{subject.email}"}
+
+    - id: representation
+      title: Vertretung
+      heading: Antragstellung durch andere Person
+      page: 1
+      point: 2
+      when: {subject: {not: [self]}}
+      questions:
+        - id: role
+          label: Ich bin
+          kind: choice
+          options: {legal: mit der gesetzlichen Vertretung betraut, authorised: bevollmächtigt}
+          pdf: Andere Person
+          map: {legal: /01, authorised: /02}
+          help: >-
+            Gesetzliche Vertretung: Obsorge, Vorsorgebevollmächtigung, gewählte, gesetzliche oder gerichtliche
+            Erwachsenenvertretung, Kuratorium. Familienmitglieder dürfen den Antrag auch ohne Vertretung stellen.
+          source_url: https://www.pv.at/web/pflegegeld
+        - id: proof
+          label: Nachweis
+          kind: choice
+          options: {attached: liegt bei, later: wird nachgereicht}
+          pdf: Nachweis
+          map: {attached: /01, later: /02}
+          when: {role: [legal, authorised]}
+          required: true
+        - {id: rep_last_name, label: Familienname, pdf: Familienname andere, value: "{user.last_name}", required: true}
+        - {id: rep_first_name, label: Vorname, pdf: Vorname andere Person, value: "{user.first_name}", required: true}
+        - {id: rep_title, label: Titel, pdf: Titel2, value: "{user.title}"}
+        - {id: rep_street, label: Straße / Gasse / Platz, pdf: Adresse Straße 1, value: "{user.street}"}
+        - {id: rep_house, label: Hausnr. / Stiege / Tür, pdf: "Hausnummer, Stiege, Tür2", value: "{user.house}"}
+        - {id: rep_postal_code, label: Postleitzahl, pdf: PLZ 1, value: "{user.postal_code}"}
+        - {id: rep_city, label: Ort, pdf: Ort 1, value: "{user.city}"}
+        - {id: rep_country, label: Land, pdf: Land2}
+        - {id: rep_phone, label: Telefonnummer, pdf: Telefon 1, value: "{user.phone}"}
+        - {id: rep_email, label: E-Mail, pdf: Email2, value: "{user.email}"}
+
+    - id: care
+      title: Betreuung
+      heading: Betreuung und Hilfe
+      page: 2
+      point: 4
+      questions:
+        - id: notify_visit
+          label: >-
+            Sollen weitere Personen vom Termin eines Hausbesuches zur Feststellung des Pflegebedarfs informiert
+            werden?
+          kind: yes_no
+          pdf: Hausbesuch
+          map: {"no": /01, "yes": /02}
+          point: 3
+        - id: notify_person
+          label: Familienname(n) und Vorname(n), Adresse, Telefonnummer, E-Mail
+          kind: multiline
+          pdf: [Name weitere Person, Adresse weitere Person]
+          when: {notify_visit: ["yes"]}
+        - id: care_by_others
+          label: Erfolgt die notwendige Betreuung und Hilfe von einer anderen Person / Stelle?
+          kind: yes_no
+          pdf: Betreuung durch andere Person
+          map: {"no": /01, "yes": /02}
+          required: true
+        - {id: carers, label: Pflegeperson(en), kind: checkbox, pdf: Person Stelle Pflegeperson, map: {"yes": /ja}, when: {care_by_others: ["yes"]}}
+        - id: carer_names
+          label: Name(n) und Adresse(n)
+          kind: multiline
+          pdf: [Name und Adresse Pflegeperson, Name und Adresse Pflegeperson2, Name und Adresse Pflegeperson3]
+          when: {carers: ["yes"]}
+        - {id: hospice_leave, label: Familienhospizkarenz, kind: yes_no, pdf: Familienhospiz, map: {"no": /01, "yes": /02}, when: {care_by_others: ["yes"]}}
+        - {id: hospice_from, label: von, kind: date, pdf: Familienhospiz seit, when: {hospice_leave: ["yes"]}}
+        - {id: hospice_to, label: bis, kind: date, pdf: Familienhospiz bis, when: {hospice_leave: ["yes"]}}
+        - {id: care_leave, label: Pflegekarenz oder Pflegeteilzeit, kind: yes_no, pdf: Pflegekarenz/-teilzeit, map: {"no": /01, "yes": /02}, when: {care_by_others: ["yes"]}}
+        - {id: care_leave_from, label: von, kind: date, pdf: Pflegekarenz seit, when: {care_leave: ["yes"]}}
+        - {id: care_leave_to, label: bis, kind: date, pdf: Pflegekarenz bis, when: {care_leave: ["yes"]}}
+        - {id: live_in_care, label: "Besteht eine 24-Stunden-Betreuung?", kind: yes_no, pdf: 24 Stunden Betreuuung, map: {"no": /01, "yes": /02}, when: {care_by_others: ["yes"]}}
+        - id: mobile_services
+          label: mobile Dienste
+          kind: checkbox
+          pdf: mobile Dienste
+          map: {"yes": /ja}
+          when: {care_by_others: ["yes"]}
+          help: z.B. mobile Hilfe und Betreuung, Hauskrankenpflege, Essen auf Rädern
+        - {id: mobile_services_text, label: "Dienste, Kostenträger", kind: multiline, pdf: Name mobiler Dienst, when: {mobile_services: ["yes"]}}
+        - id: day_care
+          label: ambulante / teilstationäre Dienste
+          kind: checkbox
+          pdf: Person Stelle ambulant teilstationär
+          map: {"yes": /ja}
+          when: {care_by_others: ["yes"]}
+          help: z.B. Behinderteneinrichtung, Tagesheimstätte, Tagespflege, Kindergarten, Hort
+        - {id: day_care_text, label: "Einrichtung sowie Adresse, Kostenträger", kind: multiline, pdf: "ambulante teilstationäre Einrichtung, Kostenträger", when: {day_care: ["yes"]}}
+        - id: residence
+          label: Wohnen
+          kind: choice
+          options: {residential: dauernde Unterbringung in stationärer Einrichtung, assisted: betreutes Wohnen}
+          pdf: Wohnsituation
+          map: {residential: /01, assisted: /02}
+          when: {care_by_others: ["yes"]}
+          help: z.B. Altenheim, Pflegeheim, Erziehungsheim, Krankenanstalt
+        - {id: residence_text, label: "Einrichtung sowie Adresse, Kostenträger", kind: multiline, pdf: "dauernde Einrichtung, Kostenträger", when: {residence: [residential, assisted]}}
+
+    - id: benefits
+      title: Leistungen
+      heading: Andere Leistungen und Pension
+      page: 3
+      point: 7
+      questions:
+        - id: similar_benefit
+          label: Haben Sie Anspruch auf eine dem Pflegegeld ähnliche inländische oder ausländische Leistung?
+          kind: yes_no
+          pdf: andere Leistung
+          map: {"no": /01, "yes": /02}
+          required: true
+          help: z.B. Pflegezulage, Blindenzulage, Pflegesachleistungen
+        - id: similar_benefit_applied
+          label: Wenn nein, haben Sie eine solche Leistung beantragt?
+          kind: yes_no
+          pdf: andere Leistung beantragt
+          map: {"no": /01, "yes": /02}
+          when: {similar_benefit: ["no"]}
+          required: true
+        - {id: similar_benefit_kind, label: Art der Leistung, pdf: "Art der Leistung?", when: [{similar_benefit: ["yes"]}, {similar_benefit_applied: ["yes"]}]}
+        - {id: similar_benefit_since, label: seit, kind: date, pdf: Art der Leistung seit, when: [{similar_benefit: ["yes"]}, {similar_benefit_applied: ["yes"]}]}
+        - {id: similar_benefit_payer, label: Auszahlende Stelle und Aktenzeichen, pdf: auszahlende Stelle, when: [{similar_benefit: ["yes"]}, {similar_benefit_applied: ["yes"]}]}
+        - id: eu_care_benefit
+          label: Bekommen Sie aus einem EU / EWR Staat oder der Schweiz eine Pflegesachleistung?
+          kind: yes_no
+          pdf: Pflegesachleistung
+          map: {"no": /01, "yes": /02}
+          help: z.B. Hilfe bei der Haushaltsführung, Hilfe bei der Körperpflege
+        - {id: eu_care_benefit_text, label: "Art der Leistung, auszahlende Stelle, Aktenzeichen", pdf: Pflegesachleistung aus EU, when: {eu_care_benefit: ["yes"]}}
+        - id: pension
+          label: Haben Sie Anspruch auf inländische oder ausländische Pensionsleistungen?
+          kind: yes_no
+          pdf: ausländische Pension
+          map: {"no": /01, "yes": /02}
+          value: {fact: pension_payer, map: {pv: "yes", bvaeb: "yes", svs: "yes", none: "no"}}
+          required: true
+          point: 8
+          help: z.B. Pension, Rente, Ruhe- oder Versorgungsgenuss, ähnliche Leistung
+        - {id: pension_applied, label: "Wenn nein, haben Sie eine solche Leistung beantragt?", kind: yes_no, pdf: ausländische Pension benatragt, map: {"no": /01, "yes": /02}, when: {pension: ["no"]}, required: true}
+        - {id: pension_kind, label: Art der Leistung, pdf: Art der ausl. Leistung, when: [{pension: ["yes"]}, {pension_applied: ["yes"]}]}
+        - {id: pension_since, label: seit, kind: date, pdf: Art der Leistung seit2, when: [{pension: ["yes"]}, {pension_applied: ["yes"]}]}
+        - id: pension_office
+          label: Auszahlende Stelle und Aktenzeichen
+          pdf: ausl. Leistung Stelle
+          value: {fact: pension_payer, map: {pv: Pensionsversicherungsanstalt, bvaeb: BVAEB, svs: SVS}}
+          when: [{pension: ["yes"]}, {pension_applied: ["yes"]}]
+        - id: payout
+          label: Kein Leistungsbezug
+          kind: choice
+          options: {account: Anweisung auf ein Konto wird gewünscht., cash: Barzahlung wird ausdrücklich beantragt.}
+          pdf: Anweisung
+          map: {account: /01, cash: /02}
+          when: {pension: ["no"]}
+          page: 4
+          point: 10
+          help: >-
+            Für ein Konto lassen Sie bei Ihrer Bank den „Antrag auf bargeldlose Pensionszahlung“ ausstellen und
+            senden ihn an die Pensionsversicherung.
+
+    - id: attachments
+      title: Beilagen
+      page: 4
+      point: 11
+      questions:
+        - id: attachments
+          label: Folgende Unterlagen liegen bei
+          kind: multiline
+          pdf: [Unterlagen, Unterlagen2]
+          suggest: true
+          help: Bitte legen Sie vorhandene Befunde von Ihrem Arzt / Ihrer Ärztin oder Krankenhaus in Kopie bei.
+
+    - id: paper
+      title: Selbst ausfüllen
+      questions:
+        - {id: conditions, label: Krankheiten bzw. gesundheitliche Beeinträchtigungen, pdf: [Leiden, Leiden2], manual: true, page: 2, point: 3}
+        - id: care_reasons
+          label: Gründe Ihrer Pflegebedürftigkeit
+          pdf: [körperl. Einschränkung, Rollstuhlfahrer, Sehbehinderung, geistige Beeinträchtigung, Demenz, psychische Erkrankung]
+          manual: true
+          page: 2
+          point: 3
+        - {id: medication, label: "Nehmen Sie regelmäßig Medikamente?", pdf: [regelm. Medikamente, Medikamente, Medikamente2], manual: true, page: 2, point: 3}
+        - id: hospital_stays
+          label: Waren Sie innerhalb der letzten Monate vor der Antragstellung in einer Krankenanstalt?
+          pdf: [Krankenhaus, KH von, KH bis, Spital, KH von 2, KH bis 2, Spital2]
+          manual: true
+          page: 3
+          point: 5
+        - id: accident
+          label: Sind Sie durch einen Unfall pflegebedürftig geworden?
+          pdf: [Unfall, Datum Unfall, Unfallhergang, Unfallhergang2, Unfallschuld, Arbeitsunfall, Unfallanzeige, "Anzeige wo?"]
+          manual: true
+          page: 3
+          point: 6
+        - id: care_advice
+          label: Wünschen Sie eine kostenlose Pflegeberatung zu Hause durch eine diplomierte Pflegefachkraft?
+          pdf: [Pflegeberatung, Antragstellung andere Person]
+          manual: true
+          page: 4
+          point: 9
+        - {id: date, label: Datum, pdf: Datum_1, manual: true, page: 4, point: 11}
+        - {id: signature, label: Unterschrift, manual: true, page: 4, point: 11}
+
+  # Shown in the review when true, over chat facts and answers. Deterministic, before any LLM hint.
+  checks:
+    - when: {pension_payer: [pv, bvaeb, svs], pension: ["no"]}
+      text: Im Gespräch haben Sie eine Pension genannt, bei Punkt 8 steht aber „nein“.
+    - when: {care_by_others: ["yes"], carers: [empty], mobile_services: [empty], day_care: [empty], residence: [empty]}
+      text: Bei Punkt 4 steht „ja“. Kreuzen Sie bitte auch an, wer hilft.
+    - when: {citizenship: [other]}
+      text: Legen Sie einen Nachweis über die Aufenthaltsberechtigung bei.
+    - when: {proof: [attached]}
+      text: Legen Sie den Nachweis über die Vertretung bei.
+    - when: {application_type: [increase]}
+      text: >-
+        Neuerlicher Antrag innerhalb eines Jahres nach der letzten Entscheidung: Aktuelle medizinische Unterlagen
+        (z.B. ärztliches Attest, Krankenhausbefunde) sind vorzulegen.
 
 - id: fsw_application_form
   title: Antrag auf Förderung von Leistungen (FSW)
