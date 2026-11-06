@@ -287,7 +287,7 @@ class Corpus(Model):
     forms: dict[str, Form]
     services: list[Service]
     questions: list[Question]
-    cards: dict[Literal["boundary", "out_of_scope", "general"], Card]
+    cards: dict[Literal["boundary", "acute", "out_of_scope", "general"], Card]
     directory: DoctorDirectory
 
     def question(self, fact_key: str) -> Question:

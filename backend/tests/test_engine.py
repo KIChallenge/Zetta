@@ -247,8 +247,16 @@ def test_seasonal_offers_are_dropped_outside_their_season():
     assert summer["steps"][0]["contact"]["value"] == "https://www.bewegt-im-park.at/"
 
 
-def test_an_acute_appointment_gets_the_boundary_card():
-    assert evaluate({"goal": ["doctor_appointment"], "appointment_reason": "acute"}, corpus).kind == "boundary"
+@pytest.mark.parametrize("medical", [False, True])
+def test_an_acute_appointment_gets_the_acute_card(medical):
+    facts = {"goal": ["doctor_appointment"], "appointment_reason": "acute"}
+    assert evaluate(facts, corpus, medical=medical).kind == "acute"
+
+
+def test_the_acute_card_points_to_the_hotline_and_the_ambulance_not_the_own_doctor():
+    card = corpus.cards["acute"]
+    assert card.contacts == ["health_hotline_1450", "emergency_144"]
+    assert "Haus" not in card.text
 
 
 def test_broad_goals_ask_their_questions_first():

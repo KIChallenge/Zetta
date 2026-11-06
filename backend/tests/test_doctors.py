@@ -126,4 +126,4 @@ def test_the_llm_never_gets_doctor_data():
 
 
 def test_acute_complaints_never_get_a_list():
-    assert evaluate({**FACTS_FOR_PLAN, "appointment_reason": "acute", "specialty": "ent"}, corpus).kind == "boundary"
+    assert evaluate({**FACTS_FOR_PLAN, "appointment_reason": "acute", "specialty": "ent"}, corpus).kind == "acute"

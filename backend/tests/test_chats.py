@@ -609,17 +609,17 @@ def test_an_off_topic_first_message_gets_the_first_question_with_a_hint(client, 
     assert (first["payload"]["fact_key"], first["payload"]["note"]) == ("goal", pipeline.OFF_TOPIC)
 
 
-def test_after_the_boundary_card_a_new_topic_starts_fresh(client, anna, llm):
+def test_after_the_acute_card_a_new_topic_starts_fresh(client, anna, llm):
     llm.facts = {"subject": "self", "goal": ["doctor_appointment"], "appointment_reason": "acute"}
     chat = create_chat(client, anna)
-    boundary = send(client, anna, chat["id"], "Ich brauche heute einen Arzttermin, ich habe starke Schmerzen.")
+    acute = send(client, anna, chat["id"], "Ich brauche heute einen Arzttermin, ich habe starke Schmerzen.")
     llm.facts = {**MOTHER, "goal": ["apply_care_allowance"]}
 
     events = send(client, anna, chat["id"], QUESTION)
 
-    assert reply(boundary)["payload"]["card"] == "boundary"
+    assert reply(acute)["payload"]["card"] == "acute"
     assert reply(events)["kind"] == "question"
-    assert "appointment_reason" not in {f["key"] for f in dict(boundary)["facts"]}
+    assert "appointment_reason" not in {f["key"] for f in dict(acute)["facts"]}
 
 
 def test_a_vienna_district_named_later_ends_outside_vienna(client, anna, llm):

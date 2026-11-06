@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from backend import forms, scripts
 from backend.corpus import Corpus, Institution, get_corpus
-from backend.engine import BOUNDARY, DONE, ENTRY_FACT, evaluate, statuses, visible
+from backend.engine import ACUTE, DONE, ENTRY_FACT, evaluate, statuses, visible
 from backend.facts import FACTS, SENTINELS, VIENNA_POSTAL_CODE, merge, subject_words, value_label
 from backend.hours import now as vienna_now
 from backend.hours import reachable, summary
@@ -427,9 +427,9 @@ async def respond(
         )
     if answer is None and latest and result and result.kind == "plan" and result.plan == latest.graph:
         result = None  # new facts that leave the plan as it is ("Was kostet die Heimhilfe?" sets a goal)
-    if result and result.kind == "boundary":
+    if result and result.kind == "acute":
         # The card answers an acute appointment once: the next message starts fresh instead of getting it again.
-        for key in [k for k, v in BOUNDARY.items() if facts.get(k) == v]:
+        for key in [k for k, v in ACUTE.items() if facts.get(k) == v]:
             db.delete(rows.pop(key))
             del facts[key]
         db.commit()

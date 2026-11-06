@@ -89,7 +89,7 @@ Initial keys (to be finalized with the corpus):
 | `goal` | list of enum | apply_care_allowance, find_support_services, prevention, exercise, nutrition, vaccination, doctor_appointment, child_offers, in_hospital, after_hospital |
 | `hospital_topic` | list of enum | discharge, visit |
 | `interests` | list of enum | exercise, nutrition, stress, screening, vaccination |
-| `appointment_reason` | enum | check_up, prevention, follow_up, acute (acute -> boundary card) |
+| `appointment_reason` | enum | check_up, prevention, follow_up, acute (acute -> acute card) |
 | `specialty` | enum | fixed list from the corpus, chosen by the user, never derived from symptoms |
 | `preferred_time` | enum | morning, afternoon, any |
 | `near_home` | bool | |
@@ -302,7 +302,7 @@ Not allowed in output: "Aufgrund Ihrer Diagnose benötigen Sie ...". Allowed: "I
 ## 10. Medical boundary
 
 - The extraction schema has an `intent` field with a value `medical_question` (symptoms, diagnosis, medication, dosage, risk). If set, the engine returns a fixed boundary card: contacts from the corpus (e.g. health hotline 1450, emergency 144, own doctor), no LLM text beyond a fixed sentence. The numbers on the card come from the corpus like everything else.
-- `appointment_reason=acute` also returns the boundary card.
+- `appointment_reason=acute` returns its own fixed acute card instead, even when the message is also a medical question: health hotline 1450 and, if urgent, emergency 144, not the own doctor.
 - No fact key can hold a diagnosis or symptom, so no rule can depend on one.
 - Screening explanations (12.2) only restate a corpus rule with its source and always end with "Besprechen Sie das mit Ihrer Hausärztin / Ihrem Hausarzt".
 - Script validation blocks medical wording (8.3).
@@ -396,7 +396,7 @@ Plan, filtered by age band:
 
 Input: "Ich möchte einen Arzttermin."
 
-Questions: `appointment_reason` (acute -> boundary card) -> `specialty` (chips, chosen by the user) -> `district` -> `preferred_time`.
+Questions: `appointment_reason` (acute -> acute card) -> `specialty` (chips, chosen by the user) -> `district` -> `preferred_time`.
 
 Plan: call step with up to five practices from `corpus/doctors.json` and a script ("Ich hätte gerne einen Termin für {reason}, am liebsten vormittags") -> outcome `appointment_made` stores date and time. The engine ranks by contract (all insurers or ÖGK first, no contract last), own district, preferred time, then distance. A practice that may not take the user's insurance shows a red warning about the costs. The list is never sent to the LLM. Without a match (dentistry has no data, or the specialty is unknown), a doctor search step comes before the call.
 

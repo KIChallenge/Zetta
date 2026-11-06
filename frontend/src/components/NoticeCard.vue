@@ -2,7 +2,7 @@
 import type { CardPayload } from '../chats'
 import { hours, t } from '../i18n'
 
-// Fixed cards (boundary, out of scope, general): corpus text and corpus contacts only, no LLM text.
+// Fixed cards (boundary, acute, out of scope, general): corpus text and corpus contacts only, no LLM text.
 // Name, number and "jetzt erreichbar" are shown; labels, hours, addresses and sources open under "Mehr".
 defineProps<{ card: CardPayload; text: string }>()
 </script>
@@ -10,7 +10,7 @@ defineProps<{ card: CardPayload; text: string }>()
 <template>
   <section class="notice-card" :data-card="card.card">
     <h2 class="nc-h">
-      <svg class="i" aria-hidden="true"><use :href="card.card === 'boundary' ? '#i-alert' : '#i-info'" /></svg>{{ t(card.title) }}
+      <svg class="i" aria-hidden="true"><use :href="card.card === 'boundary' || card.card === 'acute' ? '#i-alert' : '#i-info'" /></svg>{{ t(card.title) }}
     </h2>
     <p>{{ text }}</p>
     <template v-if="card.contacts.length">
@@ -44,9 +44,9 @@ defineProps<{ card: CardPayload; text: string }>()
 
 <style scoped>
 .notice-card { display: grid; gap: .8rem; max-width: 40rem; padding: 1.25rem 1.4rem; border: var(--hair); border-radius: var(--r-m); background: var(--sheet); }
-/* Boundary (not a medical answer): the "your turn" tone, since the next step is the user's. */
-.notice-card[data-card="boundary"] { border: 2px solid var(--turn-mark); }
-.notice-card[data-card="boundary"] .nc-h .i { color: var(--turn-mark); }
+/* Boundary and acute (not a medical answer): the "your turn" tone, since the next step is the user's. */
+.notice-card[data-card="boundary"], .notice-card[data-card="acute"] { border: 2px solid var(--turn-mark); }
+.notice-card[data-card="boundary"] .nc-h .i, .notice-card[data-card="acute"] .nc-h .i { color: var(--turn-mark); }
 .nc-h { display: flex; gap: .5em; align-items: flex-start; font-size: var(--fs-h3); font-weight: 600; color: var(--head); }
 .nc-h .i { margin-top: .1em; color: var(--head); }
 .nc-list { list-style: none; margin: 0; padding: 0; display: grid; }

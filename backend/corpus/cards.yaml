@@ -7,6 +7,12 @@ boundary:
     Gesundheitsberatung oder im Notfall die Rettung.
   contacts: [health_hotline_1450, emergency_144]
 
+acute:
+  title: Hilfe bei akuten Beschwerden
+  text: >-
+    Bitte rufen Sie die Gesundheitsberatung an. Wenn es dringend ist, rufen Sie sofort die Rettung.
+  contacts: [health_hotline_1450, emergency_144]
+
 out_of_scope:
   title: Zetta kennt nur Angebote in Wien
   text: >-

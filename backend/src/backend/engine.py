@@ -11,8 +11,8 @@ QUESTION_CAP = 4
 DOCTOR_LIMIT = 5
 # Asked when nothing matches yet, so a vague first message (or a failed extraction) still leads somewhere.
 ENTRY_FACT = "goal"
-# Fact values that mean "this is medical": the boundary card, never a plan (spec 10).
-BOUNDARY = {"appointment_reason": "acute"}
+# Fact values that mean "this is acute": the acute card, never a plan (spec 10).
+ACUTE = {"appointment_reason": "acute"}
 DONE = ("done", "skipped")
 # A call step that stays a call although the user does not want calls (no curated email for it).
 NO_PHONE_NOTE = (
@@ -23,7 +23,7 @@ NO_PHONE_NOTE = (
 
 @dataclass
 class Result:
-    kind: str  # boundary | out_of_scope | general | question | plan
+    kind: str  # boundary | acute | out_of_scope | general | question | plan
     question: str | None = None  # fact key
     plan: dict | None = None
 
@@ -76,7 +76,10 @@ def evaluate(
 ) -> Result:
     """`asked`: questions since the last plan or card, for the cap. `quotes`: confirmed letter quotes.
     `phone_calls`: False if the user does not want calls, so they become emails where the corpus has one."""
-    if medical or any(facts.get(k) == v for k, v in BOUNDARY.items()):
+    # Before the medical check: acute complaints are usually flagged as a medical question too.
+    if any(facts.get(k) == v for k, v in ACUTE.items()):
+        return Result("acute")
+    if medical:
         return Result("boundary")
     if facts.get("district") == "outside_vienna":
         return Result("out_of_scope")
