@@ -177,6 +177,7 @@ Stack: Vue 3, Vite and TypeScript in the frontend; FastAPI, SQLAlchemy and SQLit
 
 ## Docs
 
+- [Presentation overview](docs/presentation.md): example use cases, privacy, safeguards and limits
 - [Product spec](docs/README.md): the idea and the scope
 - [Response system](docs/response-system.md): pipeline, fact schema, engine, step graph and evaluation
 - [Design system](docs/design.md): colour roles, type, patterns
