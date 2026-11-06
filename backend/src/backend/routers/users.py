@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 from backend import forms
 from backend.dependencies import COOKIE, CurrentUser, DbSession, set_session_cookie
 from backend.guards import PASSWORD_FAILURES
-from backend.models import Person, Profile, User, utcnow
+from backend.models import Person, Preference, Profile, User, utcnow
 from backend.facts import FACTS
 from backend.schemas import (
     DeleteAccountRequest,
@@ -33,12 +33,14 @@ def me(user: CurrentUser) -> UserResponse:
 
 @router.get("/me/profile")
 def get_profile(user: CurrentUser) -> ProfileData:
-    return ProfileData.model_validate(user.profile) if user.profile else ProfileData()
+    profile = ProfileData.model_validate(user.profile) if user.profile else ProfileData()
+    return profile.model_copy(update={"phone_calls": user.preference is None or user.preference.phone_calls})
 
 
 @router.put("/me/profile")
 def put_profile(body: ProfileData, user: CurrentUser, db: DbSession) -> ProfileData:
-    db.merge(Profile(user_id=user.id, **body.model_dump()))
+    db.merge(Profile(user_id=user.id, **body.model_dump(exclude={"phone_calls"})))
+    db.merge(Preference(user_id=user.id, phone_calls=body.phone_calls))
     db.commit()
     return body
 

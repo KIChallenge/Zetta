@@ -8,7 +8,7 @@ cannot put new contact data in front of a user.
 import re
 from pathlib import Path
 
-from backend import forms, scripts
+from backend import engine, forms, scripts
 from backend.corpus import get_corpus
 from backend.facts import DISTRICTS, FACTS, SENTINELS, SUBJECT_WORDS
 from backend.schemas import CHOICES
@@ -43,6 +43,7 @@ FROM_CODE = (
     "Gelesen",
     "Hochgeladen",
     "Termin vereinbart",
+    engine.NO_PHONE_NOTE,
 )
 MARKED = re.compile(r"(?<![\w.$])[tk]\(\s*'((?:[^'\\]|\\.)*)'")
 PLACEHOLDER = re.compile(r"\{[a-z_.]+\}")
@@ -87,6 +88,9 @@ def corpus_sources() -> set[str]:
             found |= {step.title, step.why}
             found |= {text for text in (step.text, step.done_label, step.contact_label) if text}
             found |= {outcome.label for outcome in step.outcomes}
+            if step.by_email:
+                script = step.by_email.fallback_script
+                found |= {step.by_email.title, script.subject, script.body}
             script = step.fallback_script
             if script is None:
                 continue

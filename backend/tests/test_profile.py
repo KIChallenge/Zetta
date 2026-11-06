@@ -16,6 +16,7 @@ EMPTY = {
     "contact_email": "",
     "answer_language": "de",
     "answer_length": "short",
+    "phone_calls": True,
 }
 ANNA = {
     **EMPTY,
@@ -84,6 +85,14 @@ def test_profiles_are_per_user(client, anna, bob):
     assert client.get("/me/profile", headers=bob).json() == EMPTY
 
 
+def test_phone_calls_can_be_turned_off_and_on_again(client, anna):
+    put(client, anna, {**ANNA, "phone_calls": False})
+
+    assert client.get("/me/profile", headers=anna).json() == {**ANNA, "phone_calls": False}
+    put(client, anna, ANNA)
+    assert client.get("/me/profile", headers=anna).json() == ANNA
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -122,6 +131,47 @@ def test_own_postal_code_answers_the_district_question(client, anna, llm):
     district = next(f for f in events["facts"] if f["key"] == "district")
     assert (district["value"], district["source"]) == ("1100", "profile")
     assert events["done"]["payload"]["fact_key"] == "pension_payer"
+
+
+def test_without_phone_calls_the_plan_writes_an_email_instead_of_a_call(client, anna, llm):
+    put(client, anna, {**ANNA, "phone_calls": False})
+    llm.facts = {"subject": "self", "goal": ["apply_care_allowance"], "pension_payer": "pv"}
+    chat = create_chat(client, anna)
+
+    events = dict(send(client, anna, chat["id"], "Ich möchte Pflegegeld beantragen"))
+
+    step = next(s for s in events["plan"]["steps"] if s["id"] == "care_allowance.call")
+    assert (step["type"], step["contact"]["value"]) == ("email", "pva-lsw@pv.at")
+    assert {"subject", "body"} <= set(step["script"])
+
+
+def test_one_call_can_be_switched_to_an_email_and_back(client, anna, llm):
+    put(client, anna, ANNA)
+    llm.facts = {"subject": "self", "goal": ["apply_care_allowance"], "pension_payer": "pv"}
+    chat = create_chat(client, anna)
+    events = dict(send(client, anna, chat["id"], "Ich möchte Pflegegeld beantragen"))
+    call = next(s for s in events["plan"]["steps"] if s["id"] == "care_allowance.call")
+    assert (call["type"], call["switchable"], call["by_email"]) == ("call", True, False)
+    url = f"/chats/{chat['id']}/steps/care_allowance.call"
+
+    plan = client.patch(url, json={"by_email": True}, headers=anna).json()
+
+    step = next(s for s in plan["steps"] if s["id"] == "care_allowance.call")
+    assert (step["type"], step["by_email"], step["contact"]["value"]) == ("email", True, "pva-lsw@pv.at")
+    assert "anna.huber@example.at" in step["script"]["body"]  # the corpus email, filled in
+    assert step["outcomes"][0]["id"] == "sent"
+    plan = client.patch(url, json={"by_email": False}, headers=anna).json()
+    step = next(s for s in plan["steps"] if s["id"] == "care_allowance.call")
+    assert (step["type"], step["by_email"], "opening" in step["script"]) == ("call", False, True)
+
+
+def test_a_step_without_an_email_version_cannot_be_switched(client, anna, llm):
+    put(client, anna, ANNA)
+    llm.facts = {"subject": "self", "goal": ["apply_care_allowance"], "pension_payer": "pv"}
+    chat = create_chat(client, anna)
+    send(client, anna, chat["id"], "Ich möchte Pflegegeld beantragen")
+
+    assert_error(client.patch(f"/chats/{chat['id']}/steps/care_allowance.info", json={"by_email": True}, headers=anna), 422)
 
 
 def test_a_relatives_district_is_not_taken_from_the_profile(client, anna, llm):

@@ -60,6 +60,29 @@
           - {covers: assessment, text: "Wie läuft die Begutachtung ab, und kann eine Vertrauensperson dabei sein?"}
           - {covers: consultation, text: "Gibt es Hilfe beim Ausfüllen, zum Beispiel einen Beratungstermin?"}
         closing: Vielen Dank. Darf ich mir Ihren Namen notieren? Für Rückfragen erreichen Sie mich unter {user.phone}.
+      by_email:
+        title: Der zuständigen Stelle eine E-Mail schreiben
+        channel: email
+        slots: [user.name, user.email, user.address, subject.relation, subject.name, subject.svnr]
+        must_include:
+          - {id: get_form, text: "Um den Antrag auf Pflegegeld bitten oder fragen, ob er online gestellt werden kann"}
+          - {id: assessment, text: "Fragen, wie die Begutachtung abläuft und ob eine Vertrauensperson dabei sein kann"}
+          - {id: consultation, text: "Fragen, ob es Hilfe beim Ausfüllen oder einen Beratungstermin gibt"}
+          - {id: in_writing, text: "Um eine Antwort per E-Mail oder Post bitten, weil Telefonieren nicht möglich ist"}
+        fallback_script:
+          subject: Anfrage zum Antrag auf Pflegegeld
+          body: |-
+            Sehr geehrte Damen und Herren,
+
+            ich möchte Pflegegeld für {subject.relation} beantragen (Name: {subject.name}, SV-Nummer: {subject.svnr}).
+
+            Können Sie mir das Antragsformular zuschicken, oder kann der Antrag auch online gestellt werden? Wie läuft die Begutachtung ab, und kann eine Vertrauensperson dabei sein? Gibt es Hilfe beim Ausfüllen, zum Beispiel einen Beratungstermin?
+
+            Ich kann leider nicht telefonieren. Bitte antworten Sie mir per E-Mail an {user.email} oder per Post an {user.address}.
+
+            Mit freundlichen Grüßen
+            {user.name}
+          covers: [get_form, assessment, consultation, in_writing]
 
     - id: documents
       type: documents
@@ -120,6 +143,28 @@
           - {covers: reason, text: "Warum wurde der Antrag abgelehnt?"}
           - {covers: options, text: "Welche Möglichkeiten gibt es jetzt, und bis wann muss ich etwas tun?"}
         closing: Vielen Dank. Darf ich mir Ihren Namen notieren? Für Rückfragen erreichen Sie mich unter {user.phone}.
+      by_email:
+        title: Der zuständigen Stelle wegen der Entscheidung schreiben
+        channel: email
+        slots: [user.name, user.email, user.address, subject.relation, subject.name, subject.svnr]
+        must_include:
+          - {id: reason, text: "Fragen, warum der Antrag auf Pflegegeld abgelehnt wurde"}
+          - {id: options, text: "Fragen, welche Möglichkeiten es jetzt gibt und bis wann"}
+          - {id: in_writing, text: "Um eine Antwort per E-Mail oder Post bitten, weil Telefonieren nicht möglich ist"}
+        fallback_script:
+          subject: Frage zur Entscheidung über das Pflegegeld
+          body: |-
+            Sehr geehrte Damen und Herren,
+
+            der Antrag auf Pflegegeld für {subject.relation} wurde abgelehnt (Name: {subject.name}, SV-Nummer: {subject.svnr}).
+
+            Warum wurde der Antrag abgelehnt? Welche Möglichkeiten gibt es jetzt, und bis wann muss ich etwas tun?
+
+            Ich kann leider nicht telefonieren. Bitte antworten Sie mir per E-Mail an {user.email} oder per Post an {user.address}.
+
+            Mit freundlichen Grüßen
+            {user.name}
+          covers: [reason, options, in_writing]
 
 - id: home_care_fsw
   title: Pflege und Betreuung zu Hause (FSW)
@@ -168,6 +213,31 @@
           - {covers: assessment, text: "Wie wird der Bedarf festgestellt, und wie stelle ich den Antrag?"}
           - {covers: costs, text: "Wovon hängt der Kostenbeitrag ab?"}
         closing: Vielen Dank. Für Rückfragen erreichen Sie mich unter {user.phone}.
+      by_email:
+        title: Dem FSW-Kund:innenservice eine E-Mail schreiben
+        channel: email
+        slots: [user.name, user.email, user.address, subject.relation]
+        must_include:
+          - {id: home_help, text: "Nach Heimhilfe fragen, z. B. bei Körperpflege, Haushalt und kleinen Einkäufen"}
+          - {id: meals, text: "Nach Essen auf Rädern fragen"}
+          - {id: escort, text: "Nach einem Begleitdienst für Wege und Besorgungen fragen"}
+          - {id: assessment, text: "Fragen, wie der Bedarf festgestellt wird und wie der Antrag gestellt wird"}
+          - {id: costs, text: "Fragen, wovon der Kostenbeitrag abhängt"}
+          - {id: in_writing, text: "Um eine Antwort per E-Mail oder Post bitten, weil Telefonieren nicht möglich ist"}
+        fallback_script:
+          subject: Anfrage Unterstützung zu Hause
+          body: |-
+            Sehr geehrte Damen und Herren,
+
+            ich suche Unterstützung zu Hause für {subject.relation}.
+
+            Welche Hilfe zu Hause gibt es, zum Beispiel Heimhilfe bei Körperpflege, Haushalt und Einkäufen? Ist Essen auf Rädern möglich? Gibt es eine Begleitung für Wege und Besorgungen? Wie wird der Bedarf festgestellt, und wie stelle ich den Antrag? Wovon hängt der Kostenbeitrag ab?
+
+            Ich kann leider nicht telefonieren. Bitte antworten Sie mir per E-Mail an {user.email} oder per Post an {user.address}.
+
+            Mit freundlichen Grüßen
+            {user.name}
+          covers: [home_help, meals, escort, assessment, costs, in_writing]
 
     - id: documents
       type: documents
@@ -766,6 +836,29 @@
           - {covers: nearby, text: "Gibt es ein Familienzentrum in meiner Nähe?"}
           - {covers: appointment, text: "Kann ich einen Beratungstermin vereinbaren?"}
         closing: Vielen Dank. Sie erreichen mich unter {user.phone}.
+      by_email:
+        title: Der Servicestelle der Kinder- und Jugendhilfe schreiben
+        channel: email
+        slots: [user.name, user.email, user.address]
+        must_include:
+          - {id: offers, text: "Fragen, welche Beratungs- und Familienangebote es für das Alter des Kindes gibt"}
+          - {id: nearby, text: "Nach Familienzentren in der Nähe fragen"}
+          - {id: appointment, text: "Fragen, ob ein Beratungstermin vereinbart werden kann"}
+          - {id: in_writing, text: "Um eine Antwort per E-Mail oder Post bitten, weil Telefonieren nicht möglich ist"}
+        fallback_script:
+          subject: Anfrage Beratung für Familien
+          body: |-
+            Sehr geehrte Damen und Herren,
+
+            ich habe ein Kind und möchte wissen, welche Angebote es für uns gibt.
+
+            Welche Beratungs- und Familienangebote gibt es für das Alter meines Kindes? Gibt es ein Familienzentrum in meiner Nähe? Kann ich einen Beratungstermin vereinbaren?
+
+            Ich kann leider nicht telefonieren. Bitte antworten Sie mir per E-Mail an {user.email} oder per Post an {user.address}.
+
+            Mit freundlichen Grüßen
+            {user.name}
+          covers: [offers, nearby, appointment, in_writing]
 
 - id: doctor_appointment
   title: Arzttermin

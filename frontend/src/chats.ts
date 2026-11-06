@@ -123,6 +123,9 @@ export interface Step {
   form?: { id?: string; title: string; url: string; online_url: string | null; prefill?: Prefill }
   documents?: Doc[]
   script?: Script
+  phone_note?: string // a call although the user wants no calls: there is no other way
+  switchable: boolean // a call with an email version the user can pick instead
+  by_email: boolean // the user picked it
 }
 
 export interface Prefill {
@@ -180,6 +183,7 @@ export interface StepUpdate {
   outcome?: string
   note?: string
   checks?: string[]
+  by_email?: boolean
 }
 
 export type ReplyEvent =

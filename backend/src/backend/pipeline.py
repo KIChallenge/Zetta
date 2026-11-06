@@ -16,7 +16,7 @@ from backend.facts import FACTS, SENTINELS, VIENNA_POSTAL_CODE, merge, subject_w
 from backend.hours import now as vienna_now
 from backend.hours import reachable, summary
 from backend.llm import Llm, redact
-from backend.models import Chat, ChatFact, Message, Person, Plan, Profile, StepState, utcnow
+from backend.models import Chat, ChatFact, EmailChoice, Message, Person, Plan, Preference, Profile, StepState, utcnow
 from backend.schemas import Contact, FormDetails, FormRequest, MessageResponse, PersonData, ProfileData
 
 logger = logging.getLogger(__name__)
@@ -48,13 +48,25 @@ def outcomes_of(step: dict) -> dict[str, tuple[str, str]]:
     return OUTCOMES[step["type"]]
 
 
+def email_choices(db: Session, chat_id: str) -> set[str]:
+    return set(db.scalars(select(EmailChoice.step_id).where(EmailChoice.chat_id == chat_id)))
+
+
+def effective(step: dict, chosen: set[str]) -> dict:
+    """The step as the user does it: a call with an email version they picked becomes that email."""
+    if step["id"] not in chosen or "email" not in step:
+        return step
+    return {**step, **step["email"]}
+
+
 def shown(plan: Plan, states: dict[str, StepState]) -> list[dict]:
     return visible(plan.graph["steps"], {k: s.outcome for k, s in states.items()})
 
 
 def profile_of(db: Session, user_id: str) -> ProfileData:
-    row = db.get(Profile, user_id)
-    return ProfileData.model_validate(row) if row else ProfileData()
+    row, preference = db.get(Profile, user_id), db.get(Preference, user_id)
+    profile = ProfileData.model_validate(row) if row else ProfileData()
+    return profile.model_copy(update={"phone_calls": preference is None or preference.phone_calls})
 
 
 def kept_of(db: Session, user_id: str) -> dict[str, dict]:
@@ -95,7 +107,7 @@ def remember(db: Session, user_id: str, new: dict[str, dict]) -> None:
     for relation, details in new.items():
         if relation == "self" and (contact := {k: v for k, v in details.items() if k in Contact.model_fields}):
             profile = profile_of(db, user_id).model_copy(update=contact)
-            db.merge(Profile(user_id=user_id, **profile.model_dump()))
+            db.merge(Profile(user_id=user_id, **profile.model_dump(exclude={"phone_calls"})))
             details = {k: v for k, v in details.items() if k in FormDetails.model_fields}
         if not details:
             continue
@@ -266,16 +278,25 @@ def chat_next(db: Session, chat_id: str) -> dict | None:
 
 
 def render_plan(
-    plan: Plan, states: dict[str, StepState], profile: ProfileData, kept: dict[str, dict], facts: dict, now: datetime
+    plan: Plan,
+    states: dict[str, StepState],
+    profile: ProfileData,
+    kept: dict[str, dict],
+    facts: dict,
+    now: datetime,
+    chosen: frozenset[str] | set[str] = frozenset(),
 ) -> dict:
     steps = shown(plan, states)
     status = statuses(steps, {k: s.status for k, s in states.items()})
     out = []
-    for step in steps:
+    for step in (effective(s, chosen) for s in steps):
         state = states.get(step["id"])
         view = {
-            k: v for k, v in step.items() if k not in ("slots", "have_ready", "script_facts", "must", "outcomes")
+            k: v for k, v in step.items() if k not in ("slots", "have_ready", "script_facts", "must", "outcomes", "email")
         }
+        # Whether the user can switch this step between calling and writing, and which one they picked.
+        view["switchable"] = "email" in step
+        view["by_email"] = step["id"] in chosen and "email" in step
         view["status"] = status[step["id"]]
         view["outcome"] = state.outcome if state else None
         view["note"] = state.note if state else None
@@ -315,7 +336,13 @@ def current_plan(db: Session, chat: Chat) -> dict | None:
         return None
     facts = {k: r.value for k, r in fact_rows(db, chat.id).items()}
     return render_plan(
-        plan, step_states(db, chat.id), profile_of(db, chat.user_id), kept_of(db, chat.user_id), facts, vienna_now()
+        plan,
+        step_states(db, chat.id),
+        profile_of(db, chat.user_id),
+        kept_of(db, chat.user_id),
+        facts,
+        vienna_now(),
+        email_choices(db, chat.id),
     )
 
 
@@ -398,7 +425,9 @@ async def respond(
     if off_topic or unchanged:
         result = None
     else:
-        result = evaluate(facts, corpus, asked=questions_asked(db, chat.id), medical=medical, quotes=quotes)
+        result = evaluate(
+            facts, corpus, asked=questions_asked(db, chat.id), medical=medical, quotes=quotes, phone_calls=profile.phone_calls
+        )
     if answer is None and latest and result and result.kind == "plan" and result.plan == latest.graph:
         result = None  # new facts that leave the plan as it is ("Was kostet die Heimhilfe?" sets a goal)
     if result and result.kind == "boundary":
@@ -448,9 +477,10 @@ async def respond(
         plan = Plan(chat_id=chat.id, version=latest.version + 1 if latest else 1, graph=graph, created_at=utcnow())
         states = step_states(db, chat.id)
         detail = profile.answer_length
+        chosen = email_choices(db, chat.id)
         todo = []
         # Saved with the corpus scripts first, so a lost connection still leaves a complete plan.
-        for step in filter(scripts.needs_text, graph["steps"]):
+        for step in filter(scripts.needs_text, (effective(s, chosen) for s in graph["steps"])):
             key = scripts.inputs_hash(step, detail)
             state = states.get(step["id"])
             if state and state.script and state.script["hash"] == key and state.script["source"] == "llm":
@@ -482,7 +512,8 @@ async def respond(
         for step in todo:
             states[step["id"]].script = {**written[step["id"]], "hash": scripts.inputs_hash(step, detail)}
         db.commit()
-        yield ServerSentEvent(event="plan", data=render_plan(plan, states, profile, kept_of(db, chat.user_id), facts, vienna_now()))
+        view = render_plan(plan, states, profile, kept_of(db, chat.user_id), facts, vienna_now(), chosen)
+        yield ServerSentEvent(event="plan", data=view)
 
     if reply not in db:
         db.add(reply)

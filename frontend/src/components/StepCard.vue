@@ -199,6 +199,8 @@ async function copy() {
 
           <!-- Call -->
           <template v-if="s.type === 'call'">
+            <p v-if="s.phone_note" class="why"><svg class="i" aria-hidden="true"><use href="#i-info" /></svg><span>{{ t(s.phone_note) }}</span></p>
+            <p v-if="s.switchable"><button type="button" class="linkbtn" @click="emit('update', { by_email: true })">{{ t('Lieber eine E-Mail schreiben') }}</button></p>
             <p v-if="!s.contact && !s.doctors" class="hint">{{ t('Die Nummer kennen Sie selbst: Der Lotse hat keine Daten zu Ihrer Ordination.') }}</p>
             <p v-else-if="s.contact" class="hint">{{ t('Telefonzeiten:') }} {{ s.contact.hours ? hours(s.contact.hours) : t('in der Quelle nicht angegeben') }}</p>
             <p v-if="translated" class="hint">{{ t('Sprechen Sie den deutschen Text. Die Übersetzung darunter hilft Ihnen beim Verstehen.') }}</p>
@@ -251,6 +253,7 @@ async function copy() {
 
           <!-- Email -->
           <template v-else-if="s.type === 'email' && s.contact">
+            <p v-if="s.by_email"><button type="button" class="linkbtn" @click="emit('update', { by_email: false })"><svg class="i" aria-hidden="true"><use href="#i-phone" /></svg>{{ t('Doch lieber anrufen') }}</button></p>
             <dl class="mail-meta">
               <dt>{{ t('An') }}</dt><dd><a :href="s.contact.href">{{ s.contact.value }}</a></dd>
               <dt>{{ t('Betreff') }}</dt><dd>{{ script?.subject }}<small v-if="translated" class="say-tr" :lang="locale">{{ translated.subject }}</small></dd>

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
@@ -24,6 +24,7 @@ class User(Base):
     people: Mapped[list["Person"]] = relationship(cascade="all, delete-orphan")
     chats: Mapped[list["Chat"]] = relationship(cascade="all, delete-orphan")
     token_version: Mapped["TokenVersion | None"] = relationship(cascade="all, delete-orphan")
+    preference: Mapped["Preference | None"] = relationship(cascade="all, delete-orphan")
 
     @property
     def version(self) -> int:
@@ -62,6 +63,15 @@ class Profile(Base):
     answer_length: Mapped[str] = mapped_column(String(10))
 
 
+class Preference(Base):
+    """Settings added after the profile. Own table, so existing databases need no migration."""
+
+    __tablename__ = "preferences"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    phone_calls: Mapped[bool] = mapped_column(Boolean)
+
+
 class Person(Base):
     """Details for forms, kept from a form card: of a relative (by relation), or the user's own ones beyond the profile
     ("self"). Own table, so existing databases need no migration."""
@@ -88,6 +98,7 @@ class Chat(Base):
     facts: Mapped[list["ChatFact"]] = relationship(cascade="all, delete-orphan")
     plans: Mapped[list["Plan"]] = relationship(cascade="all, delete-orphan")
     step_states: Mapped[list["StepState"]] = relationship(cascade="all, delete-orphan")
+    email_choices: Mapped[list["EmailChoice"]] = relationship(cascade="all, delete-orphan")
 
 
 class Message(Base):
@@ -138,3 +149,13 @@ class StepState(Base):
     checks: Mapped[list] = mapped_column(JSON, default=list)  # ticked checklist items
     script: Mapped[dict | None] = mapped_column(JSON, default=None)  # with placeholders, filled on render
     updated_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class EmailChoice(Base):
+    """A call step the user writes an email for instead (engine: the step's `email` version). Own table, so existing
+    databases need no migration."""
+
+    __tablename__ = "email_choices"
+
+    chat_id: Mapped[str] = mapped_column(ForeignKey("chats.id"), primary_key=True)
+    step_id: Mapped[str] = mapped_column(String(100), primary_key=True)

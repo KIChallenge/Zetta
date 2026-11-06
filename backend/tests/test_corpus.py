@@ -120,6 +120,25 @@ def test_fallback_scripts_pass_validation_with_all_items():
         assert scripts.validate(scripts.fallback(step, corpus), step) == [], f"{s.id}.{t.id}"
 
 
+def test_email_alternatives_reach_an_email_channel_and_pass_validation():
+    for s, t in TEMPLATES:
+        if not t.by_email:
+            continue
+        alt, where = t.by_email, f"{s.id}.{t.id}"
+        assert t.type == "call" and t.institution, where
+        targets = [r.institution for r in s.responsible] if t.institution == "responsible" else [t.institution]
+        assert any(
+            c.type == "email" and (alt.channel is None or c.id == alt.channel)
+            for target in targets
+            for c in corpus.institutions[target].channels
+        ), where
+        assert set(alt.slots) <= set(scripts.SLOTS), where
+        # One body for everyone: an item left out by its condition would still be in the text.
+        assert alt.must_include and not any(i.when for i in alt.must_include), where
+        step = {"id": where, "type": "email", "must": [{"id": i.id} for i in alt.must_include], "slots": alt.slots}
+        assert scripts.validate(scripts.fallback(step, corpus), step) == [], where
+
+
 def test_required_facts_have_a_question():
     asked = [q.fact_key for q in corpus.questions]
     assert len(asked) == len(set(asked))

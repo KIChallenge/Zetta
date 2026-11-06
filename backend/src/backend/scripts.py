@@ -127,7 +127,9 @@ def fallback(step: dict, corpus: Corpus) -> dict:
     service_id, template_id = step["id"].split(".")
     service = next(s for s in corpus.services if s.id == service_id)
     template = next(t for t in service.steps if t.id == template_id)
-    script = template.fallback_script.model_dump()
+    # A call written as an email for a user who cannot phone (engine._step).
+    source = template.by_email.fallback_script if step["type"] != template.type else template.fallback_script
+    script = source.model_dump()
     must = {item["id"] for item in step["must"]}
     if step["type"] == "call":
         script["points"] = [p for p in script["points"] if p["covers"] in must]

@@ -19,6 +19,7 @@ export interface Profile {
   contact_email: string
   answer_language: keyof typeof LANGS
   answer_length: keyof typeof LENGTHS
+  phone_calls: boolean // false: calls become emails where the Lotse has an address
 }
 
 export const getProfile = () => api<Profile>('/me/profile')

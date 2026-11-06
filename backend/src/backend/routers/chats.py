@@ -17,7 +17,7 @@ from backend.dependencies import CurrentUser, DbSession
 from backend.facts import FACTS, value_label
 from backend.guards import TURNS, UPLOADS
 from backend.llm import Llm, LlmClient, redact
-from backend.models import Chat, Message, StepState, utcnow
+from backend.models import Chat, EmailChoice, Message, StepState, utcnow
 from backend.schemas import (
     AnswerRequest,
     ChatRequest,
@@ -254,15 +254,33 @@ async def upload_document(
 
 @router.patch("/{chat_id}/steps/{step_id}")
 def update_step(step_id: str, body: StepUpdate, chat: OwnedChat, db: DbSession) -> dict:
-    """Check off a step, record an outcome or a note, tick checklist items. Returns the whole plan."""
+    """Check off a step, record an outcome or a note, tick checklist items, switch between calling and writing.
+    Returns the whole plan."""
     plan = pipeline.latest_plan(db, chat.id)
     step = next((s for s in plan.graph["steps"] if s["id"] == step_id), None) if plan else None
     if step is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Step not found")
+    chosen = pipeline.email_choices(db, chat.id)
     state = db.get(StepState, (chat.id, step_id))
     if state is None:
         state = StepState(chat_id=chat.id, step_id=step_id, checks=[])
         db.add(state)
+    if body.by_email is not None:
+        if "email" not in step:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Step has no email version")
+        if body.by_email != (step_id in chosen):
+            if body.by_email:
+                db.add(EmailChoice(chat_id=chat.id, step_id=step_id))
+                chosen.add(step_id)
+            else:
+                db.delete(db.get(EmailChoice, (chat.id, step_id)))
+                chosen.discard(step_id)
+            # The other way has its own items, outcomes and text: it starts fresh, with the corpus text.
+            new = pipeline.effective(step, chosen)
+            detail = pipeline.profile_of(db, chat.user_id).answer_length
+            state.script = {**scripts.fallback(new, get_corpus()), "source": "fallback", "hash": scripts.inputs_hash(new, detail)}
+            state.status, state.outcome, state.checks = None, None, []
+    step = pipeline.effective(step, chosen)
     if body.outcome is not None:
         outcome = pipeline.outcomes_of(step).get(body.outcome)
         if outcome is None:

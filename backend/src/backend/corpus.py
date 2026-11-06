@@ -138,6 +138,16 @@ class Outcome(Model):
     effect: Literal["done", "keep"]  # keep: the step stays open, e.g. to call again
 
 
+class EmailAlternative(Model):
+    """A call step written as an email, used instead of the call for users who cannot phone."""
+
+    title: str
+    channel: str | None = None
+    slots: list[str] = []
+    must_include: list[Item]
+    fallback_script: EmailScript
+
+
 class StepTemplate(Model):
     id: str
     type: Literal["call", "email", "form", "info", "wait", "documents", "upload", "book"]
@@ -160,6 +170,7 @@ class StepTemplate(Model):
     fallback_script: CallScript | EmailScript | None = None
     outcomes: list[Outcome] = []  # empty: the defaults for the step type
     unlocked_by: str | None = None  # "<template id>:<outcome id>": shown only after that outcome
+    by_email: EmailAlternative | None = None  # call: the same step by email, for users who cannot phone
 
 
 class Rule(Model):

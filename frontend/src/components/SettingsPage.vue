@@ -42,7 +42,7 @@ const person = reactive<Record<Field, string>>({ full_name: '', street: '', post
 // The SVNR is entered as on the e-card: 4 digits, then the birth date; "Nummer weicht ab?" switches to the whole number.
 const sv = reactive({ birth: '', serial: '', whole: '', own: false })
 const errors = reactive<Record<Key, string>>({ full_name: '', street: '', postal_code: '', city: '', svnr: '', phone: '', contact_email: '' })
-const answers = reactive<Pick<Profile, 'answer_language' | 'answer_length'>>({ answer_language: 'de', answer_length: 'short' })
+const answers = reactive<Pick<Profile, 'answer_language' | 'answer_length' | 'phone_calls'>>({ answer_language: 'de', answer_length: 'short', phone_calls: true })
 const busy = reactive({ data: false, password: false, delete: false })
 const pw = reactive({ current: '', next: '' })
 const pwErr = reactive({ current: '', next: '' })
@@ -78,6 +78,7 @@ function fill(p: Profile) {
   Object.assign(sv, { serial: parts?.serial ?? '', birth: parts?.birth ?? '', whole: fmtSvnr(p.svnr), own: !!p.svnr && !parts })
   answers.answer_language = p.answer_language
   answers.answer_length = p.answer_length
+  answers.phone_calls = p.phone_calls
 }
 
 async function load() {
@@ -374,6 +375,10 @@ async function confirmDelete() {
               </label>
             </div>
           </fieldset>
+          <div class="field">
+            <label class="toggle"><input v-model="answers.phone_calls" type="checkbox" aria-describedby="a-phone-d" /><b>{{ t('Anrufe vorschlagen') }}</b></label>
+            <p id="a-phone-d" class="hint">{{ t('Ausgeschaltet schlägt der Lotse, wo es geht, eine E-Mail statt eines Anrufs vor. Gilt ab dem nächsten Plan.') }}</p>
+          </div>
         </div>
       </section>
 

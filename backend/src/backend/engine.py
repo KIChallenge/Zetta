@@ -14,6 +14,11 @@ ENTRY_FACT = "goal"
 # Fact values that mean "this is medical": the boundary card, never a plan (spec 10).
 BOUNDARY = {"appointment_reason": "acute"}
 DONE = ("done", "skipped")
+# A call step that stays a call although the user does not want calls (no curated email for it).
+NO_PHONE_NOTE = (
+    "Im Lotsen ist dafür kein anderer Weg als ein Anruf hinterlegt. "
+    "Eine Person, der Sie vertrauen, kann mit diesem Text für Sie anrufen."
+)
 
 
 @dataclass
@@ -67,8 +72,10 @@ def evaluate(
     medical: bool = False,
     quotes: dict[str, str] | None = None,
     today: date | None = None,
+    phone_calls: bool = True,
 ) -> Result:
-    """`asked`: questions since the last plan or card, for the cap. `quotes`: confirmed letter quotes."""
+    """`asked`: questions since the last plan or card, for the cap. `quotes`: confirmed letter quotes.
+    `phone_calls`: False if the user does not want calls, so they become emails where the corpus has one."""
     if medical or any(facts.get(k) == v for k, v in BOUNDARY.items()):
         return Result("boundary")
     if facts.get("district") == "outside_vienna":
@@ -81,7 +88,7 @@ def evaluate(
         return Result("general")
     if can_ask and (key := next_question(found, facts, corpus)):
         return Result("question", question=key)
-    plan = build_plan(found, facts, corpus, quotes or {}, today or date.today())
+    plan = build_plan(found, facts, corpus, quotes or {}, today or date.today(), phone_calls)
     if not plan["services"] and not plan["dropped"]:
         return Result("general")  # only hubs matched, and their answers led nowhere
     return Result("plan", plan=plan)
@@ -102,7 +109,36 @@ def responsible(service: Service, facts: dict) -> str | None:
     return next((r.institution for r in service.responsible if r.when is None or check(r.when, facts)), None)
 
 
-def _step(service: Service, template: StepTemplate, institution_id: str | None, facts: dict, corpus: Corpus) -> dict:
+# What a call step's email version replaces when the user picks it (pipeline.effective).
+EMAIL_FIELDS = ("type", "title", "contact", "must", "slots", "have_ready")
+
+
+def _email_version(template: StepTemplate, institution_id: str | None, corpus: Corpus) -> StepTemplate | None:
+    """The call as an email, if the corpus has one and the institution a curated address for it."""
+    alt = template.by_email
+    if alt is None:
+        return None
+    target = corpus.institutions[institution_id if template.institution == "responsible" else template.institution]
+    if not any(c.type == "email" and (alt.channel is None or c.id == alt.channel) for c in target.channels):
+        return None
+    return template.model_copy(update={
+        "type": "email", "title": alt.title, "channel": alt.channel, "slots": alt.slots,
+        "have_ready": [s for s in template.have_ready if s in alt.slots], "must_include": alt.must_include,
+        "by_email": None,
+    })  # fmt: skip
+
+
+def _step(
+    service: Service, template: StepTemplate, institution_id: str | None, facts: dict, corpus: Corpus, phone_calls: bool = True
+) -> dict:
+    if email := _email_version(template, institution_id, corpus):
+        written = _step(service, email, institution_id, facts, corpus)
+        if not phone_calls:
+            return written
+        step = _step(service, template.model_copy(update={"by_email": None}), institution_id, facts, corpus)
+        if step["type"] == "call":
+            step["email"] = {k: written[k] for k in EMAIL_FIELDS}
+        return step
     step = {
         "id": f"{service.id}.{template.id}",
         "service": service.id,
@@ -149,6 +185,8 @@ def _step(service: Service, template: StepTemplate, institution_id: str | None, 
             step["contact"]["source_url"] = channel.source_url or institution.source_url
             if template.type != "book":
                 _must(step, template, facts)
+    if not phone_calls and step["type"] == "call":
+        step["phone_note"] = NO_PHONE_NOTE
     return step
 
 
@@ -254,7 +292,12 @@ def in_season(service: Service, today: date) -> bool:
 
 
 def build_plan(
-    services: list[Service], facts: dict, corpus: Corpus, quotes: dict[str, str] | None = None, today: date | None = None
+    services: list[Service],
+    facts: dict,
+    corpus: Corpus,
+    quotes: dict[str, str] | None = None,
+    today: date | None = None,
+    phone_calls: bool = True,
 ) -> dict:
     kept, dropped, steps = [], [], []
     for service in sorted(services, key=lambda s: s.priority):
@@ -291,14 +334,14 @@ def build_plan(
             "responsible_source": service.responsible_source,
             "source_url": service.source_url,
         })
-        steps += [_step(service, t, institution_id, facts, corpus) for t in templates]
+        steps += [_step(service, t, institution_id, facts, corpus, phone_calls) for t in templates]
         if doctors:
             step = next(s for s in steps if s["id"] == f"{service.id}.{_directory_step(service, 'list').id}")
             step["doctors"] = doctors
             step["doctors_source"] = {"url": corpus.directory.source, "scraped_at": corpus.directory.scraped_at.isoformat()}
             step["institution"]["name"] = "Eine Ordination aus der Liste"
             # The search the list comes instead of stays available, for anyone who wants more to choose from.
-            search = _step(service, _directory_step(service, "fallback"), institution_id, facts, corpus)
+            search = _step(service, _directory_step(service, "fallback"), institution_id, facts, corpus, phone_calls)
             step["more"] = search.get("contact")
 
     # Document steps of several services become one checklist (spec 6.4).

@@ -3,7 +3,7 @@
 import pytest
 
 from backend.corpus import get_corpus
-from backend.engine import QUESTION_CAP, check, evaluate, statuses
+from backend.engine import NO_PHONE_NOTE, QUESTION_CAP, check, evaluate, statuses
 from backend.facts import extraction_guide, merge
 
 corpus = get_corpus()
@@ -97,6 +97,39 @@ def test_care_allowance_goes_to_the_institution_that_pays_the_pension(payer, ins
     # No curated contact: the step names the institution but shows no invented number.
     assert call["type"] == call_type
     assert ("contact" in call) == (call_type == "call")
+
+
+def test_a_call_with_a_curated_email_carries_it_for_the_user_to_pick():
+    steps = {s["id"]: s for s in evaluate(ALL_KNOWN, corpus).plan["steps"]}
+
+    call = steps["care_allowance.call"]
+    assert (call["type"], call["email"]["type"], call["email"]["contact"]["value"]) == ("call", "email", "pva-lsw@pv.at")
+    assert "in_writing" in [i["id"] for i in call["email"]["must"]]
+    assert "phone_note" not in call
+
+
+def test_without_phone_calls_they_become_emails_where_the_corpus_has_one():
+    steps = {s["id"]: s for s in evaluate(ALL_KNOWN, corpus, phone_calls=False).plan["steps"]}
+
+    for step_id, address in [("care_allowance.call", "pva-lsw@pv.at"), ("home_care_fsw.call", "post@fsw.at")]:
+        step = steps[step_id]
+        assert (step["type"], step["contact"]["type"], step["contact"]["value"]) == ("email", "email", address)
+        assert "in_writing" in [i["id"] for i in step["must"]]
+        assert "phone_note" not in step and "email" not in step
+
+
+def test_without_phone_calls_a_call_with_no_other_way_keeps_its_script_and_gets_a_note():
+    facts = {"subject": "father", "goal": ["in_hospital"], "hospital_topic": ["discharge"]}
+    call = evaluate(facts, corpus, phone_calls=False).plan["steps"][0]
+
+    assert (call["id"], call["type"], call["phone_note"]) == ("before_discharge.call", "call", NO_PHONE_NOTE)
+    assert "phone_note" not in evaluate(facts, corpus).plan["steps"][0]
+
+
+def test_without_phone_calls_an_institution_without_contacts_is_still_only_named():
+    call = next(s for s in evaluate({**ALL_KNOWN, "pension_payer": "bvaeb"}, corpus, phone_calls=False).plan["steps"]
+                if s["id"] == "care_allowance.call")  # fmt: skip
+    assert (call["type"], "contact" in call) == ("info", False)
 
 
 def test_call_items_that_do_not_apply_are_left_out():

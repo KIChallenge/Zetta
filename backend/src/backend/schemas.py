@@ -123,6 +123,7 @@ class StepUpdate(BaseModel):
     outcome: str | None = Field(None, max_length=40)
     note: str | None = Field(None, max_length=2000)
     checks: list[Annotated[str, Field(max_length=100)]] | None = Field(None, max_length=50)
+    by_email: bool | None = None  # a call step: write its email version instead, or go back to calling
 
 
 # Weights of the Austrian check digit (the 4th digit, so its own weight is 0).
@@ -159,6 +160,7 @@ class ProfileData(Contact):
 
     answer_language: Literal["de", "en", "fr", "cs", "sk", "sl", "tr", "bks", "ro", "pl", "hu", "uk", "ar"] = "de"
     answer_length: Literal["short", "detailed"] = "short"
+    phone_calls: bool = True  # False: calls become emails where the corpus has one
 
 
 # Choices of the form details: value -> how it is written on a form.
