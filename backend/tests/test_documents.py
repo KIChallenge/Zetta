@@ -96,6 +96,10 @@ def test_upload_confirm_and_plan_with_quotes(client, anna, llm):
     assert "contact" not in call  # the user's own doctor: no number from the system
     assert call["script"]["opening"]
 
+    # Changed later under "Verstanden": a fact edit, not the confirm card's answer.
+    events = answer(client, anna, chat["id"], "documented_recommendations", "home_nursing")
+    assert events[0][1]["text"] == "Laut Ihrem Dokument: Hauskrankenpflege"
+
 
 def test_unoffered_recommendations_cannot_be_confirmed(client, anna, llm):
     chat = create_chat(client, anna)
