@@ -433,10 +433,10 @@ def test_a_message_without_new_facts_keeps_the_plan(client, anna, llm):
     to_plan(client, anna, llm, chat["id"])
     llm.facts = {}
 
-    events = send(client, anna, chat["id"], "Was ist 1+1?")
+    events = send(client, anna, chat["id"], "Und was mache ich jetzt?")
 
     assert "plan" not in dict(events)
-    assert (reply(events)["kind"], reply(events)["text"]) == ("text", pipeline.NOTHING_NEW)
+    assert (reply(events)["kind"], reply(events)["text"]) == ("text", pipeline.TO_PLAN)
     assert client.get(f"/chats/{chat['id']}/state", headers=anna).json()["plan"]["version"] == 1
 
 
@@ -532,6 +532,71 @@ def test_the_question_loop_stops_at_the_cap(client, anna, llm):
 
     assert card["payload"]["card"] == "general"
     assert card["payload"]["contacts"][0]["channels"][0]["href"] == "tel:+435076611"
+
+
+def test_an_off_topic_message_does_not_stop_answers_about_the_plan(client, anna, llm):
+    chat = create_chat(client, anna)
+    facts = dict(to_plan(client, anna, llm, chat["id"]))["facts"]
+    llm.facts, llm.off_topic = {"subject": "self", "district": "outside_vienna"}, True
+
+    off = send(client, anna, chat["id"], "Wie wird das Wetter in Graz?")
+    # The real extraction also sets a goal here, which leaves the plan as it is.
+    llm.facts, llm.off_topic = {"goal": ["find_support_services"], "asks_about": "home_care_fsw"}, False
+    events = send(client, anna, chat["id"], "Was kostet die Heimhilfe?")
+
+    summary = next(s.summary for s in pipeline.get_corpus().services if s.id == "home_care_fsw")
+    assert (reply(events)["kind"], reply(events)["text"]) == ("text", summary)
+    assert "plan" not in dict(events)
+    assert dict(off)["facts"] == facts
+    assert (reply(off)["kind"], reply(off)["text"]) == ("text", pipeline.OFF_TOPIC_PLAN)
+
+
+def test_off_topic_messages_ask_the_open_question_again_without_using_up_the_cap(client, anna, llm):
+    llm.facts = MOTHER
+    chat = create_chat(client, anna)
+    send(client, anna, chat["id"])
+    llm.facts, llm.off_topic = {}, True
+
+    again = [reply(send(client, anna, chat["id"], "Erzähl mir einen Witz")) for _ in range(3)]
+
+    assert reply(answer(client, anna, chat["id"], "district", "1100"))["payload"]["fact_key"] == "pension_payer"
+    assert reply(answer(client, anna, chat["id"], "pension_payer", "pv"))["payload"]["fact_key"] == "lives_alone"
+    assert dict(answer(client, anna, chat["id"], "lives_alone", "yes"))["plan"]["services"]
+    assert {(q["payload"]["fact_key"], q["payload"]["note"]) for q in again} == {("district", pipeline.OFF_TOPIC)}
+
+
+def test_an_off_topic_first_message_gets_the_first_question_with_a_hint(client, anna, llm):
+    llm.off_topic = True
+    chat = create_chat(client, anna)
+
+    first = reply(send(client, anna, chat["id"], "Wer gewinnt heute das Fußballspiel?"))
+
+    assert (first["payload"]["fact_key"], first["payload"]["note"]) == ("goal", pipeline.OFF_TOPIC)
+
+
+def test_after_the_boundary_card_a_new_topic_starts_fresh(client, anna, llm):
+    llm.facts = {"subject": "self", "goal": ["doctor_appointment"], "appointment_reason": "acute"}
+    chat = create_chat(client, anna)
+    boundary = send(client, anna, chat["id"], "Ich brauche heute einen Arzttermin, ich habe starke Schmerzen.")
+    llm.facts = {**MOTHER, "goal": ["apply_care_allowance"]}
+
+    events = send(client, anna, chat["id"], QUESTION)
+
+    assert reply(boundary)["payload"]["card"] == "boundary"
+    assert reply(events)["kind"] == "question"
+    assert "appointment_reason" not in {f["key"] for f in dict(boundary)["facts"]}
+
+
+def test_a_vienna_district_named_later_ends_outside_vienna(client, anna, llm):
+    llm.facts = MOTHER
+    chat = create_chat(client, anna)
+    send(client, anna, chat["id"])
+    answer(client, anna, chat["id"], "district", "outside_vienna")
+    llm.facts = {"district": "1100"}
+
+    events = send(client, anna, chat["id"], "Entschuldigung, sie wohnt doch in Favoriten.")
+
+    assert reply(events)["payload"]["fact_key"] == "pension_payer"
 
 
 @pytest.mark.parametrize(

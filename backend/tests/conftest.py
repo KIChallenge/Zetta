@@ -25,6 +25,7 @@ class FakeLlm:
     def __init__(self):
         self.facts = {}  # what extract() finds in every message
         self.medical = False
+        self.off_topic = False
         self.intro_text = "Hier sind die nächsten Schritte für Sie."
         self.script_text = None  # step input -> script dict; default: a valid script per step
         self.title_text = "Pflege für Mama"
@@ -40,9 +41,9 @@ class FakeLlm:
         if self.fail:
             raise RuntimeError("LLM down")
 
-    async def extract(self, text, question):
+    async def extract(self, text, question, topics=None):
         await self._call("extract", {"text": text, "question": question})
-        return {"medical_question": self.medical, **self.facts}
+        return {"medical_question": self.medical, "off_topic": self.off_topic, **self.facts}
 
     async def intro(self, plan, language):
         await self._call("intro", {**plan, "language": language})

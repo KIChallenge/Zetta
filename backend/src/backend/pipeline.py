@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from backend import forms, scripts
 from backend.corpus import Corpus, Institution, get_corpus
-from backend.engine import DONE, ENTRY_FACT, evaluate, statuses, visible
+from backend.engine import BOUNDARY, DONE, ENTRY_FACT, evaluate, statuses, visible
 from backend.facts import FACTS, SENTINELS, VIENNA_POSTAL_CODE, merge, subject_words, value_label
 from backend.hours import now as vienna_now
 from backend.hours import reachable, summary
@@ -20,7 +20,12 @@ from backend.models import Chat, ChatFact, Message, Plan, Profile, StepState, ut
 from backend.schemas import MessageResponse, ProfileData
 
 logger = logging.getLogger(__name__)
-NOTHING_NEW = "Ihre Angaben sind unverändert, Ihr Plan bleibt gleich. Unter „Mehr dazu“ steht bei jedem Thema, worum es geht."
+TO_PLAN = "Ihr Plan steht weiter oben. Unter „Mehr dazu“ steht bei jedem Thema, worum es geht."
+OFF_TOPIC = (
+    "Dabei kann der Lotse leider nicht helfen. Er kennt Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen,"
+    " Kinder, Arzttermine und Mindestsicherung in Wien."
+)
+OFF_TOPIC_PLAN = OFF_TOPIC + " Ihr Plan steht weiter oben."
 
 # Outcome id -> (label, effect). "keep" leaves the step open, e.g. to call again in the next window.
 OUTCOMES = {
@@ -110,7 +115,8 @@ def questions_asked(db: Session, chat_id: str) -> int:
     for message in assistant_messages(db, chat_id, 20):
         if message.kind != "question":
             break
-        asked += not (topic_known and message.payload["fact_key"] == ENTRY_FACT)
+        # A question with a note was asked again after an off-topic message: not a new one.
+        asked += not (topic_known and message.payload["fact_key"] == ENTRY_FACT or "note" in message.payload)
     return asked
 
 
@@ -270,22 +276,27 @@ async def respond(
     corpus = get_corpus()
     rows = fact_rows(db, chat.id)
     before = {k: r.value for k, r in rows.items()}
-    medical = False
+    latest = latest_plan(db, chat.id)
+    medical = off_topic = False
+    extracted: dict = {}
     if answer:
         key, value, source, quote = answer
         set_fact(db, chat.id, rows, key, value, source)
         rows[key].quote = quote
     else:
         question = pending_question(db, chat.id)
+        topics = {s["id"]: s["title"] for s in latest.graph["services"]} if latest else None
         try:
-            extracted = await llm.extract(redact(text), question.text if question else None)
+            extracted = await llm.extract(redact(text), question.text if question else None, topics)
         except Exception:
             # The chips still lead to a plan without the LLM (spec 17).
             logger.exception("Fact extraction failed")
-            extracted = {}
         medical = extracted.get("medical_question") is True
-        for key, value in merge({k: (r.value, r.source) for k, r in rows.items()}, extracted).items():
-            set_fact(db, chat.id, rows, key, value, "user_text")
+        # Facts from an off-topic message ("the weather in Graz") would only mislead the plan.
+        off_topic = not medical and extracted.get("off_topic") is True
+        if not off_topic:
+            for key, value in merge({k: (r.value, r.source) for k, r in rows.items()}, extracted).items():
+                set_fact(db, chat.id, rows, key, value, "user_text")
     profile = profile_of(db, chat.user_id)
     facts = {k: r.value for k, r in rows.items()}
     # Someone asking for themselves has already said where they live in their profile.
@@ -293,18 +304,45 @@ async def respond(
         set_fact(db, chat.id, rows, "district", profile.postal_code, "profile")
         facts["district"] = profile.postal_code
     db.commit()
-    yield ServerSentEvent(event="facts", data=fact_list(rows))
 
     letter = rows.get("documented_recommendations")
     quotes = (letter.quote or {}) if letter else {}
     # A message that changes no fact leaves an existing plan as it is: a re-plan would only post it again.
-    latest = latest_plan(db, chat.id)
     unchanged = answer is None and not medical and facts == before and latest is not None
-    result = None if unchanged else evaluate(facts, corpus, asked=questions_asked(db, chat.id), medical=medical, quotes=quotes)
-    if result is None:
-        # A topic of the plan named in the message ("Was ist Pflegegeld?") gets its corpus summary.
-        named = next((s for s in latest.graph["services"] if s["title"].casefold() in (text or "").casefold()), None)
-        reply_text = named["summary"] if named else NOTHING_NEW
+    if off_topic or unchanged:
+        result = None
+    else:
+        result = evaluate(facts, corpus, asked=questions_asked(db, chat.id), medical=medical, quotes=quotes)
+    if answer is None and latest and result and result.kind == "plan" and result.plan == latest.graph:
+        result = None  # new facts that leave the plan as it is ("Was kostet die Heimhilfe?" sets a goal)
+    if result and result.kind == "boundary":
+        # The card answers an acute appointment once: the next message starts fresh instead of getting it again.
+        for key in [k for k, v in BOUNDARY.items() if facts.get(k) == v]:
+            db.delete(rows.pop(key))
+            del facts[key]
+        db.commit()
+    yield ServerSentEvent(event="facts", data=fact_list(rows))
+
+    if off_topic:
+        # The open question again (it does not count toward the cap), else the first one, else just the line.
+        if question:
+            key = question.payload["fact_key"]
+        else:
+            key = None if latest else evaluate(facts, corpus).question
+        if key:
+            reply = question_message(chat.id, key, facts, corpus)
+            reply.payload["note"] = OFF_TOPIC
+        else:
+            reply_text = OFF_TOPIC_PLAN if latest else OFF_TOPIC
+            reply = Message(chat_id=chat.id, role="assistant", kind="text", text=reply_text, created_at=utcnow())
+    elif result is None:
+        # A topic of the plan asked about ("Was kostet die Heimhilfe?", "Was ist Pflegegeld?") gets its corpus summary.
+        named = next(
+            (s for s in latest.graph["services"]
+             if s["id"] == extracted.get("asks_about") or s["title"].casefold() in (text or "").casefold()),
+            None,
+        )  # fmt: skip
+        reply_text = named["summary"] if named else TO_PLAN
         reply = Message(chat_id=chat.id, role="assistant", kind="text", text=reply_text, created_at=utcnow())
     elif result.kind == "question":
         reply = question_message(chat.id, result.question, facts, corpus)

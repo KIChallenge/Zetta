@@ -4,7 +4,8 @@ import type { Chip } from '../chats'
 import { t } from '../i18n'
 
 // One question at a time. Only the latest one has chips; answered ones stay as plain text in the history.
-defineProps<{ text: string; why: string; chips: Chip[]; active: boolean; multi?: boolean }>()
+// `note`: the line after an off-topic message, before the open question is asked again.
+defineProps<{ text: string; why: string; chips: Chip[]; active: boolean; multi?: boolean; note?: string }>()
 const emit = defineEmits<{ answer: [chip: Chip]; many: [chips: Chip[]] }>()
 const QUIET = ['unknown', 'declined']
 const picked = ref<Chip[]>([]) // multi: chips toggle, "Weiter" sends them; "Weiß nicht" still answers at once
@@ -16,6 +17,7 @@ function pick(c: Chip, multi: boolean) {
 
 <template>
   <section class="ask" :class="{ done: !active }">
+    <p v-if="note && active">{{ note }}</p>
     <h2 class="ask-h">{{ text }}</h2>
     <template v-if="active">
       <p class="why"><svg class="i" aria-hidden="true"><use href="#i-info" /></svg><span>{{ why }}</span></p>

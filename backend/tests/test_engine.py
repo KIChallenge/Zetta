@@ -178,6 +178,11 @@ def test_the_extraction_guide_explains_every_field_and_value():
     guide = extraction_guide()
 
     assert "- medical_question: True if the user asks for medical advice" in guide
+    assert "- off_topic: True if the message has nothing to do with social insurance" in guide
+    assert "asks_about" not in guide  # only with a plan
+    assert "- asks_about: The topic of the user's plan the message asks about: care_allowance: Pflegegeld." in (
+        extraction_guide({"care_allowance": "Pflegegeld"})
+    )
     assert "in_hospital: the person is in hospital now" in guide
     assert "Allowed: apply_care_allowance," in guide
     district = next(line for line in guide.splitlines() if line.startswith("- district: "))

@@ -19,7 +19,11 @@ LOCALES_DIR = FRONTEND_SRC / "locales"
 # Texts from the backend's code. Those with variable parts are patterns in frontend/src/i18n.ts.
 FROM_CODE = (
     "Hier ist Ihr Plan.",
-    "Ihre Angaben sind unverändert, Ihr Plan bleibt gleich. Unter „Mehr dazu“ steht bei jedem Thema, worum es geht.",
+    "Ihr Plan steht weiter oben. Unter „Mehr dazu“ steht bei jedem Thema, worum es geht.",
+    "Dabei kann der Lotse leider nicht helfen. Er kennt Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen,"
+    " Kinder, Arzttermine und Mindestsicherung in Wien.",
+    "Dabei kann der Lotse leider nicht helfen. Er kennt Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen,"
+    " Kinder, Arzttermine und Mindestsicherung in Wien. Ihr Plan steht weiter oben.",
     "Das steht in Ihrem Dokument. Stimmt das?",
     "In Ihrem Dokument habe ich keine Empfehlung gefunden, zu der der Lotse helfen kann.",
     "Erledigt",
