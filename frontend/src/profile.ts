@@ -27,15 +27,14 @@ export const changePassword = (current_password: string, new_password: string) =
   api<null>('/me/password', 'POST', { current_password, new_password })
 export const deleteAccount = (password: string) => api<null>('/me', 'DELETE', { password })
 
-/** The filled fields as label/value pairs: what the Lotse fills into call scripts and emails (never sent to the LLM). */
+/** Every field as a label/value pair, "" when unset: what the Lotse fills into call scripts and emails (never sent to the LLM). */
 export function facts(p: Profile): [string, string][] {
   const place = `${p.postal_code} ${p.city}`.trim()
-  const all: [string, string][] = [
+  return [
     [k('Name'), p.full_name],
     [k('Adresse'), [p.street, place].filter(Boolean).join(', ')],
     [k('SV-Nummer'), fmtSvnr(p.svnr)],
     [k('Telefon'), p.phone],
     [k('E-Mail'), p.contact_email],
   ]
-  return all.filter(([, v]) => v)
 }

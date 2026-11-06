@@ -43,10 +43,10 @@ function pick(c: Chip, multi: boolean) {
 </template>
 
 <style scoped>
-/* A Lotse speech bubble on the blue gradient, like its text replies. The open question carries the chips;
+/* A Lotse speech bubble on navy, like its text replies. The open question carries the chips;
    answered ones shrink to the question alone. */
-.ask { position: relative; display: grid; gap: .8rem; max-width: 40rem; margin-bottom: .7rem; padding: 1.1rem 1.3rem 1.3rem; border-radius: var(--r-s); background: var(--grad); color: var(--on-navy); box-shadow: 0 14px 30px -18px rgba(0, 30, 80, .7); --focus: var(--on-navy); }
-.ask::after { content: ""; position: absolute; left: 1.25rem; bottom: -.7rem; width: 1.1rem; height: .75rem; background: var(--grad-end); clip-path: polygon(0 0, 100% 0, 0 100%); }
+.ask { position: relative; display: grid; gap: .8rem; max-width: 40rem; margin-bottom: .7rem; padding: 1.1rem 1.3rem 1.3rem; border-radius: var(--r-s); background: var(--navy); color: var(--on-navy); --focus: var(--on-navy); }
+.ask::after { content: ""; position: absolute; left: 1.25rem; bottom: -.7rem; width: 1.1rem; height: .75rem; background: var(--navy); clip-path: polygon(0 0, 100% 0, 0 100%); }
 .ask-h { font-size: var(--fs-h3); font-weight: 600; color: inherit; }
 .ask.done { justify-self: start; width: fit-content; padding: .75rem 1.1rem; }
 .ask.done .ask-h { font-size: 1rem; font-weight: 400; }
@@ -55,7 +55,8 @@ function pick(c: Chip, multi: boolean) {
 .hint { color: var(--on-navy-2); }
 .chips { margin-top: .2rem; }
 .chip:focus-visible { outline-offset: 2px; }
-.chip[aria-pressed="true"] { border-color: var(--on-navy); background: var(--accent); color: var(--on-action); }
+/* Pressed chips stay blue (green is never a button); the white edge keeps them apart from the navy. */
+.chip[aria-pressed="true"] { border-color: var(--on-navy); }
 .btn-primary { background: var(--on-navy); color: var(--navy); }
 .btn-primary:hover { background: var(--on-navy-2); }
 [data-contrast="high"] .ask { box-shadow: inset 0 0 0 2px var(--on-navy); }
