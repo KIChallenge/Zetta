@@ -43,7 +43,7 @@ const waiting = computed(() => props.chats.filter((c) => c.next?.kind === 'waiti
             <span>{{ t(c.next!.text ?? '') }}</span>
           </span>
           <span v-if="c.next!.institution || c.next!.reachable" class="row-meta">
-            <span v-if="c.next!.institution">{{ c.next!.institution }}</span>
+            <span v-if="c.next!.institution">{{ t(c.next!.institution) }}</span>
             <span v-if="c.next!.reachable" class="avail" :data-open="c.next!.reachable.open">{{ t(c.next!.reachable.text) }}</span>
           </span>
           <svg class="i row-go" aria-hidden="true"><use href="#i-arrow" /></svg>
