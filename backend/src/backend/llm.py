@@ -61,8 +61,9 @@ SCRIPTS_PROMPT = (
     "- Email: a subject and a body that starts with \"Sehr geehrte Damen und Herren,\" and ends with "
     "\"Mit freundlichen Grüßen\". `covers` lists the ids of all items the body covers.\n"
     "- Personal data only as placeholders, exactly as given, e.g. {user.name}. {subject.relation} is the person "
-    'concerned in the accusative, e.g. "meine Mutter", "meinen Vater"; you may also write the relation '
-    "yourself from facts.subject, never a name.\n"
+    'concerned in the accusative with its possessive, e.g. "meine Mutter", "meinen Vater": write "für '
+    '{subject.relation}", never "meine {subject.relation}": no possessive or article before it. You may also '
+    "write the relation yourself from facts.subject, never a name.\n"
     "- Never write phone numbers, email addresses, web addresses, dates, amounts or account numbers.\n"
     "- Nothing medical: no illnesses, diagnoses, symptoms, medication or treatments.\n"
     "- {detail}"

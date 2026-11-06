@@ -479,6 +479,24 @@ def test_a_long_plan_intro_falls_back_to_one_fixed_sentence(client, anna, llm):
     assert reply(to_plan(client, anna, llm, chat["id"]))["text"] == "Hier ist Ihr Plan."
 
 
+def test_a_possessive_before_the_relation_placeholder_never_doubles_it(client, anna, llm):
+    def doubled(step):
+        points = [{"covers": i["id"], "text": "Wie geht das?"} for i in step["items"]]
+        if step["type"] == "email":
+            body = "Sehr geehrte Damen und Herren, ich schreibe für meine {subject.relation}."
+            return {"email": {"subject": "Anfrage", "body": body, "covers": [i["id"] for i in step["items"]]}}
+        return {"call": {"opening": "Guten Tag, ich rufe für meine {subject.relation} an.", "points": points, "closing": "Danke."}}
+
+    llm.script_text = doubled
+    chat = create_chat(client, anna)
+
+    plan = dict(to_plan(client, anna, llm, chat["id"]))["plan"]
+    written = [s for s in plan["steps"] if "script" in s]
+    assert written and {s["script"]["source"] for s in written} == {"fallback"}
+    assert "meine meine" not in json.dumps(plan, ensure_ascii=False)
+    assert steps_of(plan)["care_allowance.call"]["script"]["opening"].endswith("für meine Mutter an.")
+
+
 def test_without_the_llm_the_chips_and_fallback_scripts_still_lead_to_a_plan(client, anna, llm):
     llm.fail, llm.title_text = True, None
     chat = create_chat(client, anna)
