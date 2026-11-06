@@ -1,21 +1,21 @@
 # Fixed cards: no LLM text, contacts from institutions.yaml (sections 6.1 and 10).
 
 boundary:
-  title: Medizinische Fragen beantwortet der Lotse nicht
+  title: Medizinische Fragen beantwortet Zetta nicht
   text: >-
     Bei Beschwerden, Diagnosen, Medikamenten oder Risiken fragen Sie bitte Ihre Hausärztin oder Ihren Hausarzt, die
     Gesundheitsberatung oder im Notfall die Rettung.
   contacts: [health_hotline_1450, emergency_144]
 
 out_of_scope:
-  title: Der Lotse kennt nur Angebote in Wien
+  title: Zetta kennt nur Angebote in Wien
   text: >-
     Außerhalb von Wien sind andere Stellen zuständig. Geht es doch um Wien, ändern Sie den Bezirk bei „Verstanden“.
   contacts: []
 
 general:
-  title: Dazu hat der Lotse noch keinen passenden Plan
+  title: Dazu hat Zetta noch keinen passenden Plan
   text: >-
-    Der Lotse kennt bisher Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen, Kinder, Arzttermine und
+    Zetta kennt bisher Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen, Kinder, Arzttermine und
     Mindestsicherung. Sonst hilft das Kundenservice der ÖGK.
   contacts: [oegk_vienna_customer_service]

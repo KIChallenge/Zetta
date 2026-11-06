@@ -26,7 +26,7 @@ function confirm() {
           </label>
         </li>
       </ul>
-      <p class="hint">{{ t('Befunde liest der Lotse nicht. Ihr Dokument wird nicht gespeichert.') }}</p>
+      <p class="hint">{{ t('Befunde liest Zetta nicht. Ihr Dokument wird nicht gespeichert.') }}</p>
       <div class="actions"><button type="button" class="btn btn-primary" @click="confirm">{{ t('Stimmt so, weiter') }}</button></div>
     </template>
     <!-- Answered: the quotes are in the plan, here only what the letter contained. -->

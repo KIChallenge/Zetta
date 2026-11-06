@@ -43,7 +43,7 @@ function pick(c: Chip, multi: boolean) {
 </template>
 
 <style scoped>
-/* A Lotse speech bubble on navy, like its text replies. The open question carries the chips;
+/* A Zetta speech bubble on navy, like its text replies. The open question carries the chips;
    answered ones shrink to the question alone. */
 .ask { position: relative; display: grid; gap: .8rem; max-width: 40rem; margin-bottom: .7rem; padding: 1.1rem 1.3rem 1.3rem; border-radius: var(--r-s); background: var(--navy); color: var(--on-navy); --focus: var(--on-navy); }
 .ask::after { content: ""; position: absolute; left: 1.25rem; bottom: -.7rem; width: 1.1rem; height: .75rem; background: var(--navy); clip-path: polygon(0 0, 100% 0, 0 100%); }

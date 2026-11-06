@@ -112,7 +112,7 @@ function show(id: string) {
     </div>
     <details class="more plan-src">
       <summary>{{ t('„Kommt in Frage“ ist keine Zusage') }}</summary>
-      <p>{{ t('Darüber entscheidet die zuständige Stelle. Telefonnummern, Zeiten und Adressen kommen aus dem geprüften Verzeichnis des Lotsen, nicht von der KI. Der Lotse bereitet vor, er bucht und sendet nichts selbst und stellt keine Diagnosen.') }}</p>
+      <p>{{ t('Darüber entscheidet die zuständige Stelle. Telefonnummern, Zeiten und Adressen kommen aus dem geprüften Verzeichnis von Zetta, nicht von der KI. Zetta bereitet vor, bucht und sendet aber nichts selbst und stellt keine Diagnosen.') }}</p>
     </details>
   </section>
 </template>

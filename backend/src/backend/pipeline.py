@@ -24,7 +24,7 @@ from backend.schemas import Contact, FormDetails, MessageResponse, PersonData, P
 logger = logging.getLogger(__name__)
 TO_PLAN = "Ihr Plan steht weiter oben. Unter „Mehr dazu“ steht bei jedem Thema, worum es geht."
 OFF_TOPIC = (
-    "Dabei kann der Lotse leider nicht helfen. Er kennt Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen,"
+    "Dabei kann Zetta leider nicht helfen. Zetta kennt Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen,"
     " Kinder, Arzttermine und Mindestsicherung in Wien."
 )
 OFF_TOPIC_PLAN = OFF_TOPIC + " Ihr Plan steht weiter oben."

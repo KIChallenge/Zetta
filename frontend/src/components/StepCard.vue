@@ -204,7 +204,7 @@ async function copy() {
           <template v-if="s.type === 'call'">
             <p v-if="s.phone_note" class="why"><svg class="i" aria-hidden="true"><use href="#i-info" /></svg><span>{{ t(s.phone_note) }}</span></p>
             <p v-if="s.switchable"><button type="button" class="linkbtn" @click="emit('update', { by_email: true })">{{ t('Lieber eine E-Mail schreiben') }}</button></p>
-            <p v-if="!s.contact && !s.doctors" class="hint">{{ t('Die Nummer kennen Sie selbst: Der Lotse hat keine Daten zu Ihrer Ordination.') }}</p>
+            <p v-if="!s.contact && !s.doctors" class="hint">{{ t('Die Nummer kennen Sie selbst: Zetta hat keine Daten zu Ihrer Ordination.') }}</p>
             <p v-else-if="s.contact" class="hint">{{ t('Telefonzeiten:') }} {{ s.contact.hours ? hours(s.contact.hours) : t('in der Quelle nicht angegeben') }}</p>
             <p v-if="translated" class="hint">{{ t('Sprechen Sie den deutschen Text. Die Übersetzung darunter hilft Ihnen beim Verstehen.') }}</p>
             <div v-if="script" class="script">
@@ -280,7 +280,7 @@ async function copy() {
             <div v-if="s.form.wizard" class="wz-meter">
               <p><b>{{ t('{done} von {total} Pflichtangaben', { done: s.form.wizard.done, total: s.form.wizard.total }) }}</b> · {{ s.form.title }}</p>
               <div class="bar" role="progressbar" :aria-valuenow="meter" aria-valuemin="0" aria-valuemax="100" :aria-label="t('Schon ausgefüllt')"><span :style="{ width: `${meter}%` }" /></div>
-              <p class="hint">{{ t('Vorausgefüllt aus Ihrem Profil, den gemerkten Angaben und dem Gespräch. Den Rest fragt der Lotse Schritt für Schritt.') }}</p>
+              <p class="hint">{{ t('Vorausgefüllt aus Ihrem Profil, den gemerkten Angaben und dem Gespräch. Den Rest fragt Zetta Schritt für Schritt.') }}</p>
               <!-- Above, the card shows this button once the step is due; it can be filled in before. -->
               <div v-if="!act" class="actions"><button type="button" class="btn btn-primary" @click="emit('wizard')"><svg class="i" aria-hidden="true"><use href="#i-pencil" /></svg>{{ t('Formular ausfüllen') }}</button></div>
             </div>

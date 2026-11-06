@@ -59,7 +59,7 @@ watch(user, () => nextTick(() => main.value?.focus()))
       <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
         <circle cx="16" cy="16" r="16" class="mark-disc" /><circle cx="16" cy="16" r="8.75" class="mark-ring" /><circle cx="16" cy="16" r="3.75" class="mark-dot" />
       </svg>
-      <b class="brand-t" :class="{ bl: user }">SV KI-Lotse</b>
+      <b class="brand-t" :class="{ bl: user }">Zetta</b>
     </span>
     <select v-if="!user" class="lang" :aria-label="t('Sprache')" :value="locale" @change="setLocale(($event.target as HTMLSelectElement).value)">
       <option v-for="code in ENTRY_LANGS" :key="code" :value="code">{{ LANGS[code] }}</option>
@@ -90,7 +90,7 @@ watch(user, () => nextTick(() => main.value?.focus()))
         <div class="entry-text">
           <!-- avoid-ai-design-ignore: SD5 (two-weight headline: a bold first line, as asked in the brief) -->
           <h1 class="entry-h"><b>{{ t('Ihr Wegweiser') }}</b> {{ t('durch die Sozialversicherung') }}</h1>
-          <p class="entry-lead">{{ t('Beschreiben Sie Ihr Anliegen. Der Lotse sagt Ihnen, wen Sie anrufen und was Sie mitbringen.') }}</p>
+          <p class="entry-lead">{{ t('Beschreiben Sie Ihr Anliegen. Zetta sagt Ihnen, wen Sie anrufen und was Sie mitbringen.') }}</p>
         </div>
         <div class="entry-side">
           <AuthCard @done="user = $event" />
@@ -99,11 +99,11 @@ watch(user, () => nextTick(() => main.value?.focus()))
     </template>
   </main>
 
-  <!-- Navy, like the home pane: it frames the app opposite the white bar. Contacts as the Lotse's medical card
+  <!-- Navy, like the home pane: it frames the app opposite the white bar. Contacts as Zetta's medical card
        names them; institution names stay German, as everywhere. -->
   <footer v-if="ready && (!user || atHome)" class="foot navy-band">
     <span class="foot-brand" aria-hidden="true">
-      <svg class="foot-mark" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" class="fm-ring" /><circle cx="16" cy="16" r="5" class="fm-dot" /></svg>SV KI-Lotse
+      <svg class="foot-mark" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15" class="fm-ring" /><circle cx="16" cy="16" r="5" class="fm-dot" /></svg>Zetta
     </span>
     <span class="foot-call">
       <span class="foot-l">{{ t('Medizinische Fragen:') }}</span>

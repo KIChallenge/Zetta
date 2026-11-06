@@ -4,8 +4,8 @@
 
 - fact_key: goal
   text:
-    self: Wobei kann der Lotse Ihnen helfen?
-    other: Wobei kann der Lotse Ihnen helfen?
+    self: Wobei kann Zetta Ihnen helfen?
+    other: Wobei kann Zetta Ihnen helfen?
   why_we_ask: Oder beschreiben Sie es in eigenen Worten.
   chips:
     - {value: apply_care_allowance}
@@ -28,7 +28,7 @@
   text:
     self: In welchem Wiener Bezirk wohnen Sie?
     other: In welchem Wiener Bezirk wohnt {subject.ihr}?
-  why_we_ask: Der Lotse kennt nur Angebote in Wien.
+  why_we_ask: Zetta kennt nur Angebote in Wien.
 
 - fact_key: pension_payer
   text:
@@ -76,7 +76,7 @@
   text:
     self: Zu welcher Fachrichtung möchten Sie?
     other: Zu welcher Fachrichtung möchten Sie?
-  why_we_ask: Der Lotse wählt keine Fachrichtung für Sie aus.
+  why_we_ask: Zetta wählt keine Fachrichtung für Sie aus.
 
 - fact_key: preferred_time
   text:

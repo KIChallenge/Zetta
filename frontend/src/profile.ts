@@ -19,7 +19,7 @@ export interface Profile {
   contact_email: string
   answer_language: keyof typeof LANGS
   answer_length: keyof typeof LENGTHS
-  phone_calls: boolean // false: calls become emails where the Lotse has an address
+  phone_calls: boolean // false: calls become emails where Zetta has an address
 }
 
 export const getProfile = () => api<Profile>('/me/profile')
@@ -39,7 +39,7 @@ export const changePassword = (current_password: string, new_password: string) =
   api<null>('/me/password', 'POST', { current_password, new_password })
 export const deleteAccount = (password: string) => api<null>('/me', 'DELETE', { password })
 
-/** Every field as a label/value pair, "" when unset: what the Lotse fills into call scripts and emails (never sent to the LLM). */
+/** Every field as a label/value pair, "" when unset: what Zetta fills into call scripts and emails (never sent to the LLM). */
 export function facts(p: Profile): [string, string][] {
   const place = `${p.postal_code} ${p.city}`.trim()
   return [

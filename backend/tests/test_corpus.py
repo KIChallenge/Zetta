@@ -72,7 +72,7 @@ def test_references_resolve():
 
 
 def test_step_channels_exist_or_the_institution_has_none():
-    """A missing channel only degrades to "contact not in the Lotse yet" for institutions without channels."""
+    """A missing channel only degrades to "contact not in Zetta yet" for institutions without channels."""
     for s, t in TEMPLATES:
         if t.type not in ("call", "email") or t.contact_label:
             continue

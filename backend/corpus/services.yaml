@@ -369,7 +369,7 @@
       why: Den Brief gibt es am Entlassungstag. Darin steht, was nach dem Spital empfohlen wird.
       after: [call]
       text: >-
-        Der Lotse sucht nur Empfehlungen zu Anträgen und Unterstützung, keine Befunde, und zeigt Ihnen jede Stelle
+        Zetta sucht nur Empfehlungen zu Anträgen und Unterstützung, keine Befunde, und zeigt Ihnen jede Stelle
         wörtlich. Der Brief wird nicht gespeichert.
 
 # Hours differ by hospital and even by ward, so the plan never states them: the script asks the ward.
@@ -410,7 +410,7 @@
 # Phase 2: after a hospital stay (spec 12.3). The letter's confirmed recommendations trigger the services below.
 - id: after_hospital
   title: Nach dem Spital
-  summary: Der Lotse liest die Empfehlungen aus Ihrem Entlassungsbrief und macht daraus Ihre nächsten Schritte.
+  summary: Zetta liest die Empfehlungen aus Ihrem Entlassungsbrief und macht daraus Ihre nächsten Schritte.
   priority: 2
   triggers:
     - {goal: [after_hospital]}
@@ -424,7 +424,7 @@
       title: Entlassungsbrief hochladen
       why: Im Brief steht, was nach dem Spital empfohlen wird, zum Beispiel Reha oder Pflege zu Hause.
       text: >-
-        Der Lotse sucht nur Empfehlungen zu Anträgen und Unterstützung, keine Befunde, und zeigt Ihnen jede Stelle
+        Zetta sucht nur Empfehlungen zu Anträgen und Unterstützung, keine Befunde, und zeigt Ihnen jede Stelle
         wörtlich. Der Brief wird nicht gespeichert.
 - id: rehab
   title: Medizinische Rehabilitation
@@ -862,7 +862,7 @@
 
 - id: doctor_appointment
   title: Arzttermin
-  summary: Der Lotse bucht keine Termine. Er hilft Ihnen, eine Ordination zu finden, und bereitet den Anruf vor.
+  summary: Zetta bucht keine Termine, hilft Ihnen aber, eine Ordination zu finden, und bereitet den Anruf vor.
   priority: 16
   triggers:
     - {goal: [doctor_appointment]}

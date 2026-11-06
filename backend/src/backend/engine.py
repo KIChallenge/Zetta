@@ -16,7 +16,7 @@ BOUNDARY = {"appointment_reason": "acute"}
 DONE = ("done", "skipped")
 # A call step that stays a call although the user does not want calls (no curated email for it).
 NO_PHONE_NOTE = (
-    "Im Lotsen ist dafür kein anderer Weg als ein Anruf hinterlegt. "
+    "Zetta kennt dafür keinen anderen Weg als einen Anruf. "
     "Eine Person, der Sie vertrauen, kann mit diesem Text für Sie anrufen."
 )
 
@@ -178,7 +178,7 @@ def _step(
                 # Never guess contact data: without a curated channel the step only names the institution.
                 step["type"] = "info"
                 step["text"] = (
-                    f"Wenden Sie sich an: {institution.name}. Die Kontaktdaten sind im Lotsen noch nicht hinterlegt."
+                    f"Wenden Sie sich an: {institution.name}. Die Kontaktdaten sind in Zetta noch nicht hinterlegt."
                 )
                 return step
             step["contact"] = channel.model_dump(mode="json", by_alias=True)
@@ -235,7 +235,7 @@ def find_doctors(facts: dict, corpus: Corpus) -> list[dict]:
     """The best practices for the chosen specialty: by contract, district, preferred time, then distance."""
     specialty = _value(facts, "specialty")
     if not specialty:
-        return []  # the Lotse never chooses a specialty for the user
+        return []  # Zetta never chooses a specialty for the user
     doctors = corpus.directory.doctors
     district = (_value(facts, "district") or [None])[0]
     time = (_value(facts, "preferred_time") or [None])[0]

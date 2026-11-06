@@ -21,12 +21,12 @@ LOCALES_DIR = FRONTEND_SRC / "locales"
 FROM_CODE = (
     "Hier ist Ihr Plan.",
     "Ihr Plan steht weiter oben. Unter „Mehr dazu“ steht bei jedem Thema, worum es geht.",
-    "Dabei kann der Lotse leider nicht helfen. Er kennt Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen,"
+    "Dabei kann Zetta leider nicht helfen. Zetta kennt Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen,"
     " Kinder, Arzttermine und Mindestsicherung in Wien.",
-    "Dabei kann der Lotse leider nicht helfen. Er kennt Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen,"
+    "Dabei kann Zetta leider nicht helfen. Zetta kennt Pflege, Nachsorge nach dem Spital, Vorsorge, Impfungen,"
     " Kinder, Arzttermine und Mindestsicherung in Wien. Ihr Plan steht weiter oben.",
     "Das steht in Ihrem Dokument. Stimmt das?",
-    "In Ihrem Dokument habe ich keine Empfehlung gefunden, zu der der Lotse helfen kann.",
+    "In Ihrem Dokument habe ich keine Empfehlung gefunden, zu der Zetta helfen kann.",
     "Erledigt",
     "Wartet auf Rückmeldung",
     "1 offener Schritt",

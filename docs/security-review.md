@@ -1,4 +1,4 @@
-# Security review: Zetta (SV KI-Lotse)
+# Security review: Zetta
 
 - **Scope:** `main` at `0456cae` (2026-11-05), working tree as it is. Review only, no code changed.
 - **Method:**

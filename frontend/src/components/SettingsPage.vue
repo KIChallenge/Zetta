@@ -257,7 +257,7 @@ async function confirmDelete() {
   <section class="settings" aria-labelledby="view-h">
     <header class="head">
       <h1 id="view-h" tabindex="-1">{{ t('Einstellungen') }}</h1>
-      <p class="intro">{{ t('Der Lotse setzt Ihre Angaben in Anrufe und E-Mails ein. Alles ist freiwillig.') }}</p>
+      <p class="intro">{{ t('Zetta setzt Ihre Angaben in Anrufe und E-Mails ein. Alles ist freiwillig.') }}</p>
     </header>
 
     <p v-if="loadErr" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ loadErr }}</span></p>
@@ -359,7 +359,7 @@ async function confirmDelete() {
       </section>
 
       <section class="card wide" aria-labelledby="h-answers">
-        <h2 id="h-answers">{{ t('So antwortet der Lotse') }}</h2>
+        <h2 id="h-answers">{{ t('So antwortet Zetta') }}</h2>
         <div class="row">
           <div class="field">
             <label class="field-l" for="a-lang">{{ t('Sprache') }}</label>
@@ -377,7 +377,7 @@ async function confirmDelete() {
           </fieldset>
           <div class="field">
             <label class="toggle"><input v-model="answers.phone_calls" type="checkbox" aria-describedby="a-phone-d" /><b>{{ t('Anrufe vorschlagen') }}</b></label>
-            <p id="a-phone-d" class="hint">{{ t('Ausgeschaltet schlägt der Lotse, wo es geht, eine E-Mail statt eines Anrufs vor. Gilt ab dem nächsten Plan.') }}</p>
+            <p id="a-phone-d" class="hint">{{ t('Ausgeschaltet schlägt Zetta, wo es geht, eine E-Mail statt eines Anrufs vor. Gilt ab dem nächsten Plan.') }}</p>
           </div>
         </div>
       </section>
@@ -395,7 +395,7 @@ async function confirmDelete() {
     <section v-if="saved" class="card" aria-labelledby="h-kept">
       <div class="card-h">
         <h2 id="h-kept">{{ t('Angaben für Anträge') }}</h2>
-        <p class="hint">{{ t('Tragen Sie hier ein, was Sie schon wissen. Den Rest fragt der Lotse beim ersten Formular und merkt es sich.') }}</p>
+        <p class="hint">{{ t('Tragen Sie hier ein, was Sie schon wissen. Den Rest fragt Zetta beim ersten Formular und merkt es sich.') }}</p>
       </div>
       <p v-if="!shownPeople.length" class="muted">{{ t('Noch nichts gemerkt.') }}</p>
       <div v-for="p in shownPeople" :key="p.relation" class="kept">
@@ -630,7 +630,7 @@ async function confirmDelete() {
 .sv-foot .good { letter-spacing: .03em; }
 .sv-foot .linkbtn { font-size: var(--fs-small); min-height: 2rem; }
 
-/* One save for Person, Kontakt and Lotse; with unsaved changes it stays in view while the page scrolls. */
+/* One save for Person, Kontakt and the answer settings; with unsaved changes it stays in view while the page scrolls. */
 .savebar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem 1rem; padding: .55rem clamp(.9rem, 4vw, 1.4rem); border: var(--hair); border-radius: var(--r-m); background: var(--sheet); }
 .savebar.stick { position: sticky; bottom: 0; z-index: 1; }
 .done { display: flex; gap: .4em; align-items: center; }

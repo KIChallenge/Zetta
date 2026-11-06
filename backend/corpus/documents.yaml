@@ -9,7 +9,7 @@
 - id: medical_reports
   title: Vorhandene Befunde in Kopie
   where_to_get: Von der Hausärztin, dem Hausarzt oder dem Krankenhaus
-  notes: Werden dem Pflegegeld-Antrag in Kopie beigelegt. Der Lotse liest oder bewertet sie nicht.
+  notes: Werden dem Pflegegeld-Antrag in Kopie beigelegt. Zetta liest oder bewertet sie nicht.
   source_url: https://www.pv.at/cdscontent/load?contentid=10008.781956&version=1783516198
   verified_at: 2026-11-05
 

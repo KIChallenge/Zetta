@@ -26,7 +26,7 @@ const PATTERNS: [RegExp, string][] = [
   [/^Gibt es nur (?<season>.+)\.$/, k('Gibt es nur {season}.')],
   [/^Kassen: (?<insurers>.+)$/, k('Kassen: {insurers}')],
   [/^Vertrag nur mit: (?<insurers>.+)\. Bei einer anderen Kasse zahlen Sie die Behandlung zuerst selbst\.$/, k('Vertrag nur mit: {insurers}. Bei einer anderen Kasse zahlen Sie die Behandlung zuerst selbst.')],
-  [/^Wenden Sie sich an: (?<name>.+)\. Die Kontaktdaten sind im Lotsen noch nicht hinterlegt\.$/, k('Wenden Sie sich an: {name}. Die Kontaktdaten sind im Lotsen noch nicht hinterlegt.')],
+  [/^Wenden Sie sich an: (?<name>.+)\. Die Kontaktdaten sind in Zetta noch nicht hinterlegt\.$/, k('Wenden Sie sich an: {name}. Die Kontaktdaten sind in Zetta noch nicht hinterlegt.')],
 ]
 k('Jetzt erreichbar, rund um die Uhr')
 

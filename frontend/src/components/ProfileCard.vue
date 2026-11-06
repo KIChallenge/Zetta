@@ -17,7 +17,7 @@ const ICONS: Record<string, string> = { [k('Name')]: 'i-user', [k('Adresse')]: '
     <component :is="compact ? 'summary' : 'h2'" class="known-h">
       <svg v-if="compact" class="i" aria-hidden="true"><use href="#i-user" /></svg>
       <span>
-        {{ known.length ? t('Das weiß der Lotse über Sie') : failed ? t('Ihre Daten konnten gerade nicht geladen werden.') : t('Der Lotse weiß noch nichts über Sie.') }}<span v-if="compact && known[0]" class="muted">: {{ known[0][1] }}</span>
+        {{ known.length ? t('Das weiß Zetta über Sie') : failed ? t('Ihre Daten konnten gerade nicht geladen werden.') : t('Zetta weiß noch nichts über Sie.') }}<span v-if="compact && known[0]" class="muted">: {{ known[0][1] }}</span>
       </span>
     </component>
     <dl v-if="rows.length" class="kv">

@@ -419,7 +419,7 @@ async function download() {
 
         <section class="block" aria-labelledby="wz-p">
           <h4 id="wz-p">{{ t('Selbst ausfüllen') }}</h4>
-          <p class="hint">{{ t('Diese Teile füllt der Lotse nie aus: Angaben zur Gesundheit, Zustimmungen, das Datum und Ihre Unterschrift.') }}</p>
+          <p class="hint">{{ t('Diese Teile füllt Zetta nie aus: Angaben zur Gesundheit, Zustimmungen, das Datum und Ihre Unterschrift.') }}</p>
           <ul class="paper">
             <li v-for="g in paper" :key="g.where"><span class="where">{{ g.where }}</span><span>{{ g.labels.join(' · ') }}</span></li>
           </ul>
@@ -448,13 +448,13 @@ async function download() {
           <div class="field">
             <label class="q-l" for="wz-ask">{{ t('Ihre Frage') }}</label>
             <textarea id="wz-ask" v-model="askText" class="input" rows="2" maxlength="500" aria-describedby="wz-ask-h"></textarea>
-            <p id="wz-ask-h" class="hint">{{ t('Zum Ausfüllen dieses Formulars. Fragen zu Krankheiten beantwortet der Lotse nicht. Schreiben Sie keine Namen oder Nummern hinein.') }}</p>
+            <p id="wz-ask-h" class="hint">{{ t('Zum Ausfüllen dieses Formulars. Fragen zu Krankheiten beantwortet Zetta nicht. Schreiben Sie keine Namen oder Nummern hinein.') }}</p>
           </div>
           <div class="actions"><button type="submit" class="btn btn-secondary" :aria-disabled="asked?.state === 'loading'">{{ t('Fragen') }}</button></div>
           <div v-if="asked" class="answer" role="status">
             <p v-if="asked.state === 'loading'" class="hint">{{ t('Einen Moment …') }}</p>
             <p v-else-if="asked.state === 'fail'">{{ t('Eine Antwort ist gerade nicht möglich. Bei Fragen hilft die Stelle, an die der Antrag geht.') }}</p>
-            <p v-else-if="asked.refused">{{ t('Fragen zu Krankheiten, Beschwerden oder Medikamenten beantwortet der Lotse nicht. Diese Angaben tragen Sie selbst ins Formular ein.') }}</p>
+            <p v-else-if="asked.refused">{{ t('Fragen zu Krankheiten, Beschwerden oder Medikamenten beantwortet Zetta nicht. Diese Angaben tragen Sie selbst ins Formular ein.') }}</p>
             <template v-else>
               <p>{{ asked.text }}</p>
               <p class="hint">{{ t('Antwort der KI. Es gilt, was im Formular steht.') }}</p>

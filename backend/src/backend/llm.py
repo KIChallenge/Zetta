@@ -80,7 +80,7 @@ TRANSLATE_PROMPT = (
     "plainly and politely, addressing the reader formally. Many texts are short labels of buttons, chips and form "
     "fields. A text may come with a `note` that says what it means in the app: follow it, but do not translate it.\n"
     "Terms:\n"
-    "- \"Der Lotse\" is the name of this app. Keep \"Lotse\" as a name in every language, never translate it.\n"
+    "- Zetta is the name of this app. Keep \"Zetta\" as a name in every language, never translate it.\n"
     "- Bewegt im Park is the name of a programme: keep it in German.\n"
     "Translate these into {language} by their meaning, never leave the German word:\n"
     "- Kasse: a public health insurance fund. Kassenvertrag: a contract with one.\n"

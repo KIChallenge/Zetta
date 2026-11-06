@@ -309,7 +309,7 @@
   source_url: https://www.fsw.at/antrag
   verified_at: 2026-11-05
   # The care part only (Punkt 10, Pflege und Betreuung): the service this form is used for (home_care_fsw). The parts
-  # for Behinderung und Inklusion and Obdach- und Wohnungslosenhilfe belong to services the Lotse does not offer.
+  # for Behinderung und Inklusion and Obdach- und Wohnungslosenhilfe belong to services Zetta does not offer.
   sections:
     - id: person
       title: Person

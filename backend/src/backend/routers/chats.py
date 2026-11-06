@@ -244,7 +244,7 @@ async def upload_document(
         kind="confirm",
         text="Das steht in Ihrem Dokument. Stimmt das?"
         if items
-        else "In Ihrem Dokument habe ich keine Empfehlung gefunden, zu der der Lotse helfen kann.",
+        else "In Ihrem Dokument habe ich keine Empfehlung gefunden, zu der Zetta helfen kann.",
         payload={"items": [{**i, "label": labels[i["recommendation"]]} for i in items]},
         created_at=now,
     )

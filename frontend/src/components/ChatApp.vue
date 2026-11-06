@@ -65,7 +65,7 @@ const announce = ref('')
 const facts = ref<Fact[]>([]) // the "Verstanden" chips of the open chat
 const plan = ref<Plan | null>(null) // its latest plan, with current step states
 const planErr = ref('')
-const profile = ref<Profile | null>(null) // for the "Das weiß der Lotse" card; SettingsPage reports saves
+const profile = ref<Profile | null>(null) // for the "Das weiß Zetta" card; SettingsPage reports saves
 const profileFailed = ref(false)
 let seq = 0
 let preset: string | null = null // a chat opened right after creating it: its messages are already local
@@ -480,7 +480,7 @@ async function confirmDelete() {
           <li v-for="m in messages" :id="`m-${m.key ?? m.id}`" :key="m.key ?? m.id" class="msg" :class="[m.role, m.kind]">
             <FactChips v-if="m === anchor && facts.length && (m.kind === 'plan' || m.kind === 'card')" class="msg-facts" :facts="facts" :disabled="!!run" @answer="editFact" />
             <p v-if="m.pending" class="typing" role="status">
-              {{ t('Der Lotse sucht die passenden Stellen') }}<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              {{ t('Zetta sucht die passenden Stellen') }}<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
             </p>
             <QuestionCard
               v-else-if="m.kind === 'question'"
@@ -649,7 +649,7 @@ async function confirmDelete() {
 
 .pane { --gut: max(1.25rem, calc((100% - 48rem) / 2)); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 
-/* Home: the navy column starts something new (greeting, composer, what the Lotse knows); "Was jetzt ansteht"
+/* Home: the navy column starts something new (greeting, composer, what Zetta knows); "Was jetzt ansteht"
    sits beside it on the page. Narrow, they stack: navy, the list, then the details on navy again. */
 .is-home { --gut: max(1.25rem, calc((100% - 60rem) / 2)); overflow-y: auto; }
 .is-chat .lead-area { display: contents; }
@@ -691,7 +691,7 @@ async function confirmDelete() {
 .msgs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
 .msg { display: flex; justify-content: flex-end; }
 .msg.assistant { justify-content: flex-start; }
-/* Rectangular speech bubbles: the user's lavender with a tail on the right, the Lotse's on navy with a tail on the left. */
+/* Rectangular speech bubbles: the user's lavender with a tail on the right, Zetta's on navy with a tail on the left. */
 .bubble { position: relative; max-width: min(34rem, 85%); display: grid; gap: .4rem; justify-items: start; padding: .75rem 1.1rem; border-radius: var(--r-s); background: var(--band); color: var(--ink); }
 .bubble::after { content: ""; position: absolute; right: 1.25rem; bottom: -.7rem; width: 1.1rem; height: .75rem; background: var(--band); clip-path: polygon(0 0, 100% 0, 100% 100%); }
 .assistant .bubble { max-width: min(40rem, 92%); background: var(--navy); color: var(--on-navy); --focus: var(--on-navy); }
