@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
-import type { FormBody, Plan, StepUpdate } from '../chats'
+import type { Plan, StepUpdate } from '../chats'
 import { k, t } from '../i18n'
 import StepCard from './StepCard.vue'
 
 const props = defineProps<{ plan: Plan; error: string }>()
-const emit = defineEmits<{ update: [step: string, body: StepUpdate]; upload: []; form: [step: string, body?: FormBody]; wizard: [step: string] }>()
+const emit = defineEmits<{ update: [step: string, body: StepUpdate]; upload: []; wizard: [step: string] }>()
 
 const finished = (status: string) => status === 'done' || status === 'skipped'
 const titles = computed(() => Object.fromEntries(props.plan.services.map((s) => [s.id, s.title])))
@@ -101,7 +101,6 @@ function show(id: string) {
           @toggle="toggle(s.id)"
           @update="(body) => emit('update', s.id, body)"
           @upload="emit('upload')"
-          @form="(body) => emit('form', s.id, body)"
           @wizard="emit('wizard', s.id)"
         />
       </ol>

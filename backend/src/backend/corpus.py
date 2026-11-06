@@ -90,13 +90,6 @@ class Document(Model):
     verified_at: date
 
 
-class FormField(Model):
-    field: str  # the field's name in the PDF
-    value: str  # text with placeholders like {user.last_name}, or the state of a checkbox or radio button
-    when: Condition | None = None  # filled only when known to be true
-    map: dict[str, str] = {}  # for a checkbox or radio button: the person's choice -> its state, e.g. female: /w
-
-
 class FactValue(Model):
     fact: str  # a chat fact
     map: dict[str, str]  # its value -> the answer
@@ -137,8 +130,13 @@ class FormSection(Model):
 
 
 class Check(Model):
-    when: Condition  # over chat facts and answers
+    when: Condition | list[Condition]  # over chat facts and answers; a list: any of them
     text: str
+
+
+class Fill(Model):
+    field: str  # a PDF field the form asks for twice, e.g. a name
+    value: str  # from other answers: "{last_name} {first_name}"
 
 
 class Form(Model):
@@ -146,20 +144,17 @@ class Form(Model):
     title: str
     url: str
     online_url: str | None = None
-    file: str | None = None  # the blank PDF in corpus/forms; with `fields` or `sections` the user gets it filled in
-    fields: list[FormField] = []  # only the person's details, asked for on the form card
-    sections: list[FormSection] = []  # the whole form, asked for in the wizard
+    file: str | None = None  # the blank PDF in corpus/forms; with `sections` the user fills it in with the wizard
+    sections: list[FormSection] = []
     checks: list[Check] = []
+    fills: list[Fill] = []
     submit_to: str
     source_url: str
     verified_at: date
 
     @property
     def questions(self) -> list[FormQuestion]:
-        """The questions of the sections, or the flat `fields` as questions."""
-        if self.sections:
-            return [q for s in self.sections for q in s.questions]
-        return [FormQuestion(id=f.field, label=f.field, pdf=f.field, value=f.value, when=f.when, map=f.map) for f in self.fields]
+        return [q for s in self.sections for q in s.questions]
 
 
 class Item(Model):

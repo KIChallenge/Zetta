@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { when, type FormBody, type Step, type StepUpdate } from '../chats'
-import FormFill from './FormFill.vue'
+import { when, type Step, type StepUpdate } from '../chats'
 import { hours, k, locale, t, translating } from '../i18n'
 
 const props = defineProps<{ step: Step; now: boolean; open: boolean; forServices: string[] }>()
-const emit = defineEmits<{ toggle: []; update: [body: StepUpdate]; upload: []; form: [body?: FormBody]; wizard: [] }>()
+const emit = defineEmits<{ toggle: []; update: [body: StepUpdate]; upload: []; wizard: [] }>()
 
 const KIND = {
   call: ['phone', k('Anrufen')],
@@ -175,7 +174,6 @@ async function copy() {
             <button type="button" class="btn btn-quiet" :aria-expanded="open" :aria-controls="`b-${s.id}`" @click="emit('toggle')">{{ t('E-Mail ansehen') }}</button>
           </template>
           <button v-else-if="s.type === 'form' && s.form?.wizard" type="button" class="btn btn-primary" @click="emit('wizard')"><svg class="i" aria-hidden="true"><use href="#i-pencil" /></svg>{{ t('Formular ausfüllen') }}</button>
-          <button v-else-if="s.type === 'form' && s.form?.prefill" type="button" class="btn btn-primary" @click="emit('form')"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ s.form.title }} (PDF, {{ t('vorausgefüllt') }})</button>
           <a v-else-if="s.type === 'form' && s.form" class="btn btn-primary" :href="s.form.url" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ s.form.title }} (PDF)</a>
           <a v-else-if="s.type === 'book' && s.contact" class="btn btn-primary" :href="s.contact.href" target="_blank" rel="noopener noreferrer"><svg class="i" aria-hidden="true"><use href="#i-ext" /></svg>{{ t(s.contact.label ?? 'Öffnen') }}</a>
           <button v-else-if="s.type === 'upload'" type="button" class="btn btn-primary" @click="emit('upload')"><svg class="i" aria-hidden="true"><use href="#i-file" /></svg>{{ t('PDF auswählen') }}</button>
@@ -259,7 +257,7 @@ async function copy() {
             <dl class="mail-meta">
               <dt>{{ t('An') }}</dt><dd><a :href="s.contact.href">{{ s.contact.value }}</a></dd>
               <dt>{{ t('Betreff') }}</dt><dd>{{ script?.subject }}<small v-if="translated" class="say-tr" :lang="locale">{{ translated.subject }}</small></dd>
-              <template v-if="s.form"><dt>{{ t('Anhang') }}</dt><dd><button v-if="s.form.prefill" type="button" class="linkbtn" @click="emit('form')">{{ s.form.title }} ({{ t('vorausgefüllt') }})</button><a v-else :href="s.form.url" target="_blank" rel="noopener noreferrer">{{ s.form.title }}</a> {{ t('und die Unterlagen aus der Checkliste') }}</dd></template>
+              <template v-if="s.form"><dt>{{ t('Anhang') }}</dt><dd><button v-if="s.form.wizard" type="button" class="linkbtn" @click="emit('wizard')">{{ s.form.title }} ({{ t('ausfüllen') }})</button><a v-else :href="s.form.url" target="_blank" rel="noopener noreferrer">{{ s.form.title }}</a> {{ t('und die Unterlagen aus der Checkliste') }}</dd></template>
             </dl>
             <div class="field">
               <label class="field-l" :for="`m-${s.id}`">{{ t('Ihre E-Mail') }} <span class="muted">{{ t('(änderbar)') }}</span></label>
@@ -283,8 +281,7 @@ async function copy() {
               <!-- Above, the card shows this button once the step is due; it can be filled in before. -->
               <div v-if="!act" class="actions"><button type="button" class="btn btn-primary" @click="emit('wizard')"><svg class="i" aria-hidden="true"><use href="#i-pencil" /></svg>{{ t('Formular ausfüllen') }}</button></div>
             </div>
-            <FormFill v-else-if="s.form.prefill" :prefill="s.form.prefill" :title="s.form.title" @submit="(body) => emit('form', body)" />
-            <p v-if="s.form.wizard || s.form.prefill" class="hint">
+            <p v-if="s.form.wizard" class="hint">
               {{ t('Bitte prüfen, den Rest ergänzen und unterschreiben.') }} <a :href="s.form.url" target="_blank" rel="noopener noreferrer">{{ t('Leeres Formular') }}</a>
             </p>
             <div v-if="s.form.online_url" class="actions">

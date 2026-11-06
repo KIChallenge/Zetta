@@ -38,6 +38,7 @@ test('answers are checked as on the server', () => {
   assert.equal(problem(q('b', { kind: 'date', detail: 'birth_date' }), '01.01.2999'), 'birth')
   assert.equal(problem(q('s', { detail: 'svnr' }), '1237 010180'), '')
   assert.equal(problem(q('s', { detail: 'svnr' }), '1234 567890'), 'svnr')
+  assert.equal(problem(q('s', { detail: 'svnr', max: 10 }), '1237 010180'), '') // the space is not sent
   assert.equal(problem(q('p', { detail: 'postal_code' }), '110'), 'postal')
   assert.equal(problem(q('e', { detail: 'email' }), 'anna@'), 'email')
   assert.equal(problem(q('t', { max: 5 }), 'zu lang'), 'long')

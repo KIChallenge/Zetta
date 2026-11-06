@@ -52,21 +52,26 @@ def test_every_question_names_a_real_field_and_state_of_the_pdf():
     assert {f for q in CARE.questions for f in q.fields} == set(fields)  # every field is accounted for
 
 
-def test_question_ids_are_unique_and_never_a_fact_key():
-    ids = [q.id for q in CARE.questions]
+WIZARDS = [f for f in get_corpus().forms.values() if f.sections]
+
+
+@pytest.mark.parametrize("form", WIZARDS, ids=lambda f: f.id)
+def test_question_ids_are_unique_and_never_a_fact_key(form):
+    ids = [q.id for q in form.questions]
 
     assert len(ids) == len(set(ids))
     assert not set(ids) & set(FACTS)
 
 
-def test_conditions_only_look_at_facts_and_earlier_questions():
+@pytest.mark.parametrize("form", WIZARDS, ids=lambda f: f.id)
+def test_conditions_only_look_at_facts_and_earlier_questions(form):
     seen = set(FACTS)
-    for section in CARE.sections:
+    for section in form.sections:
         assert set(section.when or {}) <= set(FACTS), section.id
         for q in section.questions:
             assert all(set(c) <= seen for c in conditions(q.when)), q.id
             seen.add(q.id)
-    assert all(set(c.when) <= seen for c in CARE.checks)
+    assert all(set(c) <= seen for check in form.checks for c in conditions(check.when))
 
 
 def test_everything_medical_the_consents_and_the_signature_stay_on_paper():
@@ -81,8 +86,9 @@ def test_everything_medical_the_consents_and_the_signature_stay_on_paper():
             assert not scripts.MEDICAL.search(" ".join([q.label, *q.fields])), q.id
 
 
-def test_kinds_fit_their_options_and_drafts():
-    for q in CARE.questions:
+@pytest.mark.parametrize("form", WIZARDS, ids=lambda f: f.id)
+def test_kinds_fit_their_options_and_drafts(form):
+    for q in form.questions:
         if q.kind in forms.CHOICE_KINDS:
             assert forms.options(q), q.id
             assert set(q.map) <= set(forms.options(q)), q.id
@@ -158,6 +164,22 @@ def test_open_required_questions_and_the_forms_checks_are_the_findings():
     assert "Bei Punkt 4 steht „ja“. Kreuzen Sie bitte auch an, wer hilft." not in [
         f.get("text") for f in model({"subject": "mother"}, {"care_by_others": "yes", "carers": "yes"})["findings"]
     ]
+
+
+def test_the_fsw_form_reminds_of_its_documents_and_catches_a_contradiction():
+    fsw = get_corpus().forms["fsw_application_form"]
+    answers = {"maintenance_none": "yes", "maintenance_liable": "yes", "care_home": "yes"}
+
+    view = forms.wizard(fsw, ANNA, {"self": {"marital_status": "widowed"}}, {"subject": "self", "pension_payer": "pv"}, answers)
+
+    hints = [f["text"] for f in view["findings"] if f["kind"] == "check"]
+    assert any("Lichtbildausweis" in h for h in hints)  # always
+    assert any("Einkommen" in h for h in hints)  # the pension from the chat: "Ich habe ein Einkommen"
+    assert any("Sterbeurkunde" in h for h in hints)
+    assert any("Beilage Angehörige" in h for h in hints)
+    assert any("und zugleich" in h for h in hints)
+    assert any("Befundbericht" in h for h in hints)
+    assert not any("Heiratsurkunde" in h or "Bestätigung dafür" in h for h in hints)
 
 
 def test_the_paper_parts_are_listed_but_never_asked():
@@ -247,8 +269,8 @@ def test_another_users_chat_has_no_wizard(client, anna, chat):  # noqa: F811
 
     assert_error(client.get(url(chat, "/wizard"), headers=bob), 404)
     assert_error(save(client, bob, chat, {"application_type": "new"}), 404)
-    # A form card without a wizard.
-    assert_error(client.get(f"/chats/{chat['id']}/steps/home_care_fsw.send_application/form/wizard", headers=anna), 404)
+    # A step without a form.
+    assert_error(client.get(f"/chats/{chat['id']}/steps/care_allowance.call/form/wizard", headers=anna), 404)
 
 
 def test_the_pdf_has_the_answers_and_leaves_the_paper_parts_blank(client, anna, chat):  # noqa: F811
@@ -329,6 +351,18 @@ def test_the_llm_never_sees_a_personal_value_or_a_paper_part(client, anna, chat,
     assert calls[3]["answers"] == {"care_by_others": "yes", "carers": "yes", "pension": "yes"}
     assert calls[3]["filled"]["svnr"] is True
     assert "Für wen: Mutter" in calls[1]["facts"]
+
+
+@pytest.mark.parametrize("form", WIZARDS, ids=lambda f: f.id)
+def test_every_form_can_be_shown_to_the_llm_without_values(form):
+    facts = {"subject": "mother", "pension_payer": "pv", "lives_alone": "yes"}
+    found = forms.rows(form, ANNA, {"mother": MOTHER}, facts, {})
+
+    data = forms.llm_form(form, found, facts)
+
+    sent = json.dumps(data, ensure_ascii=False)
+    assert not {"Berger", "Anna", "Maria", "1948", "Favoritenstraße"} & set(sent.replace('"', " ").replace(",", " ").split())
+    assert all(label.split(":")[0] in {f.label for f in FACTS.values()} for label in data["facts"])  # only fact labels
 
 
 def test_explanations_are_asked_once_per_question_and_language(client, anna, chat, llm):  # noqa: F811

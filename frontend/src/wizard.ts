@@ -57,12 +57,14 @@ export function problem(q: WizardQuestion, raw: string): Problem {
   if (q.detail === 'email' && !EMAIL.test(v)) return 'email'
   if (q.detail === 'phone' && !/^[0-9 +()-]*$/.test(v)) return 'phone'
   if (q.kind === 'number' && !/^\d+$/.test(v)) return 'number'
-  if (q.max !== null && v.length > q.max) return 'long'
+  if (q.max !== null && wire(q, v).length > q.max) return 'long' // as sent: an SVNR without its space
   return ''
 }
 
 /** The answer as it is sent: trimmed, an SVNR without its space. */
-export const wire = (q: WizardQuestion, v: string) => (q.detail === 'svnr' ? v.replace(/\s/g, '') : v.trim())
+export function wire(q: WizardQuestion, v: string) {
+  return q.detail === 'svnr' ? v.replace(/\s/g, '') : v.trim()
+}
 
 /** A Vienna postal code fills in the city, if it is still empty. */
 export const viennaCity = (postal: string, city: string) => (VIENNA.test(postal) && !city.trim() ? 'Wien' : city)

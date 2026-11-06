@@ -17,7 +17,7 @@ from backend.hours import now as vienna_now
 from backend.hours import reachable, summary
 from backend.llm import Llm, redact
 from backend.models import Chat, ChatFact, FormAnswer, Message, Person, Plan, Profile, StepState, utcnow
-from backend.schemas import Contact, FormDetails, FormRequest, MessageResponse, PersonData, ProfileData
+from backend.schemas import Contact, FormDetails, MessageResponse, PersonData, ProfileData
 
 logger = logging.getLogger(__name__)
 TO_PLAN = "Ihr Plan steht weiter oben. Unter „Mehr dazu“ steht bei jedem Thema, worum es geht."
@@ -62,15 +62,12 @@ def kept_of(db: Session, user_id: str) -> dict[str, dict]:
     return {p.relation: p.details for p in db.scalars(select(Person).where(Person.user_id == user_id))}
 
 
-def people_of(db: Session, user_id: str, facts: dict) -> tuple[PersonData, PersonData | None]:
-    return forms.people(profile_of(db, user_id), kept_of(db, user_id), facts)
-
-
-def entered(body: FormRequest, facts: dict) -> dict[str, dict]:
-    """Relation -> the details typed into a form card, without the empty ones. The subject's details go to the
-    user's when they ask for themselves, and nowhere while it is not known who the chat is about."""
-    out = {"self": body.user.model_dump(exclude_defaults=True)}
-    subject = body.subject.model_dump(exclude_defaults=True)
+def entered(typed: dict[str, dict], facts: dict) -> dict[str, dict]:
+    """Relation -> the details typed into a form ("user"/"subject" -> PersonData fields), without the empty ones. The
+    subject's details go to the user's when they ask for themselves, and nowhere while it is not known who the chat is
+    about."""
+    out = {"self": PersonData(**typed.get("user", {})).model_dump(exclude_defaults=True)}
+    subject = PersonData(**typed.get("subject", {})).model_dump(exclude_defaults=True)
     if facts.get("subject") == "self":
         out["self"] |= subject
     elif facts.get("subject") in FACTS["subject"].values:
@@ -78,18 +75,8 @@ def entered(body: FormRequest, facts: dict) -> dict[str, dict]:
     return {k: v for k, v in out.items() if v}
 
 
-def with_entered(user: PersonData, subject: PersonData | None, new: dict[str, dict], facts: dict):
-    """The people with the details just typed in, for one PDF."""
-    user = user.model_copy(update=new.get("self", {}))
-    if facts.get("subject") == "self":
-        return user, user
-    if subject is None:
-        return user, None
-    return user, subject.model_copy(update=new.get(facts["subject"], {}))
-
-
 def remember(db: Session, user_id: str, new: dict[str, dict]) -> None:
-    """Keeps details typed into a form card for the next forms. The user's name and contact details go to the
+    """Keeps details typed into a form for the next forms. The user's name and contact details go to the
     profile, everything else to their row in `people`."""
     now = utcnow()
     for relation, details in new.items():
@@ -301,10 +288,6 @@ def render_plan(
             # The whole form, in a wizard (GET /chats/{id}/steps/{step_id}/form/wizard): the card shows how far it is.
             found = forms.rows(form, profile, kept, facts, answers.get(form.id, {}))
             view["form"] = {**step["form"], "wizard": forms.progress(found)}
-        elif form and form.file and form.fields:
-            # The PDF itself is filled in on download (GET /chats/{id}/steps/{step_id}/form).
-            user, subject = forms.people(profile, kept, facts)
-            view["form"] = {**step["form"], "prefill": forms.summary(form, user, subject, facts)}
         if "contact" in step:
             view["contact"] = contact_view(step["contact"], now)
         if "doctors" in step:

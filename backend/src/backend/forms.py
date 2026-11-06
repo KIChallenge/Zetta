@@ -1,14 +1,13 @@
 """Prefilled application forms: the blank PDF from corpus/forms with the user's details and answers in its fields.
 
-Which field gets what is corpus data (forms.yaml). A form card fills in the profile and the details kept from form
-cards. A form with sections is filled in with a wizard: the same details, the chat's facts and what the user answers.
-Never medical details, signatures, application dates or consents: those are manual and stay on paper. The filled
-PDF is built on request and not stored.
+Which field gets what is corpus data (forms.yaml). The wizard asks for the whole form, section by section, and fills
+in what it can: the profile, the details kept for a person, the chat's facts and what the user answers. Never medical
+details, signatures, application dates or consents: those are manual and stay on paper. The filled PDF is built on
+request and not stored.
 """
 
 import io
 import re
-from collections import Counter
 from datetime import date
 from functools import cache
 from typing import NamedTuple
@@ -18,14 +17,15 @@ from pypdf import PdfReader, PdfWriter
 
 from backend.corpus import CORPUS_DIR, Condition, FactValue, Form, FormQuestion, FormSection, Not
 from backend.engine import check
-from backend.facts import FACTS, subject_words, value_label
+from backend.facts import FACTS, value_label
 from backend.schemas import CHOICES, Contact, PersonData, ProfileData
 from backend.scripts import SLOT
 
 FORMS_DIR = CORPUS_DIR / "forms"
 # The house number starts at the last part that is only numbers, letters, slashes and dashes: "Straße des 1. Mai 5".
 HOUSE = re.compile(r"^(.+?)\s+(\d[\d\sA-Za-z/-]*)$")
-# What a form card asks for: entry -> (label for the user, label for someone else, the PersonData fields it sets).
+# A person's details as the settings page asks for them: entry -> (label for the user, label for someone else, the
+# PersonData fields it sets).
 ENTRIES = {
     "name": ("Ihr Name", "Name", ["full_name"]),
     "phone": ("Ihre Telefonnummer", "Telefonnummer", ["phone"]),
@@ -130,79 +130,8 @@ def max_lengths(file: str) -> dict[str, int]:
     return found
 
 
-class Filled(NamedTuple):
-    fields: dict[str, str]  # PDF field -> value
-    used: set[str]  # placeholders that went in
-    absent: Counter[str]  # placeholders without a value -> how many fields wait for them
-    done: int  # fields with the person's details that are filled
-    total: int  # fields with the person's details that apply
-
-
-def values(form: Form, user: PersonData, subject: PersonData | None, facts: dict) -> Filled:
-    """The fields the person's details fill. One that is too long or has a choice the form lacks stays for the user to
-    write. The form card's view: answers typed into the wizard come in with `fill_wizard`."""
-    have = known(user, subject)
-    limits = max_lengths(form.file) if form.file else {}
-    hidden = {q.id for s in form.sections if s.when and check(s.when, facts) is not True for q in s.questions}
-    out = Filled({}, set(), Counter(), 0, 0)
-    for q in form.questions:
-        if q.id in hidden or q.manual or not isinstance(q.value, str) or not holds(q.when, facts):
-            continue
-        field = q.fields[0]
-        slots = SLOT.findall(q.value)
-        out = out._replace(total=out.total + bool(slots))
-        if absent := [s for s in slots if s not in have]:
-            out.absent.update(absent)
-            continue
-        if q.map:
-            # A checkbox or radio button: the state for the person's choice, e.g. {subject.sex} -> /weiblich.
-            value = q.map.get(have[slots[0]])
-            if value is None:
-                continue
-        else:
-            value = SLOT.sub(lambda m: text(m[1], have[m[1]]), q.value)
-            # Cut off, a name or number would be wrong on the form: the user writes it in by hand instead.
-            if len(value) > limits.get(field, len(value)):
-                continue
-        out.fields[field] = value
-        out.used.update(slots)
-        out = out._replace(done=out.done + bool(slots))
-    return out
-
-
-def summary(form: Form, user: PersonData, subject: PersonData | None, facts: dict) -> dict:
-    """For the form card: which details are in the PDF, and the ones still missing, to be asked for right there."""
-    result = values(form, user, subject, facts)
-    gen = subject_words(facts)[2]
-
-    def entries(slots: set[str]) -> list[tuple[str, str]]:
-        # The user's own details and the subject's are the same person when the user asks for themselves. While it
-        # is not known who the chat is about, there is no one to keep the subject's details for.
-        self = facts.get("subject") == "self"
-        found = {("user" if s.startswith("user.") or self else "subject", FROM[s.split(".")[1]]) for s in slots}
-        whose = ("user", "subject") if subject is not None else ("user",)
-        return [(who, e) for who in whose for e in ENTRIES if (who, e) in found]
-
-    def label(who: str, entry: str) -> str:
-        own, noun, _ = ENTRIES[entry]
-        return own if who == "user" else f"{noun} {gen}"
-
-    weight = Counter()
-    for slot, n in result.absent.items():
-        weight.update({e: n for e in entries({slot})})
-    # The details that fill the most fields first: the card shows a few, the next forms ask for the rest.
-    ask = sorted(entries(set(result.absent)), key=lambda e: weight[e], reverse=True)
-    person = {"user": user, "subject": subject}
-    return {
-        "filled": [label(*e) for e in entries(result.used) if e not in ask],
-        "ask": [{"who": who, **entry_item(entry, label(who, entry), person[who])} for who, entry in ask],
-        "done": result.done,
-        "total": result.total,
-    }
-
-
 def entry_item(entry: str, label: str, person: PersonData) -> dict:
-    """An entry as the form card and the settings page ask for it, with what is known already."""
+    """An entry as the settings page asks for it, with what is known already."""
     fields = ENTRIES[entry][2]
     return {
         "entry": entry,
@@ -211,10 +140,6 @@ def entry_item(entry: str, label: str, person: PersonData) -> dict:
         "values": {f: getattr(person, f) for f in fields},
         "choices": {f: CHOICES[f] for f in fields if f in CHOICES},
     }
-
-
-def fill(form: Form, user: PersonData, subject: PersonData | None, facts: dict) -> bytes:
-    return pdf(form, values(form, user, subject, facts).fields)
 
 
 def pdf(form: Form, fields: dict[str, str]) -> bytes:
@@ -233,10 +158,11 @@ EMPTY = "empty"  # an unanswered question, in `when` and `checks`
 YES_NO = {"yes": "Ja", "no": "Nein"}
 CHOICE_KINDS = ("choice", "yes_no", "checkbox")
 DETAIL = re.compile(r"^\{(user|subject)\.([a-z_]+)\}$")
+FILL = re.compile(r"\{([a-z_]+)\}")  # a question's answer in `fills`
 PAPER_DATE = re.compile(r"^(\d{2})\.(\d{2})\.(\d{4})$")
 # A detail typed into the wizard -> the PersonData field it is validated as and kept in.
 PERSON = {
-    "svnr": "svnr", "postal_code": "postal_code", "city": "city", "phone": "phone", "email": "contact_email",
+    "name": "full_name", "svnr": "svnr", "postal_code": "postal_code", "city": "city", "phone": "phone", "email": "contact_email",
     "title": "title", "birth_date": "birth_date", "sex": "sex", "marital_status": "marital_status",
     "citizenship": "citizenship",
 }  # fmt: skip
@@ -255,12 +181,20 @@ def detail(q: FormQuestion) -> tuple[str, str] | None:
     return (match[1], match[2]) if match else None
 
 
-def options(q: FormQuestion) -> dict[str, str]:
+def options(q: FormQuestion, limits: dict[str, int] | None = None) -> dict[str, str]:
+    """The answers offered. With a `map` only those the form has a box for, with `limits` (a text field) only those
+    whose label fits: the others are written in by hand."""
     if q.kind == "yes_no":
-        return YES_NO
-    if q.kind == "checkbox":
-        return {"yes": q.label}
-    return q.options or CHOICES.get((detail(q) or ("", ""))[1], {})
+        found = YES_NO
+    elif q.kind == "checkbox":
+        found = {"yes": q.label}
+    else:
+        found = q.options or CHOICES.get((detail(q) or ("", ""))[1], {})
+    if q.map:
+        return {k: v for k, v in found.items() if k in q.map}
+    if limits is not None:
+        return {k: v for k, v in found.items() if lines(v, [limits.get(f) for f in q.fields])}
+    return found
 
 
 def paper_date(value: str) -> date | None:
@@ -325,6 +259,8 @@ def prefill(q: FormQuestion, have: dict[str, str], origin: dict[str, str], facts
     single = detail(q)
     if single and single[1] in CHOICES:
         value = have[slots[0]]  # the code, e.g. "female"
+        if value not in options(q, limits):
+            return None
     else:
         value = SLOT.sub(lambda m: text(m[1], have[m[1]]), q.value)
         if lines(value, [limits.get(f) for f in q.fields]) is None:
@@ -363,7 +299,7 @@ def findings(form: Form, found: list[Row], facts: dict) -> list[dict]:
         for r in found
         if r.shown and r.question.required and not r.value
     ]
-    return missing + [{"kind": "check", "text": c.text} for c in form.checks if check(c.when, state) is True]
+    return missing + [{"kind": "check", "text": c.text} for c in form.checks if holds(c.when, state)]
 
 
 def progress(found: list[Row]) -> dict:
@@ -389,7 +325,7 @@ def wizard(form: Form, profile: ProfileData, kept: dict[str, dict], facts: dict,
             "id": q.id,
             "label": q.label,
             "kind": q.kind,
-            "options": options(q) if q.kind in CHOICE_KINDS else {},
+            "options": options(q, limits) if q.kind in CHOICE_KINDS else {},
             "help": q.help,
             "source_url": q.source_url,
             "required": q.required,
@@ -451,7 +387,7 @@ def valid(q: FormQuestion, value: str, limits: dict[str, int]) -> bool:
     if len(value) > MAX_ANSWER or any(ord(c) < 32 and c != "\n" for c in value):
         return False
     if q.kind in CHOICE_KINDS:
-        return value in options(q)
+        return value in options(q, limits)
     if q.kind == "date" and paper_date(value) is None or q.kind == "number" and not value.isdigit():
         return False
     whose = detail(q)
@@ -477,7 +413,8 @@ def merged(stored: dict[str, str], new: dict[str, str], prefills: list[Row]) -> 
 
 
 def entered(found: list[Row]) -> dict[str, dict]:
-    """"user"/"subject" -> the person's details typed into the wizard, as PersonData fields, to keep them."""
+    """"user"/"subject" -> the person's details typed into the wizard, as PersonData fields, to keep them. Combined
+    details like an address on one line are not kept: they cannot be split back."""
     out: dict[str, dict] = {"user": {}, "subject": {}}
     values = {detail(r.question): r for r in found if detail(r.question)}
     for (whose, name), r in values.items():
@@ -505,10 +442,16 @@ def wizard_fields(form: Form, found: list[Row]) -> dict[str, str]:
             if state := q.map.get(r.value):
                 out[q.fields[0]] = state
         elif q.kind in CHOICE_KINDS:
-            if label := options(q).get(r.value):
+            if label := options(q, limits).get(r.value):
                 out[q.fields[0]] = label
         else:
             out |= dict(zip(q.fields, lines(r.value, [limits.get(f) for f in q.fields]) or []))
+    answered = {r.question.id: r.value for r in found if r.shown and r.value}
+    for fill in form.fills:
+        names = FILL.findall(fill.value)
+        value = FILL.sub(lambda m: answered.get(m[1], ""), fill.value)
+        if all(n in answered for n in names) and lines(value, [limits.get(fill.field)]):
+            out[fill.field] = value
     return out
 
 
@@ -523,9 +466,8 @@ def llm_question(q: FormQuestion) -> dict:
 def llm_form(form: Form, found: list[Row], facts: dict) -> dict:
     """The form as the LLM sees it: the questions and help texts of the sections that apply, and the labels of the
     chat facts the form depends on. Never a value typed in or prefilled, never a manual question."""
-    conditions = [s.when for s in form.sections] + [c.when for c in form.checks]
-    conditions += [c for r in found for c in condition_view(r.question.when)]
-    keys = {k for c in conditions if c for k in c}
+    whens = [s.when for s in form.sections] + [c.when for c in form.checks] + [r.question.when for r in found]
+    keys = {k for when in whens for c in condition_view(when) for k in c}
     keys |= {r.question.value.fact for r in found if isinstance(r.question.value, FactValue)}
     return {
         "form": form.title,

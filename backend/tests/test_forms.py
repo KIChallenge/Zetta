@@ -1,4 +1,4 @@
-"""Prefilled forms: only the user's own details, in the right fields, and nothing cut off."""
+"""Prefilled forms: the person's details in the right fields, and nothing cut off or medical."""
 
 import io
 
@@ -22,9 +22,11 @@ PROFILE = ProfileData(
 )
 
 
-def filled(form, profile, facts, kept=None):
-    fields = PdfReader(io.BytesIO(forms.fill(form, *forms.people(profile, kept or {}, facts), facts))).get_fields()
-    return {name: f.get("/V") for name, f in fields.items() if f.get("/V") not in (None, "", "/Off")}
+def filled(form, profile, facts, kept=None, answers=None):
+    """PDF field -> value of the downloaded form, read back."""
+    fields = forms.wizard_fields(form, forms.rows(form, profile, kept or {}, facts, answers or {}))
+    pdf = PdfReader(io.BytesIO(forms.pdf(form, fields))).get_fields()
+    return {name: f.get("/V") for name, f in pdf.items() if f.get("/V") not in (None, "", "/Off")}
 
 
 @pytest.mark.parametrize(
@@ -92,43 +94,9 @@ def test_a_value_longer_than_the_field_is_left_for_the_user():
     values = filled(CARE, long, {"subject": "self"})
 
     assert values["Fam.Name"] == "Berger"
-    assert "Vorname" not in values  # 38 characters, the field takes 30
-    # Known, so not asked for again: the user writes it in by hand.
-    asked = forms.summary(CARE, *forms.people(long, {}, {"subject": "self"}), {"subject": "self"})["ask"]
-    assert "name" not in [a["entry"] for a in asked]
-
-
-def summary(profile, facts, kept=None):
-    return forms.summary(CARE, *forms.people(profile, kept or {}, facts), facts)
-
-
-def test_summary_lists_filled_details_and_asks_for_the_missing_ones():
-    partial = PROFILE.model_copy(update={"svnr": "", "contact_email": ""})
-
-    result = summary(partial, {"subject": "self"})
-
-    assert result["filled"] == ["Ihr Name", "Ihre Telefonnummer", "Ihre Adresse"]
-    assert [a["label"] for a in result["ask"]] == [
-        "Ihre E-Mail-Adresse", "Ihre SV-Nummer", "Ihr Titel", "Ihr Geburtsdatum", "Ihr Geschlecht",
-        "Ihr Familienstand", "Ihre Staatsbürgerschaft",
-    ]  # fmt: skip
-    assert (result["done"], result["total"]) == (7, 14)
-    sex = next(a for a in result["ask"] if a["entry"] == "sex")
-    assert sex == {
-        "who": "user", "entry": "sex", "label": "Ihr Geschlecht", "fields": ["sex"], "values": {"sex": ""},
-        "choices": {"sex": {"female": "weiblich", "male": "männlich", "diverse": "divers"}},
-    }  # fmt: skip
-
-
-def test_for_a_relative_the_summary_asks_for_their_details_by_relation():
-    result = summary(PROFILE, {"subject": "mother"})
-
-    assert "Name Ihrer Mutter" in [a["label"] for a in result["ask"]]
-    assert {a["who"] for a in result["ask"]} == {"user", "subject"}  # the user's title, the mother's details
-
-
-def test_while_the_subject_is_unknown_only_the_users_details_are_asked_for():
-    assert {a["who"] for a in summary(PROFILE, {})["ask"]} <= {"user"}
+    assert "Vorname" not in values  # 38 characters, the field takes 30: the user writes it in by hand
+    first = next(r for r in forms.rows(CARE, long, {}, {"subject": "self"}, {}) if r.question.id == "first_name")
+    assert (first.value, first.source) == ("", None)
 
 
 def test_kept_details_of_a_relative_fill_the_form():
@@ -147,11 +115,17 @@ def test_kept_details_of_a_relative_fill_the_form():
     assert values["Familienname andere"] == "Berger"  # the user, filling in for her
 
 
-def test_a_choice_the_form_has_no_box_for_is_left_open():
-    rehab, facts, kept = corpus.forms["rehab_form"], {"subject": "self"}, {"self": {"sex": "diverse"}}
+def test_a_choice_the_form_has_no_box_or_room_for_is_left_open():
+    rehab, facts = corpus.forms["rehab_form"], {"subject": "self"}
+    kept = {"self": {"sex": "diverse", "marital_status": "partnership"}}
 
-    assert "Geschlecht" not in filled(rehab, PROFILE, facts, kept)  # only "männlich" and "weiblich"
-    assert "sex" not in [a["entry"] for a in forms.summary(rehab, *forms.people(PROFILE, kept, facts), facts)["ask"]]
+    values = filled(rehab, PROFILE, facts, kept)
+
+    assert "Geschlecht" not in values  # only "männlich" and "weiblich"
+    assert "Personenstand" not in values  # "eingetragene Partnerschaft" does not fit its 15 characters
+    offered = {q.id: forms.options(q, forms.max_lengths(rehab.file)) for q in rehab.questions if q.id in ("sex", "marital_status")}
+    assert set(offered["sex"]) == {"female", "male"}
+    assert "partnership" not in offered["marital_status"] and "married" in offered["marital_status"]
 
 
 @pytest.mark.parametrize(("sex", "state"), [("female", "/weiblich"), ("male", "/maennlich"), ("diverse", "/divers/inter/offen")])
@@ -161,15 +135,15 @@ def test_radio_buttons_get_the_state_of_the_choice(sex, state):
     assert values["Geschlecht KundIn"] == state
 
 
-def test_nothing_medical_is_ever_filled():
-    for form in corpus.forms.values():
-        for field in form.fields:
-            assert not scripts.MEDICAL.search(field.field), (form.id, field.field)
+def test_a_name_the_form_asks_for_twice_is_written_from_the_answers():
+    values = filled(corpus.forms["rehab_form"], PROFILE, {"subject": "self"}, answers={"first_name": "Anna"})
+
+    assert (values["Familienname"], values["Vorname"], values["Patient(in)"]) == ("Berger", "Anna", "Berger Anna")
+    assert "Patient(in)" not in filled(corpus.forms["rehab_form"], ProfileData(), {"subject": "self"})
 
 
-def test_the_details_that_fill_the_most_fields_are_asked_for_first():
-    asked = [a["entry"] for a in summary(ProfileData(), {"subject": "mother"})["ask"]]
-
-    # The address fills street, house number, postal code and city, for the mother and for the user.
-    assert asked[:2] == ["address", "address"]
-    assert asked.index("name") < asked.index("title")
+@pytest.mark.parametrize("form", [f for f in corpus.forms.values() if f.sections], ids=lambda f: f.id)
+def test_nothing_medical_is_ever_asked_or_filled(form):
+    for q in form.questions:
+        if not q.manual:
+            assert not scripts.MEDICAL.search(" ".join([q.label, *q.fields])), (form.id, q.id)

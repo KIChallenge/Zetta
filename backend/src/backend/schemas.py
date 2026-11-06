@@ -205,10 +205,8 @@ class PersonData(Contact, FormDetails):
 
 
 class FormRequest(BaseModel):
-    """Details typed into a form card. Only the ones entered are sent; "remember" keeps them for later forms."""
+    """Downloading a form filled in with the wizard. "remember" keeps the person's details typed into it."""
 
-    user: PersonData = PersonData()
-    subject: PersonData = PersonData()
     remember: bool = True
 
 

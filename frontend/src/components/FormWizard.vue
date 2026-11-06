@@ -261,7 +261,7 @@ function where(f: Finding | Hint) {
 async function download() {
   downloadErr.value = ''
   try {
-    await downloadForm(props.chat, props.step, { user: {}, subject: {}, remember: remember.value })
+    await downloadForm(props.chat, props.step, { remember: remember.value })
     remembered.value ||= remember.value
   } catch (e) {
     downloadErr.value = say(e)

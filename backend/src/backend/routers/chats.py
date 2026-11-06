@@ -28,7 +28,6 @@ from backend.schemas import (
     MessageRequest,
     MessageResponse,
     NextUp,
-    PersonData,
     StepUpdate,
 )
 
@@ -288,11 +287,11 @@ def update_step(step_id: str, body: StepUpdate, chat: OwnedChat, db: DbSession) 
     return pipeline.current_plan(db, chat)
 
 
-def step_form(db: Session, chat: Chat, step_id: str, wizard: bool = False):
+def step_form(db: Session, chat: Chat, step_id: str):
     plan = pipeline.latest_plan(db, chat.id)
     step = next((s for s in plan.graph["steps"] if s["id"] == step_id), None) if plan else None
     form = get_corpus().forms.get(step.get("form", {}).get("id")) if step else None
-    if form is None or not form.file or not (form.sections if wizard else form.fields or form.sections):
+    if form is None or not form.file or not form.sections:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Form not found")
     return form
 
@@ -320,30 +319,17 @@ def wizard_rows(db: Session, chat: Chat, form) -> tuple[list[forms.Row], dict]:
 def download_form(step_id: str, chat: OwnedChat, db: DbSession) -> Response:
     """The step's form as a PDF, filled in with the user's details and answers. Built on request, never stored."""
     form = step_form(db, chat, step_id)
-    if form.sections:
-        return pdf(form, forms.pdf(form, forms.wizard_fields(form, wizard_rows(db, chat, form)[0])))
-    facts = {k: r.value for k, r in pipeline.fact_rows(db, chat.id).items()}
-    return pdf(form, forms.fill(form, *pipeline.people_of(db, chat.user_id, facts), facts))
+    return pdf(form, forms.pdf(form, forms.wizard_fields(form, wizard_rows(db, chat, form)[0])))
 
 
 @router.post("/{chat_id}/steps/{step_id}/form", response_class=Response)
 def complete_form(step_id: str, body: FormRequest, chat: OwnedChat, db: DbSession) -> Response:
-    """The form with the details just typed into its card, or into its wizard, as well. With "remember", they are
-    kept for later forms."""
+    """The PDF, as above. With "remember", the person's details typed into the wizard are kept for later forms."""
     form = step_form(db, chat, step_id)
-    if form.sections:
-        found, facts = wizard_rows(db, chat, form)
-        typed = forms.entered(found)
-        if body.remember:
-            request = FormRequest(user=PersonData(**typed["user"]), subject=PersonData(**typed["subject"]))
-            pipeline.remember(db, chat.user_id, pipeline.entered(request, facts))
-        return pdf(form, forms.pdf(form, forms.wizard_fields(form, found)))
-    facts = {k: r.value for k, r in pipeline.fact_rows(db, chat.id).items()}
-    new = pipeline.entered(body, facts)
-    people = pipeline.with_entered(*pipeline.people_of(db, chat.user_id, facts), new, facts)
+    found, facts = wizard_rows(db, chat, form)
     if body.remember:
-        pipeline.remember(db, chat.user_id, new)
-    return pdf(form, forms.fill(form, *people, facts))
+        pipeline.remember(db, chat.user_id, pipeline.entered(forms.entered(found), facts))
+    return pdf(form, forms.pdf(form, forms.wizard_fields(form, found)))
 
 
 def wizard_view(db: Session, chat: Chat, form) -> dict:
@@ -363,13 +349,13 @@ def wizard_view(db: Session, chat: Chat, form) -> dict:
 @router.get("/{chat_id}/steps/{step_id}/form/wizard")
 def form_wizard(step_id: str, chat: OwnedChat, db: DbSession) -> dict:
     """The form's wizard: its sections with what is known already and where it came from, and the review."""
-    return wizard_view(db, chat, step_form(db, chat, step_id, wizard=True))
+    return wizard_view(db, chat, step_form(db, chat, step_id))
 
 
 @router.put("/{chat_id}/steps/{step_id}/form/answers")
 def save_answers(step_id: str, body: AnswersRequest, chat: OwnedChat, db: DbSession) -> dict:
     """Saves answers typed into the wizard, section by section, so it can be resumed. Returns the wizard again."""
-    form = step_form(db, chat, step_id, wizard=True)
+    form = step_form(db, chat, step_id)
     try:
         new = forms.clean(form, body.answers)
     except ValueError as e:
@@ -399,7 +385,7 @@ async def form_help(
 ) -> dict:
     """The optional LLM layer of the wizard. It sees the form's questions, help texts, chosen options and fact labels,
     never a value of the user's. 503 when the LLM fails or writes something it must not: the wizard works without."""
-    form = step_form(db, chat, step_id, wizard=True)
+    form = step_form(db, chat, step_id)
     found, facts = wizard_rows(db, chat, form)
     language = pipeline.profile_of(db, chat.user_id).answer_language
     data = forms.llm_form(form, found, facts)

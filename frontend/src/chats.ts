@@ -119,9 +119,8 @@ export interface Step {
   doctors?: Doctor[] // practices to choose from, instead of one contact
   doctors_source?: { url: string; scraped_at: string }
   more?: Channel // a search for further practices
-  // prefill: the form can be downloaded filled in with these details (labels); ask: the ones still missing.
-  // wizard: the whole form is filled in with FormWizard; how many of its required answers are there.
-  form?: { id?: string; title: string; url: string; online_url: string | null; prefill?: Prefill; wizard?: Progress }
+  // wizard: the form is filled in with FormWizard, and how many of its required answers are there. Without: a link.
+  form?: { id?: string; title: string; url: string; online_url: string | null; wizard?: Progress }
   documents?: Doc[]
   script?: Script
 }
@@ -193,13 +192,6 @@ export interface HelpReply {
   refused?: boolean // a medical question: not sent to the LLM
 }
 
-export interface Prefill {
-  filled: string[]
-  ask: Ask[]
-  done: number // fields with the person's details that are filled
-  total: number
-}
-
 /** One detail of a person, as asked for: `fields` are keys of PersonData (backend/schemas.py), `values` the known ones. */
 export interface Entry {
   who?: string
@@ -210,15 +202,8 @@ export interface Entry {
   choices: Record<string, Record<string, string>>
 }
 
-/** A detail a form still needs, asked for on its card: the user's own or the subject's. */
-export interface Ask extends Entry {
-  who: 'user' | 'subject'
-}
-
 export interface FormBody {
-  user: Record<string, string>
-  subject: Record<string, string>
-  remember: boolean
+  remember: boolean // keep the person's details typed into the wizard for later forms
 }
 
 export interface Service {
@@ -294,10 +279,9 @@ export const saveAnswers = (id: string | number, step: string, answers: Record<s
 export const formHelp = (id: string | number, step: string, body: HelpBody) =>
   api<HelpReply>(`${formAt(id, step)}/help`, 'POST', body)
 
-// The step's form filled in with the user's details. Fetched, so a failed download shows our error message.
-// With `body`, also with the details just typed into its card.
-export async function downloadForm(id: string | number, step: string, body?: FormBody) {
-  const res = await respond(formAt(id, step), body ? init('POST', body) : init('GET'))
+// The step's form filled in with the user's details and answers. Fetched, so a failed download shows our error message.
+export async function downloadForm(id: string | number, step: string, body: FormBody) {
+  const res = await respond(formAt(id, step), init('POST', body))
   const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'Antrag.pdf'
   const url = URL.createObjectURL(await res.blob())
   const a = Object.assign(document.createElement('a'), { href: url, download: name })
