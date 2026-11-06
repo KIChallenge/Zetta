@@ -192,7 +192,10 @@ async def answer(
         offered = letter_items(db, owned.id)
         confirmed = body.value if isinstance(body.value, list) else []
         answer = (body.fact_key, body.value, "document", {r: offered[r] for r in confirmed if r in offered})
-        if isinstance(body.value, list) or body.value == "unknown":  # the confirm card, not a fact edit
+        # The confirm card, not a fact edit: the schema makes every value of this list fact a list, so only the open
+        # card tells them apart (the facts line is not shown under it).
+        last = pipeline.assistant_messages(db, owned.id, 1)
+        if last and last[0].kind == "confirm":
             label = "Stimmt so" if confirmed else "Keine davon stimmt"
     message = Message(kind="answer", text=label, payload={"fact_key": body.fact_key, "value": body.value})
     async for event in turn(owned.id, llm, message, answer=answer):

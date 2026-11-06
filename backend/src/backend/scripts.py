@@ -50,6 +50,10 @@ MEDICAL = re.compile(
     r"infektion|fieber|therapie",
     re.I,
 )
+# {subject.relation} brings its own possessive ("meine Mutter"): a word like "meine" before it doubles it.
+DOUBLED = re.compile(
+    r"\b(?:(?:mein|dein|sein|ihr|unser|ein|kein)(?:e|en|em|er|es)?|der|die|das|den|dem|des)\s+\{subject\.relation\}", re.I
+)
 LIMITS = {
     "opening": 300, "point": 300, "closing": 300, "subject": 150, "body": 2000, "intro": 120, "title": 100,
     "explain": 600, "draft": 400, "answer": 700, "hint": 300,
@@ -97,6 +101,8 @@ def check_text(text: str, limit: str, slots: list[str]) -> list[str]:
     errors = [f"contains a {name}" for name, pattern in FORBIDDEN.items() if pattern.search(SLOT.sub("", text))]
     if MEDICAL.search(text):
         errors.append("contains medical wording")
+    if DOUBLED.search(text):
+        errors.append("has a word before {subject.relation}")
     if len(text) > LIMITS[limit]:
         errors.append(f"{limit} longer than {LIMITS[limit]} characters")
     if unknown := set(SLOT.findall(text)) - set(slots):

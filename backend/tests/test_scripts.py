@@ -47,6 +47,8 @@ def test_a_valid_script_passes():
         ({"opening": "Sie nimmt viele Medikamente."}, "medical wording"),
         ({"opening": "Mein Name ist {user.iban}."}, "unknown placeholders"),
         ({"opening": "x" * 301}, "longer than"),
+        ({"opening": "Ich rufe für meine {subject.relation} an."}, "word before {subject.relation}"),
+        ({"opening": "Ich rufe wegen Ihrer {subject.relation} an."}, "word before {subject.relation}"),
     ],
 )
 def test_invalid_scripts_are_rejected(changes, error):

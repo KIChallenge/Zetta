@@ -78,6 +78,8 @@ function fail(e: unknown, invalid?: string) {
 }
 
 const focus = (id: string) => nextTick(() => document.getElementById(id)?.focus())
+// A pressed chip or button that is gone after the update would leave the keyboard on the page: it goes to `id` instead.
+const keepFocus = (id: string) => nextTick(() => document.activeElement === document.body && document.getElementById(id)?.focus())
 const scrollDown = () => nextTick(() => scroller.value?.scrollTo({ top: scroller.value.scrollHeight }))
 // Measured before an update: a new reply only scrolls along if the user has not scrolled up to read.
 const nearBottom = (el = scroller.value) => !!el && el.scrollHeight - el.scrollTop - el.clientHeight < 80
@@ -224,6 +226,7 @@ function deliver(id: string, text: string, answer?: AnswerPayload) {
   })
   messages.value.push(m)
   scrollDown()
+  keepFocus('q') // a picked chip is gone: the keyboard goes on in the composer, right below the reply
   retry(id, m)
 }
 
@@ -367,6 +370,7 @@ async function patchStep(step: string, body: StepUpdate) {
     if (activeId.value !== id) return
     plan.value = next
     setStatus(id, next.status)
+    keepFocus(`t-${step}`) // e.g. an outcome button, gone once the step is done
   } catch (e) {
     planErr.value = fail(e)
   }
@@ -727,9 +731,9 @@ async function confirmDelete() {
 @keyframes dot { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
 
 /* Question, fact, card and plan replies use the full width, not a bubble. */
-.msg.assistant:is(.question, .card, .plan, .confirm) { display: grid; gap: 1rem; justify-content: stretch; }
+.msg.assistant:is(.question, .card, .plan, .confirm) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; justify-content: stretch; }
 .msg-facts { margin-top: .25rem; }
-.plan-msg { display: grid; gap: 1.5rem; }
+.plan-msg { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
 .plan-msg > .bubble { justify-self: start; }
 /* Sticks just below the top edge; the paper halo hides the text scrolling past it. */
 .plan-pin { position: sticky; top: -1.5rem; z-index: 2; box-shadow: 0 0 0 .5rem var(--paper); display: flex; align-items: center; gap: .55rem; width: 100%; min-height: 2.75rem; margin: -1rem 0 1rem; padding: .45rem 1.1rem; border: 1px solid var(--turn-mark); border-radius: var(--r-pill); background: var(--turn-bg); color: var(--turn-ink); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }

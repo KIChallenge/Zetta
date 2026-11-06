@@ -346,19 +346,21 @@ async function copy() {
 .step.done .state { color: var(--ready-ink); }
 .chev { color: var(--ink-3); transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
 .card-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
-/* Narrow: the state goes under the title, so the title keeps the width. */
+.card-sub { display: grid; gap: .75rem; margin-top: -.5rem; padding: 0 1.25rem 1.1rem var(--in); hyphens: auto; overflow-wrap: anywhere; }
+/* Narrow: the state goes under the title, so the title keeps the width, and the details use the card's whole width:
+   at a large text size on a phone, an inset as deep as the title leaves too little room for a phone number. */
 @container (max-width: 34rem) {
-  .card { --in: calc(1rem + 1.2em + .5rem); }
+  .card { --in: 1rem; }
   .card-toggle { grid-template-columns: auto minmax(0, 1fr) auto; gap: .3rem .5rem; padding-inline: 1rem; }
   .card-sub { padding-right: 1rem; }
   .card-toggle .state { grid-column: 2; grid-row: 2; justify-self: start; }
   .card-toggle .chev { grid-column: 3; grid-row: 1; }
 }
-.card-sub { display: grid; gap: .75rem; margin-top: -.5rem; padding: 0 1.25rem 1.1rem var(--in); }
 .card-line { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem 1rem; color: var(--ink-2); overflow-wrap: anywhere; }
 .btn.call { font-size: var(--fs-lead); }
-.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.card-body { display: grid; gap: 1.1rem; padding: 1.1rem 1.25rem 1.25rem; border-top: var(--hair); hyphens: auto; }
+/* A number too long for a narrow card wraps at its spaces, never inside a group of digits. */
+.num { font-variant-numeric: tabular-nums; overflow-wrap: normal; }
+.card-body { display: grid; gap: 1.1rem; padding: 1.1rem 1.25rem 1.25rem; border-top: var(--hair); hyphens: auto; overflow-wrap: anywhere; }
 
 .attempt { display: flex; gap: .5em; align-items: flex-start; padding: .6rem 1rem; border-radius: var(--r-m); background: var(--turn-bg); color: var(--turn-ink); font-weight: 600; }
 .attempt .i { margin-top: .15em; }
