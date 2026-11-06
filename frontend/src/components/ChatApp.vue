@@ -29,7 +29,7 @@ type Bubble = Message & {
 }
 
 defineProps<{ user: User }>()
-const emit = defineEmits<{ expired: []; deleted: [] }>()
+const emit = defineEmits<{ expired: []; deleted: []; home: [shown: boolean] }>()
 
 const LIST = 'gespraeche'
 const SETTINGS = 'einstellungen'
@@ -38,6 +38,8 @@ const NO_REPLY = k('Die Antwort konnte gerade nicht erstellt werden.')
 
 const hash = ref(location.hash.slice(1))
 const activeId = computed(() => (hash.value && hash.value !== LIST && hash.value !== SETTINGS ? decodeURIComponent(hash.value) : null))
+// The app shows its footer on the home view only.
+watch(() => !hash.value, (shown) => emit('home', shown), { immediate: true })
 const chats = ref<Chat[]>([])
 const active = computed(() => chats.value.find((c) => String(c.id) === activeId.value))
 const listLoaded = ref(false)
@@ -459,7 +461,6 @@ async function confirmDelete() {
         </li>
         <li v-if="listLoaded && !chats.length" class="empty">{{ t('Noch keine Gespräche. Ihr erstes Anliegen erscheint dann hier.') }}</li>
       </ul>
-      <div class="side-foot"><slot name="foot" /></div>
     </nav>
 
     <SettingsPage v-if="hash === SETTINGS" :user="user" @expired="emit('expired')" @saved="profileSaved" @deleted="emit('deleted')" />
@@ -523,7 +524,8 @@ async function confirmDelete() {
            this wrapper is display: contents, so the composer stays the pane's last row. -->
       <div class="lead-area" :class="{ 'navy-band': !activeId }">
         <div v-if="!activeId" class="home">
-          <h1 id="view-h" tabindex="-1">{{ t('Guten Tag, {name}.', { name: user.display_name }) }}</h1>
+          <!-- avoid-ai-design-ignore: SD5 (two weights on purpose: a quiet salutation, then the name large) -->
+          <h1 id="view-h" class="greet" tabindex="-1"><span>{{ t('Guten Tag,') }}</span> <b>{{ user.display_name }}</b></h1>
           <p v-if="notice" class="notice" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ notice }}</span></p>
         </div>
 
@@ -619,9 +621,7 @@ async function confirmDelete() {
 .shell { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
 
 /* Sidebar: a plain list of rows, the open one on the lavender band. */
-.side { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: .75rem; padding: 1.25rem 1rem 0; border-right: var(--hair); background: var(--paper); }
-/* Settings, theme and logout: pinned to the bottom edge while the list scrolls. */
-.side-foot { position: sticky; bottom: 0; margin-top: auto; display: grid; gap: .25rem; padding: .75rem 0 1rem; border-top: var(--hair); background: var(--paper); }
+.side { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: .75rem; padding: 1.25rem 1rem 1.5rem; border-right: var(--hair); background: var(--paper); }
 .side-h-row { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; margin-top: .75rem; padding-inline: .75rem; }
 .side-h-row .muted { font-size: var(--fs-small); }
 .side .btn-secondary { align-self: start; }
@@ -662,15 +662,22 @@ async function confirmDelete() {
     grid-template-areas: "lead list" "known list"; overflow: hidden;
   }
   .is-home:has(> .below) .lead-area { grid-area: lead; }
-  /* margin-top: -1px closes the sub-pixel seam between the two navy boxes. */
-  .is-home:has(> .below) .known-home { grid-area: known; overflow-y: auto; gap: .75rem; margin-top: -1px; padding-top: calc(.25rem + 1px); padding-bottom: .75rem; }
+  /* The navy shadow above covers the pixel of page that shows where the two navy boxes meet (scroll boxes snap to whole pixels). */
+  .is-home:has(> .below) .known-home { grid-area: known; overflow-y: auto; gap: .75rem; padding-top: .25rem; padding-bottom: .75rem; box-shadow: 0 -2px 0 var(--navy); }
   .is-home:has(> .below) .known-home :deep(.kv) { row-gap: .75rem; }
-  .is-home:has(> .below) .home h1 { font-size: var(--fs-h2); }
+  /* Under the app bar the column is short: tighter around the composer, and the empty fields speak for themselves. */
+  .is-home:has(> .below) .home { padding-top: 1rem; }
+  .is-home:has(> .below) .composer { padding-bottom: 1rem; }
+  .is-home:has(> .below) .known-home { gap: .5rem; }
+  .is-home:has(> .below) .known-home :deep(.kv + .muted) { display: none; }
   .is-home:has(> .below) .cbox textarea { min-height: 3rem; }
   .is-home:has(> .below) .below { grid-area: list; overflow-y: auto; padding-top: clamp(1.25rem, 4vh, 2.25rem); }
 }
 .home { display: grid; gap: .5rem; padding: clamp(1.25rem, 4vh, 2.25rem) var(--gut) 1rem; }
-.home h1 { font-size: clamp(var(--fs-h2), 5cqi, var(--fs-h1)); }
+/* The greeting: a quiet salutation, then the name large and bold, so a long name wraps on its own line. */
+.greet { display: grid; gap: .15rem; font-weight: 400; }
+.greet span { font-size: var(--fs-h2); color: var(--on-navy-2); line-height: 1.2; }
+.greet b { font-size: clamp(var(--fs-h1), 4.5cqi, var(--fs-display)); font-weight: 700; line-height: 1.08; letter-spacing: -.01em; overflow-wrap: anywhere; hyphens: auto; }
 .notice { display: flex; gap: .55em; align-items: flex-start; margin-top: .5rem; padding: .75rem 1rem; border-radius: var(--r-m); background: var(--sheet); color: var(--danger); font-weight: 600; }
 .notice .i { margin-top: .15em; }
 
