@@ -119,8 +119,8 @@ export interface Step {
   doctors?: Doctor[] // practices to choose from, instead of one contact
   doctors_source?: { url: string; scraped_at: string }
   more?: Channel // a search for further practices
-  // prefill: the form can be downloaded filled in with these details (labels); ask: the ones still missing
-  form?: { id?: string; title: string; url: string; online_url: string | null; prefill?: Prefill }
+  // wizard: the form is filled in with FormWizard, and how many of its required answers are there. Without: a link.
+  form?: { id?: string; title: string; url: string; online_url: string | null; wizard?: Progress }
   documents?: Doc[]
   script?: Script
   phone_note?: string // a call although the user wants no calls: there is no other way
@@ -128,11 +128,71 @@ export interface Step {
   by_email: boolean // the user picked it
 }
 
-export interface Prefill {
-  filled: string[]
-  ask: Ask[]
-  done: number // fields with the person's details that are filled
+export interface Progress {
+  done: number
   total: number
+}
+
+/** One question of a form wizard (backend: forms.wizard). The label is the German form's own wording. */
+export interface WizardQuestion {
+  id: string
+  label: string
+  kind: 'text' | 'multiline' | 'date' | 'number' | 'choice' | 'yes_no' | 'checkbox'
+  options: Record<string, string>
+  help: string | null
+  source_url: string | null
+  required: boolean
+  suggest: boolean // the LLM may draft it
+  max: number | null // characters the paper form has room for
+  detail: string | null // a person's detail, e.g. "svnr": checked and formatted like in the settings
+  when: Condition[] // shown when one holds; none: always
+  value: string
+  source: 'answer' | 'profile' | 'kept' | 'fact' | 'constant' | null
+  source_label: string | null // for a chat fact: its value, e.g. "Pension von der PV"
+}
+
+/** Fact or question id -> the values it must have (one of them), or {not: [...]}. */
+export type Condition = Record<string, string[] | { not: string[] }>
+
+export interface WizardSection {
+  id: string
+  title: string
+  heading: string | null
+  page: number | null
+  point: number | null
+  questions: WizardQuestion[]
+}
+
+export interface Finding {
+  kind: 'missing' | 'check'
+  question?: string
+  section?: string
+  label?: string
+  text?: string
+}
+
+export interface Wizard {
+  form: { id: string; title: string; url: string; online_url: string | null }
+  subject: string | null // e.g. "Mutter"
+  submit_to: { name: string; address: string | null } | null
+  sections: WizardSection[]
+  manual: { label: string; page: number | null; point: number | null }[] // filled in by hand on paper
+  facts: Record<string, string | string[]> // the chat facts the questions' conditions look at
+  findings: Finding[]
+  progress: Progress
+}
+
+export interface Hint {
+  question: string
+  section: string
+  text: string
+}
+
+export type HelpBody = { kind: 'explain' | 'suggest'; question: string } | { kind: 'ask'; text: string } | { kind: 'check' }
+export interface HelpReply {
+  text?: string
+  hints?: Hint[]
+  refused?: boolean // a medical question: not sent to the LLM
 }
 
 /** One detail of a person, as asked for: `fields` are keys of PersonData (backend/schemas.py), `values` the known ones. */
@@ -145,15 +205,8 @@ export interface Entry {
   choices: Record<string, Record<string, string>>
 }
 
-/** A detail a form still needs, asked for on its card: the user's own or the subject's. */
-export interface Ask extends Entry {
-  who: 'user' | 'subject'
-}
-
 export interface FormBody {
-  user: Record<string, string>
-  subject: Record<string, string>
-  remember: boolean
+  remember: boolean // keep the person's details typed into the wizard for later forms
 }
 
 export interface Service {
@@ -222,10 +275,17 @@ export const uploadDocument = async (id: string | number, file: File) => {
 }
 export const updateStep = (id: string | number, step: string, body: StepUpdate) =>
   api<Plan>(`${at(id)}/steps/${encodeURIComponent(step)}`, 'PATCH', body)
-// The step's form filled in with the user's details. Fetched, so a failed download shows our error message.
-// With `body`, also with the details just typed into its card.
-export async function downloadForm(id: string | number, step: string, body?: FormBody) {
-  const res = await respond(`${at(id)}/steps/${encodeURIComponent(step)}/form`, body ? init('POST', body) : init('GET'))
+const formAt = (id: string | number, step: string) => `${at(id)}/steps/${encodeURIComponent(step)}/form`
+export const getWizard = (id: string | number, step: string) => api<Wizard>(`${formAt(id, step)}/wizard`)
+export const saveAnswers = (id: string | number, step: string, answers: Record<string, string>) =>
+  api<Wizard>(`${formAt(id, step)}/answers`, 'PUT', { answers })
+// The optional LLM layer: 503 when it is not available. The wizard works without it.
+export const formHelp = (id: string | number, step: string, body: HelpBody) =>
+  api<HelpReply>(`${formAt(id, step)}/help`, 'POST', body)
+
+// The step's form filled in with the user's details and answers. Fetched, so a failed download shows our error message.
+export async function downloadForm(id: string | number, step: string, body: FormBody) {
+  const res = await respond(formAt(id, step), init('POST', body))
   const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'Antrag.pdf'
   const url = URL.createObjectURL(await res.blob())
   const a = Object.assign(document.createElement('a'), { href: url, download: name })

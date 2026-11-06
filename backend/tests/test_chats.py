@@ -761,10 +761,9 @@ def test_form_steps_offer_the_form_filled_in_with_the_profile(client, anna, bob,
     chat = create_chat(client, anna)
     steps = steps_of(dict(to_plan(client, anna, llm, chat["id"]))["plan"])
 
-    # The mother's details are not in the profile: only Anna's own part of the form is filled in.
-    prefill = steps["care_allowance.submit"]["form"]["prefill"]
-    assert prefill["filled"] == ["Ihr Name", "Ihre Telefonnummer", "Ihre E-Mail-Adresse", "Ihre Adresse"]
-    assert "Geburtsdatum Ihrer Mutter" in [a["label"] for a in prefill["ask"]]
+    # The card shows how far the form is; the wizard asks for the rest. The FSW form goes with an email.
+    assert steps["care_allowance.submit"]["form"]["wizard"] == {"done": 3, "total": 16}  # Anna's name, the pension
+    assert steps["home_care_fsw.send_application"]["form"]["wizard"]["total"] == 9
     response = client.get(f"/chats/{chat['id']}/steps/care_allowance.submit/form", headers=anna)
 
     assert response.status_code == 200
@@ -787,17 +786,18 @@ def kept(client, headers):
     }
 
 
-def form_url(chat):
+def care_url(chat):
     return f"/chats/{chat['id']}/steps/care_allowance.submit/form"
 
 
-def test_details_typed_into_a_form_card_fill_it_and_the_next_forms(client, anna, bob, llm):
+def test_details_typed_into_one_form_fill_the_next(client, anna, bob, llm):
     client.put("/me/profile", json=PROFILE, headers=anna)
     chat = create_chat(client, anna)
     to_plan(client, anna, llm, chat["id"])
-    body = {"subject": {"full_name": "Maria Berger", "birth_date": "1948-03-12", "sex": "female"}, "user": {"title": "Mag."}}
+    answers = {"first_name": "Maria", "last_name": "Berger", "birth_date": "12.03.1948", "sex": "female", "rep_title": "Mag."}
+    client.put(f"{care_url(chat)}/answers", json={"answers": answers}, headers=anna)
 
-    response = client.post(form_url(chat), json=body, headers=anna)
+    response = client.post(care_url(chat), json={"remember": True}, headers=anna)
 
     fields = PdfReader(io.BytesIO(response.content)).get_fields()
     assert (fields["Fam.Name"]["/V"], fields["Geburtsdatum"]["/V"], fields["Titel2"]["/V"]) == ("Berger", "12.03.1948", "Mag.")
@@ -806,49 +806,13 @@ def test_details_typed_into_a_form_card_fill_it_and_the_next_forms(client, anna,
         "mother": {"name": "Maria Berger", "birth_date": "12.03.1948", "sex": "weiblich"},
     }
     assert kept(client, bob) == {}
-    # The plain download and the card of every later form have them now.
-    fields = PdfReader(io.BytesIO(client.get(form_url(chat), headers=anna).content)).get_fields()
-    assert fields["Geburtsdatum"]["/V"] == "12.03.1948"
-    prefill = steps_of(client.get(f"/chats/{chat['id']}/state", headers=anna).json()["plan"])["care_allowance.submit"]["form"]["prefill"]
-    assert "Geburtsdatum Ihrer Mutter" in prefill["filled"]
-    assert "Geburtsdatum Ihrer Mutter" not in [a["label"] for a in prefill["ask"]]
-
-
-def test_details_not_to_remember_only_fill_this_pdf(client, anna, llm):
-    chat = create_chat(client, anna)
-    to_plan(client, anna, llm, chat["id"])
-
-    response = client.post(form_url(chat), json={"subject": {"birth_date": "1948-03-12"}, "remember": False}, headers=anna)
-
-    assert PdfReader(io.BytesIO(response.content)).get_fields()["Geburtsdatum"]["/V"] == "12.03.1948"
-    assert kept(client, anna) == {}
-
-
-def test_the_users_own_contact_details_from_a_form_card_go_to_the_profile(client, anna, llm):
-    chat = create_chat(client, anna)
-    to_plan(client, anna, llm, chat["id"])
-
-    client.post(form_url(chat), json={"user": {"full_name": "Anna Berger", "phone": "0660 1234567"}}, headers=anna)
-
-    profile = client.get("/me/profile", headers=anna).json()
-    assert (profile["full_name"], profile["phone"]) == ("Anna Berger", "0660 1234567")
-    assert kept(client, anna) == {}
-
-
-@pytest.mark.parametrize(
-    "subject", [{"birth_date": "2999-01-01"}, {"sex": "unknown"}, {"svnr": "1234567890"}]
-)
-def test_form_card_details_are_validated(client, anna, llm, subject):
-    chat = create_chat(client, anna)
-    to_plan(client, anna, llm, chat["id"])
-
-    assert_error(client.post(form_url(chat), json={"subject": subject}, headers=anna), 422)
+    # The next form has them, untouched by its wizard so far.
+    fsw = PdfReader(io.BytesIO(client.get(f"/chats/{chat['id']}/steps/home_care_fsw.send_application/form", headers=anna).content))
+    assert (fsw.get_fields()["Familienname Titel KundIn"]["/V"], fsw.get_fields()["Geburtsdatum KundIn"]["/V"]) == ("Berger", "12.03.1948")
 
 
 def test_kept_details_can_be_deleted(client, anna, llm):
-    chat = create_chat(client, anna)
-    to_plan(client, anna, llm, chat["id"])
-    client.post(form_url(chat), json={"subject": {"birth_date": "1948-03-12"}}, headers=anna)
+    client.put("/me/people/mother", json={"birth_date": "1948-03-12"}, headers=anna)
 
     assert client.delete("/me/people/mother", headers=anna).status_code == 204
     assert kept(client, anna) == {}
@@ -861,7 +825,7 @@ def test_details_entered_in_the_settings_fill_the_first_form(client, anna, llm):
     to_plan(client, anna, llm, chat["id"])
 
     assert response.json()["kept"] is True
-    fields = PdfReader(io.BytesIO(client.get(form_url(chat), headers=anna).content)).get_fields()
+    fields = PdfReader(io.BytesIO(client.get(care_url(chat), headers=anna).content)).get_fields()
     assert (fields["Fam.Name"]["/V"], fields["Geschlecht"]["/V"]) == ("Berger", "weiblich")
 
 

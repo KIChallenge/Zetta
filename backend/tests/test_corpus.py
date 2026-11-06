@@ -27,7 +27,8 @@ def conditions():
         for t in s.steps:
             yield from ((f"{s.id}.{t.id} item {i.id}", i.when) for i in [*t.must_ask, *t.must_include] if i.when)
     for f in corpus.forms.values():
-        yield from ((f"{f.id} field {field.field}", field.when) for field in f.fields if field.when)
+        # Only these are over facts alone: a question's conditions also look at answers (tests/test_wizard.py).
+        yield from ((f"{f.id} section {s.id}", s.when) for s in f.sections if s.when)
 
 
 def test_conditions_use_known_facts_and_values():
@@ -64,7 +65,7 @@ def test_references_resolve():
             assert set(s.quotes) <= set(FACTS["documented_recommendations"].values), s.id
     for form in corpus.forms.values():
         assert form.submit_to in corpus.institutions, form.id
-        assert not form.fields or form.file, form.id
+        assert not form.sections or form.file, form.id
         assert not form.file or (forms.FORMS_DIR / form.file).is_file(), form.id
     for card in corpus.cards.values():
         assert set(card.contacts) <= set(corpus.institutions)
@@ -189,31 +190,35 @@ def test_free_texts_have_no_contact_data(pattern):
             assert not scripts.FORBIDDEN[pattern].search(scripts.SLOT.sub("", text)), f"{where}: {text}"
 
 
-@pytest.mark.parametrize("form", [f for f in corpus.forms.values() if f.fields], ids=lambda f: f.id)
-def test_form_fields_exist_in_the_pdf_and_use_known_details(form):
-    pdf = PdfReader(forms.FORMS_DIR / form.file).get_fields()
-    for field in form.fields:
-        assert field.field in pdf, field.field
-        if pdf[field.field].get("/FT") == "/Btn" and field.map:
-            # A choice of the person: one placeholder, and only states the button has.
-            (slot,) = scripts.SLOT.findall(field.value)
-            assert slot in forms.DETAILS and slot.split(".")[1] in CHOICES, field.field
-            assert set(field.map) <= set(CHOICES[slot.split(".")[1]]), field.field
-            assert set(field.map.values()) <= states(PdfReader(forms.FORMS_DIR / form.file), field.field), field.field
-        elif pdf[field.field].get("/FT") == "/Btn":
-            assert field.value in states(PdfReader(forms.FORMS_DIR / form.file), field.field), field.field
-        else:
-            assert set(scripts.SLOT.findall(field.value)) <= forms.DETAILS, field.field
-            assert scripts.SLOT.findall(field.value), f"{field.field}: text fields only take the user's details"
+@pytest.mark.parametrize("form", [f for f in corpus.forms.values() if f.sections], ids=lambda f: f.id)
+def test_form_questions_use_real_fields_and_known_details(form):
+    reader = PdfReader(forms.FORMS_DIR / form.file)
+    pdf = reader.get_fields()
+    ids = [q.id for q in form.questions]
+    for q in form.questions:
+        assert set(q.fields) <= set(pdf), q.id
+        if q.map:
+            assert set(q.map.values()) <= states(reader, q.fields[0]), q.id
+        if isinstance(q.value, str):
+            assert set(scripts.SLOT.findall(q.value)) <= forms.DETAILS, q.id
+        elif q.value is not None:
+            assert q.value.fact in FACTS and set(q.value.map) <= set(FACTS[q.value.fact].values), q.id
+            assert q.kind not in forms.CHOICE_KINDS or set(q.value.map.values()) <= set(forms.options(q)), q.id
+    for fill in form.fills:
+        assert fill.field in pdf and set(forms.FILL.findall(fill.value)) <= set(ids), fill.field
 
 
 def states(reader, name):
-    """The states a checkbox or radio button can be set to, from its widgets."""
+    """The states a checkbox or radio button can be set to, from its widgets. `name` is the full name, with dots."""
     found = set()
     for page in reader.pages:
         for annot in page.get("/Annots") or []:
-            widget = annot.get_object()
-            parent = widget.get("/Parent")
-            if name in (widget.get("/T"), parent and parent.get_object().get("/T")):
+            node, names = annot.get_object(), []
+            widget = node
+            while node is not None:
+                if "/T" in node:
+                    names.insert(0, node["/T"])
+                node = node["/Parent"].get_object() if "/Parent" in node else None
+            if ".".join(names) == name and "/AP" in widget:
                 found |= set(widget["/AP"]["/N"]) - {"/Off"}
     return found

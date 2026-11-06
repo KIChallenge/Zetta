@@ -101,7 +101,7 @@ def violations(output: object, profile: ProfileData = PROFILE) -> list[str]:
 def rendered(graph: dict, written: dict[str, dict], facts: dict, now) -> dict:
     plan = Plan(chat_id="eval", version=1, graph=graph)
     states = {k: StepState(chat_id="eval", step_id=k, checks=[], script=v, updated_at=utcnow()) for k, v in written.items()}
-    return render_plan(plan, states, PROFILE, {}, facts, now)
+    return render_plan(plan, states, PROFILE, {}, facts, now, {})
 
 
 async def live(split: str | None) -> int:

@@ -1,4 +1,4 @@
-"""The three narrow LLM calls (spec section 2): text -> facts, plan intro, scripts with placeholders.
+"""The narrow LLM calls (spec section 2): text -> facts, plan intro, scripts with placeholders, and help with forms.
 
 The LLM never searches or looks anything up and never gets profile values or contact data. What the user types
 or uploads goes through `redact` first.
@@ -97,6 +97,44 @@ TRANSLATE_PROMPT = (
     "the reader can use it on the phone, e.g. \"care allowance (Pflegegeld)\". Not in very short labels.\n"
     "- Add nothing else: no advice, no medical statements."
 )
+FORM_PROMPT = (
+    "You help people in Vienna, Austria, fill in an official German application form: {form}. Readers may be old, "
+    "young or disabled and find forms hard: write plainly and politely, addressing the reader formally. You get the "
+    "form's questions with their ids, its own help texts and which options are chosen, never personal data. Use only "
+    "these: add no rules, deadlines, amounts, names, phone numbers, email or web addresses or dates, say nothing "
+    "medical and never say that someone is entitled to something. Plain text without Markdown.\n{task}"
+)
+FORM_TASKS = {
+    "explain": "Explain the question in `question` in one to three short sentences in {language}: what it means and how "
+    "to answer it. Reply with the text only.",
+    "suggest": "Write a short draft answer for the free-text question `question`, in German because it goes on the "
+    "German form, from the form's help texts and the chosen answers in `answers`, in at most `room` characters: the "
+    "lines on paper are short. A list of items goes one per line. If something personal is needed, write a gap in "
+    "square brackets, e.g. [Name]. Reply with the text only.",
+    "ask": "Answer the user's question in `user_question` about this form in one to four short sentences in {language}. "
+    "If the form's texts do not answer it, or it is about illness, symptoms, medication or treatment, say briefly that "
+    "you cannot answer it and that `submit_to` can. Reply with the text only.",
+    "check": "`filled` says which questions are answered and `answers` which options are chosen; `shown` are the hints "
+    "the user already sees. Give at most three short hints in {language} that are not among them, each about one "
+    "question (its id in `question`): a question still open that probably applies, or answers that do not fit "
+    "together. No hints if nothing is useful.",
+}
+HINTS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "hints": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"question": {"type": "string"}, "text": {"type": "string"}},
+                "required": ["question", "text"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["hints"],
+    "additionalProperties": False,
+}
 DETAIL = {
     "short": "Keep it short: one sentence per point.",
     "detailed": "Each point may have a second sentence that explains the question.",
@@ -230,6 +268,15 @@ class Llm:
         values = "; ".join(f"{v}: {h}" for v, h in fact.hints.items())
         content = await self._complete(LETTER_PROMPT.replace("{values}", values), letter, _format("letter", schema))
         return json.loads(content)["items"]
+
+    async def form_help(self, task: str, data: dict, language: str) -> str | list[dict]:
+        """One of FORM_TASKS on the form's structure (forms.llm_form): text, or [{question, text}] for "check"."""
+        system = FORM_PROMPT.replace("{form}", data["form"]).replace("{task}", FORM_TASKS[task])
+        system = system.replace("{language}", LANGUAGES[language])
+        content = json.dumps(data, ensure_ascii=False)
+        if task == "check":
+            return json.loads(await self._complete(system, content, _format("hints", HINTS_SCHEMA)))["hints"]
+        return await self._complete(system, content)
 
     async def translate(self, texts: list[str], language: str, notes: dict[str, str]) -> list[str]:
         """For scripts/translate.py only, on public texts: the app itself never translates at runtime."""

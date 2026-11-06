@@ -90,11 +90,53 @@ class Document(Model):
     verified_at: date
 
 
-class FormField(Model):
-    field: str  # the field's name in the PDF
-    value: str  # text with placeholders like {user.last_name}, or the state of a checkbox or radio button
-    when: Condition | None = None  # filled only when known to be true
-    map: dict[str, str] = {}  # for a checkbox or radio button: the person's choice -> its state, e.g. female: /w
+class FactValue(Model):
+    fact: str  # a chat fact
+    map: dict[str, str]  # its value -> the answer
+
+
+class FormQuestion(Model):
+    """One question of a form wizard, in the form's own German wording. See the head of forms.yaml."""
+
+    id: str
+    label: str
+    kind: Literal["text", "multiline", "date", "number", "choice", "yes_no", "checkbox"] = "text"
+    pdf: str | list[str] = []  # a long answer is split over the lines of the paper form
+    options: dict[str, str] = {}  # choice: answer -> label
+    map: dict[str, str] = {}  # answer -> state of a checkbox or radio button; without it a choice writes its label
+    value: str | FactValue | None = None  # the prefill: placeholders, a chat fact or a constant
+    when: Condition | list[Condition] | None = None  # a list: any of them
+    required: bool = False
+    help: str | None = None
+    source_url: str | None = None
+    suggest: bool = False  # the LLM may draft it
+    manual: bool = False  # always on paper: never prefilled, stored or sent to the LLM
+    page: int | None = None
+    point: int | None = None
+
+    @property
+    def fields(self) -> list[str]:
+        return [self.pdf] if isinstance(self.pdf, str) else self.pdf
+
+
+class FormSection(Model):
+    id: str
+    title: str  # the station on the wizard's progress line
+    heading: str | None = None
+    page: int | None = None
+    point: int | None = None
+    when: Condition | None = None  # facts only
+    questions: list[FormQuestion]
+
+
+class Check(Model):
+    when: Condition | list[Condition]  # over chat facts and answers; a list: any of them
+    text: str
+
+
+class Fill(Model):
+    field: str  # a PDF field the form asks for twice, e.g. a name
+    value: str  # from other answers: "{last_name} {first_name}"
 
 
 class Form(Model):
@@ -102,11 +144,17 @@ class Form(Model):
     title: str
     url: str
     online_url: str | None = None
-    file: str | None = None  # the blank PDF in corpus/forms; with `fields` the user gets it filled in
-    fields: list[FormField] = []
+    file: str | None = None  # the blank PDF in corpus/forms; with `sections` the user fills it in with the wizard
+    sections: list[FormSection] = []
+    checks: list[Check] = []
+    fills: list[Fill] = []
     submit_to: str
     source_url: str
     verified_at: date
+
+    @property
+    def questions(self) -> list[FormQuestion]:
+        return [q for s in self.sections for q in s.questions]
 
 
 class Item(Model):

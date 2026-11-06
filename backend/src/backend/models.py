@@ -99,6 +99,7 @@ class Chat(Base):
     plans: Mapped[list["Plan"]] = relationship(cascade="all, delete-orphan")
     step_states: Mapped[list["StepState"]] = relationship(cascade="all, delete-orphan")
     email_choices: Mapped[list["EmailChoice"]] = relationship(cascade="all, delete-orphan")
+    form_answers: Mapped[list["FormAnswer"]] = relationship(cascade="all, delete-orphan")
 
 
 class Message(Base):
@@ -159,3 +160,14 @@ class EmailChoice(Base):
 
     chat_id: Mapped[str] = mapped_column(ForeignKey("chats.id"), primary_key=True)
     step_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+
+
+class FormAnswer(Base):
+    """What was typed into a form wizard, so it can be resumed. Never the parts filled in by hand on paper."""
+
+    __tablename__ = "form_answers"
+
+    chat_id: Mapped[str] = mapped_column(ForeignKey("chats.id"), primary_key=True)
+    form_id: Mapped[str] = mapped_column(String(60), primary_key=True)
+    answers: Mapped[dict] = mapped_column(JSON)  # question id -> answer
+    updated_at: Mapped[datetime] = mapped_column(DateTime)

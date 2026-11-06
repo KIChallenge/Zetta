@@ -78,6 +78,14 @@ def corpus_sources() -> set[str]:
         found |= {card.title, card.text}
     for institution in corpus.institutions.values():
         found |= {channel.label for channel in institution.channels if channel.label}
+    # Form wizards: the labels mirror the German form and are shown with their translation beside them.
+    found |= set(forms.YES_NO.values())
+    for form in corpus.forms.values():
+        found |= {check.text for check in form.checks}
+        for section in form.sections:
+            found |= {text for text in (section.title, section.heading) if text}
+            for q in section.questions:
+                found |= {q.label, *q.options.values(), *([q.help] if q.help else [])}
     for document in corpus.documents.values():
         found |= {document.title, document.where_to_get, *([document.notes] if document.notes else [])}
     for service in corpus.services:
