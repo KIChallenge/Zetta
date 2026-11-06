@@ -49,7 +49,8 @@ watch(user, () => nextTick(() => main.value?.focus()))
 </script>
 
 <template>
-  <a class="skip" href="#inhalt">{{ t('Zum Inhalt springen') }}</a>
+  <!-- The hash is the router's: jump by focus, or "#inhalt" would be opened as a chat. -->
+  <a class="skip" href="#inhalt" @click.prevent="main?.focus()">{{ t('Zum Inhalt springen') }}</a>
   <!-- Signed in, the bar is only the way back to the list on narrow screens; the sidebar holds the rest. -->
   <header v-if="user" class="top signed">
     <div class="wrap">

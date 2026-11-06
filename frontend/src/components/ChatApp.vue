@@ -142,7 +142,11 @@ function profileSaved(p: Profile) {
   profileFailed.value = false
 }
 
+// The chat in the URL at sign-in may be a previous session's or another account's: no notice for that one.
+let firstLoad = true
 watch(activeId, async (id, _, onCleanup) => {
+  const initial = firstLoad
+  firstLoad = false
   let stale = false
   onCleanup(() => (stale = true))
   // Leaving a chat stops its reply; the server keeps what was written so far.
@@ -167,7 +171,7 @@ watch(activeId, async (id, _, onCleanup) => {
     const msg = fail(e)
     if (msg !== t(NOT_FOUND)) loadErr.value = msg
     else {
-      notice.value = msg
+      if (!initial) notice.value = msg
       go('', 'view-h', true)
     }
   } finally {
