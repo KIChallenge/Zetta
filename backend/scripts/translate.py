@@ -97,6 +97,8 @@ NOTES = {
     "unbefristet": "Form option: for an unlimited time.",
     "Hausnr.": "Form field: house number.",
     "PLZ": "Form field: postal code.",
+    "Neu registrieren": "Tab on the sign-in card: create a new account (sign up), not register again.",
+    "Zum Plan": "Button on a bar: jump to the user's plan of next steps, not to a map.",
     "Name": "Form field: the name of a person.",
     "Geburtsjahr": "Form field: year of birth.",
     "Geburtsland": "Form field: country of birth.",
