@@ -469,6 +469,7 @@ async function confirmDelete() {
             <QuestionCard
               v-else-if="m.kind === 'question'"
               :text="t(m.text)"
+              :note="q(m).note && t(q(m).note!)"
               :why="t(q(m).why)"
               :chips="q(m).chips"
               :active="m === lastMsg && !run"

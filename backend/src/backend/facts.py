@@ -218,8 +218,11 @@ def value_label(key: str, value: object) -> str:
     return ", ".join(values[v] for v in value) if isinstance(value, list) else values[value]
 
 
-def extraction_schema() -> dict:
-    """JSON schema for structured output: every fact key, nullable, plus the medical-question flag."""
+def extraction_schema(topics: dict[str, str] | None = None) -> dict:
+    """JSON schema for structured output: every fact key, nullable, plus the medical and off-topic flags.
+
+    `topics`: service id -> title of the user's current plan, for `asks_about`.
+    """
     properties: dict[str, dict] = {
         "medical_question": {
             "type": "boolean",
@@ -228,8 +231,23 @@ def extraction_schema() -> dict:
             " care services, appointments, preventive check-ups, vaccinations offered, when someone is discharged"
             " from or can be visited in hospital, or what to organise after a hospital stay or discharge letter. Wanting a doctor's appointment is not medical either; it is only"
             " medical if the user asks what is wrong, what to take or what to do about symptoms.",
-        }
+        },
+        "off_topic": {
+            "type": "boolean",
+            "description": "True if the message has nothing to do with social insurance, care, health services,"
+            " benefits, money problems, hospital stays, offers for children, doctor's appointments or the user's plan,"
+            " e.g. the weather, sports, recipes, general knowledge or jokes. False for greetings, thanks, small talk"
+            " around the user's situation, any message that states one of the facts below, and medical questions"
+            " (use medical_question for those).",
+        },
     }
+    if topics:
+        properties["asks_about"] = {
+            "anyOf": [{"type": "string", "enum": list(topics)}, {"type": "null"}],
+            "description": "The topic of the user's plan the message asks about: "
+            + "; ".join(f"{k}: {v}" for k, v in topics.items())
+            + ". null if the message asks about none of them.",
+        }
     for key, fact in FACTS.items():
         if not fact.extract:
             continue
@@ -256,10 +274,10 @@ def extraction_schema() -> dict:
     }
 
 
-def extraction_guide() -> str:
+def extraction_guide(topics: dict[str, str] | None = None) -> str:
     """The schema's meanings as text: some servers only enforce a schema's shape and never show the model its descriptions."""
     lines = []
-    for key, field in extraction_schema()["properties"].items():
+    for key, field in extraction_schema(topics)["properties"].items():
         enum = field["items"]["enum"] if "items" in field else next((o["enum"] for o in field.get("anyOf", []) if "enum" in o), [])
         # The description of `district` already says how to write its many values.
         allowed = f" Allowed: {', '.join(enum)}." if enum and key != "district" else ""
@@ -280,5 +298,10 @@ def merge(current: dict[str, tuple[object, str]], extracted: dict) -> dict[str, 
         and FACTS[key].extract
         and value not in (None, [])
         and valid(key, value)
-        and (key not in current or current[key][1] != "chip")
+        and (key not in current or current[key][1] != "chip" or _ends_outside_vienna(key, current[key][0], value))
     }
+
+
+def _ends_outside_vienna(key: str, old: object, new: object) -> bool:
+    """A Vienna district named later wins over "outside Vienna", even a chip's: otherwise the chat stays out of scope."""
+    return key == "district" and old == "outside_vienna" and bool(VIENNA_POSTAL_CODE.match(str(new)))

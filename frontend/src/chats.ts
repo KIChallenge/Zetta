@@ -31,7 +31,7 @@ export interface Institution {
   source_url: string
 }
 
-export interface QuestionPayload { fact_key: string; chips: Chip[]; why: string; multi?: boolean }
+export interface QuestionPayload { fact_key: string; chips: Chip[]; why: string; multi?: boolean; note?: string }
 export interface AnswerPayload { fact_key: string; value: string | string[] }
 export interface PlanPayload { version: number }
 export interface CardPayload { card: 'boundary' | 'out_of_scope' | 'general'; title: string; contacts: Institution[] }

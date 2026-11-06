@@ -69,3 +69,7 @@ def test_a_rendered_script_also_has_its_corpus_text_for_the_translation():
     assert plain["slots"]["subject.relation"]["value"] == "meinen Vater"
     assert plain["slots"]["subject.name"] == {"value": None, "gap": "Name Ihres Vaters"}
     assert pipeline.OUTCOMES["call"]["reached"][0] in SOURCES
+
+
+def test_the_fixed_chat_replies_are_sources():
+    assert {pipeline.TO_PLAN, pipeline.OFF_TOPIC, pipeline.OFF_TOPIC_PLAN} <= SOURCES

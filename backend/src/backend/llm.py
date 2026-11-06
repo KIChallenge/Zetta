@@ -183,11 +183,11 @@ class Llm:
         )
         return response.choices[0].message.content or ""
 
-    async def extract(self, text: str, question: str | None) -> dict:
-        """Facts from one user message. `question`: the question the user is answering, if any."""
-        system = f"{EXTRACT_PROMPT}\n\nFields:\n{extraction_guide()}"
+    async def extract(self, text: str, question: str | None, topics: dict[str, str] | None = None) -> dict:
+        """Facts from one user message. `question`: the question the user is answering, if any. `topics`: the plan's."""
+        system = f"{EXTRACT_PROMPT}\n\nFields:\n{extraction_guide(topics)}"
         system += f"\n\nThe user is answering this question: {question}" if question else ""
-        return json.loads(await self._complete(system, text, _format("facts", extraction_schema())))
+        return json.loads(await self._complete(system, text, _format("facts", extraction_schema(topics))))
 
     async def intro(self, plan: dict, language: str) -> str:
         return await self._complete(
