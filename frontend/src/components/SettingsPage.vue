@@ -4,7 +4,11 @@ import { ApiError, GENERIC, TOO_MANY, UNREACHABLE, type User } from '../auth'
 import { fmtDate, fmtPhone, fmtSvnr, joinSvnr, realDate, splitSvnr, svnrDigits, svnrOk, VIENNA } from '../fields'
 import { k, t } from '../i18n'
 import { view } from '../view'
-import { changePassword, deleteAccount, getProfile, LANGS, LENGTHS, saveProfile, type Profile } from '../profile'
+import DetailInputs from './DetailInputs.vue'
+import {
+  changePassword, deleteAccount, deletePerson, getPeople, getProfile, LANGS, LENGTHS, savePerson, saveProfile, type KeptPerson,
+  type Profile,
+} from '../profile'
 
 type Field = 'full_name' | 'street' | 'postal_code' | 'city' | 'phone' | 'contact_email'
 type Key = Field | 'svnr'
@@ -79,11 +83,54 @@ function fill(p: Profile) {
 async function load() {
   loadErr.value = ''
   try {
-    fill(await getProfile())
+    const [profile, kept] = await Promise.all([getProfile(), getPeople()])
+    fill(profile)
+    people.value = kept
   } catch (e) {
     loadErr.value = fail(e)
   }
 }
+
+// Details for application forms, per person: entered here ahead of time or learned from form cards.
+const people = ref<KeptPerson[]>([])
+const peopleErr = ref('')
+const editing = ref<string | null>(null) // the relation whose details are open for editing
+const confirming = ref<string | null>(null) // the relation whose delete waits for a "yes"
+const adding = ref('')
+const editor = ref<InstanceType<typeof DetailInputs>[]>([]) // a ref in v-for is a list; one editor is open at most
+const shownPeople = computed(() => people.value.filter((p) => p.kept || p.relation === editing.value))
+const addable = computed(() => people.value.filter((p) => !p.kept && p.relation !== editing.value))
+
+function startAdd() {
+  editing.value = adding.value || addable.value[0]!.relation
+  adding.value = ''
+  focus('h-kept-edit')
+}
+
+async function savePeople(relation: string) {
+  const entered = editor.value[0]?.collect()
+  if (!entered) return
+  peopleErr.value = ''
+  try {
+    const next = await savePerson(relation, entered[relation] ?? {})
+    people.value = people.value.map((p) => (p.relation === relation ? next : p))
+    editing.value = null
+  } catch (e) {
+    peopleErr.value = fail(e)
+  }
+}
+
+async function forget(relation: string) {
+  peopleErr.value = ''
+  try {
+    await deletePerson(relation)
+    people.value = await getPeople()
+    confirming.value = null
+  } catch (e) {
+    peopleErr.value = fail(e)
+  }
+}
+
 load()
 
 function rule(f: Key) {
@@ -340,6 +387,51 @@ async function confirmDelete() {
       </div>
     </form>
 
+    <section v-if="saved" class="card" aria-labelledby="h-kept">
+      <div class="card-h">
+        <h2 id="h-kept">{{ t('Angaben für Anträge') }}</h2>
+        <p class="hint">{{ t('Tragen Sie hier ein, was Sie schon wissen. Den Rest fragt der Lotse beim ersten Formular und merkt es sich.') }}</p>
+      </div>
+      <p v-if="!shownPeople.length" class="muted">{{ t('Noch nichts gemerkt.') }}</p>
+      <div v-for="p in shownPeople" :key="p.relation" class="kept">
+        <div class="card-h">
+          <p :id="editing === p.relation ? 'h-kept-edit' : undefined" class="mini-h" tabindex="-1">{{ t(p.label) }}</p>
+          <div v-if="editing !== p.relation" class="kept-actions">
+            <template v-if="confirming === p.relation">
+              <span role="status">{{ t('Wirklich löschen?') }}</span>
+              <button type="button" class="btn btn-quiet danger" @click="forget(p.relation)">{{ t('Ja, löschen') }}</button>
+              <button type="button" class="btn btn-quiet" @click="confirming = null">{{ t('Abbrechen') }}</button>
+            </template>
+            <template v-else>
+              <button type="button" class="btn btn-quiet" :aria-label="t('Angaben bearbeiten: {name}', { name: t(p.label) })" @click="editing = p.relation; confirming = null">{{ t('Bearbeiten') }}</button>
+              <button type="button" class="btn btn-quiet danger" :aria-label="t('Angaben löschen: {name}', { name: t(p.label) })" @click="confirming = p.relation">{{ t('Löschen') }}</button>
+            </template>
+          </div>
+        </div>
+        <form v-if="editing === p.relation" class="kept-edit" novalidate @submit.prevent="savePeople(p.relation)">
+          <DetailInputs ref="editor" :entries="p.entries" :scope="p.relation" :own="p.relation === 'self'" />
+          <div class="kept-actions">
+            <button type="submit" class="btn btn-primary">{{ t('Speichern') }}</button>
+            <button type="button" class="btn btn-quiet" @click="editing = null">{{ t('Abbrechen') }}</button>
+          </div>
+        </form>
+        <dl v-else class="kept-list">
+          <template v-for="d in p.entries.filter((x) => x.shown)" :key="d.entry"><dt>{{ t(d.label) }}</dt><dd>{{ t(d.shown) }}</dd></template>
+        </dl>
+      </div>
+      <div v-if="addable.length && !editing" class="kept-add">
+        <label class="field-l" for="k-add">{{ t('Angaben eintragen für') }}</label>
+        <div class="kept-actions">
+          <select id="k-add" v-model="adding">
+            <option value="" disabled>{{ t('Bitte wählen') }}</option>
+            <option v-for="p in addable" :key="p.relation" :value="p.relation">{{ t(p.label) }}</option>
+          </select>
+          <button type="button" class="btn btn-secondary" :disabled="!adding" @click="startAdd">{{ t('Eintragen') }}</button>
+        </div>
+      </div>
+      <p v-if="peopleErr" class="err" role="alert"><svg class="i" aria-hidden="true"><use href="#i-alert" /></svg><span>{{ peopleErr }}</span></p>
+    </section>
+
     <section class="card" aria-labelledby="h-view">
       <div class="card-h">
         <h2 id="h-view">{{ t('Ansicht') }}</h2>
@@ -493,6 +585,12 @@ async function confirmDelete() {
 }
 .card { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1rem; padding: 1.2rem clamp(.9rem, 4vw, 1.4rem) 1.4rem; border: var(--hair); border-radius: var(--r-m); background: var(--sheet); }
 .card h2 { font-size: var(--fs-h3); font-weight: 600; color: var(--head); }
+.kept { display: grid; gap: .4rem; padding-top: .8rem; border-top: var(--hair); }
+.kept-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; }
+.kept-edit, .kept-add { display: grid; gap: .8rem; }
+.kept-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .25rem 1rem; margin: 0; }
+.kept-list dt { color: var(--ink-3); }
+.kept-list dd { margin: 0; overflow-wrap: anywhere; }
 .card-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .2rem 1rem; }
 .fields { display: flex; flex-wrap: wrap; gap: 1rem; }
 .fields .field { flex: 1 1 100%; min-width: 0; }

@@ -1,9 +1,18 @@
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
+from backend import forms
 from backend.dependencies import COOKIE, CurrentUser, DbSession, set_session_cookie
 from backend.guards import PASSWORD_FAILURES
-from backend.models import Profile, User
-from backend.schemas import DeleteAccountRequest, PasswordChangeRequest, ProfileData, UserResponse
+from backend.models import Person, Profile, User, utcnow
+from backend.facts import FACTS
+from backend.schemas import (
+    DeleteAccountRequest,
+    FormDetails,
+    PasswordChangeRequest,
+    PersonData,
+    ProfileData,
+    UserResponse,
+)
 from backend.security import hash_password, verify_password
 
 router = APIRouter(tags=["users"])
@@ -32,6 +41,64 @@ def put_profile(body: ProfileData, user: CurrentUser, db: DbSession) -> ProfileD
     db.merge(Profile(user_id=user.id, **body.model_dump()))
     db.commit()
     return body
+
+
+# Your own name and contact details are in the profile; the people rows add what forms ask for beyond that.
+OWN_ENTRIES = [e for e, (_, _, fields) in forms.ENTRIES.items() if set(fields) <= set(FormDetails.model_fields)]
+
+
+def person_view(relation: str, details: dict | None) -> dict:
+    """One person for the settings page: every entry with its stored value, editable, and as shown."""
+    person = PersonData(**(details or {}))
+    shown = forms.details(person)
+    return {
+        "relation": relation,
+        "label": "Sie selbst" if relation == "self" else FACTS["subject"].values[relation],
+        "kept": details is not None,
+        "entries": [
+            {**forms.entry_item(e, forms.ENTRIES[e][1], person), "shown": forms.text(f"x.{e}", shown[e]) if e in shown else ""}
+            for e in (OWN_ENTRIES if relation == "self" else forms.ENTRIES)
+        ],
+    }
+
+
+def known_relation(relation: str) -> str:
+    if relation not in FACTS["subject"].values:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Not found")
+    return relation
+
+
+@router.get("/me/people")
+def get_people(user: CurrentUser) -> list[dict]:
+    """Every person details can be kept for (the user and each relation), kept or not, for the settings page."""
+    kept = {p.relation: p.details for p in user.people}
+    return [person_view(relation, kept.get(relation)) for relation in FACTS["subject"].values]
+
+
+@router.put("/me/people/{relation}")
+def put_person(relation: str, body: PersonData, user: CurrentUser, db: DbSession) -> dict:
+    """Replaces what is kept for a person, entered in the settings ahead of any form. Nothing left: the row goes."""
+    known_relation(relation)
+    details = body.model_dump(exclude_defaults=True, include=set(FormDetails.model_fields) if relation == "self" else None)
+    row = db.get(Person, (user.id, relation))
+    if not details:
+        if row is not None:
+            db.delete(row)
+    elif row is None:
+        db.add(Person(user_id=user.id, relation=relation, details=details, updated_at=utcnow()))
+    else:
+        row.details, row.updated_at = details, utcnow()
+    db.commit()
+    return person_view(relation, details or None)
+
+
+@router.delete("/me/people/{relation}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_person(relation: str, user: CurrentUser, db: DbSession) -> None:
+    row = db.get(Person, (user.id, relation))
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Not found")
+    db.delete(row)
+    db.commit()
 
 
 @router.post("/me/password", status_code=status.HTTP_204_NO_CONTENT)

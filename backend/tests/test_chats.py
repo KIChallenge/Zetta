@@ -697,6 +697,7 @@ def chat_requests(chat_id):
         ("POST", f"/chats/{chat_id}/answers", {"fact_key": "district", "value": "1100"}),
         ("GET", f"/chats/{chat_id}/state", None),
         ("PATCH", f"/chats/{chat_id}/steps/documents", {"status": "done"}),
+        ("POST", f"/chats/{chat_id}/steps/documents/form", {}),
     ]
 
 
@@ -744,11 +745,9 @@ def test_form_steps_offer_the_form_filled_in_with_the_profile(client, anna, bob,
     steps = steps_of(dict(to_plan(client, anna, llm, chat["id"]))["plan"])
 
     # The mother's details are not in the profile: only Anna's own part of the form is filled in.
-    assert steps["care_allowance.submit"]["form"]["prefill"] == {
-        "filled": ["Ihr Name", "Ihre Telefonnummer", "Ihre E-Mail-Adresse", "Ihre Adresse"],
-        "missing": [],
-    }
-    assert steps["home_care_fsw.send_application"]["form"]["prefill"] == {"filled": [], "missing": []}
+    prefill = steps["care_allowance.submit"]["form"]["prefill"]
+    assert prefill["filled"] == ["Ihr Name", "Ihre Telefonnummer", "Ihre E-Mail-Adresse", "Ihre Adresse"]
+    assert "Geburtsdatum Ihrer Mutter" in [a["label"] for a in prefill["ask"]]
     response = client.get(f"/chats/{chat['id']}/steps/care_allowance.submit/form", headers=anna)
 
     assert response.status_code == 200
@@ -760,3 +759,111 @@ def test_form_steps_offer_the_form_filled_in_with_the_profile(client, anna, bob,
     assert fields["Fam.Name"].get("/V") in (None, "")
     assert_error(client.get(f"/chats/{chat['id']}/steps/care_allowance.call/form", headers=anna), 404)
     assert_error(client.get(f"/chats/{chat['id']}/steps/care_allowance.submit/form", headers=bob), 404)
+
+
+def kept(client, headers):
+    """Relation -> entry -> the value as the settings page shows it, for the people with kept details."""
+    return {
+        p["relation"]: {e["entry"]: e["shown"] for e in p["entries"] if e["shown"]}
+        for p in client.get("/me/people", headers=headers).json()
+        if p["kept"]
+    }
+
+
+def form_url(chat):
+    return f"/chats/{chat['id']}/steps/care_allowance.submit/form"
+
+
+def test_details_typed_into_a_form_card_fill_it_and_the_next_forms(client, anna, bob, llm):
+    client.put("/me/profile", json=PROFILE, headers=anna)
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+    body = {"subject": {"full_name": "Maria Berger", "birth_date": "1948-03-12", "sex": "female"}, "user": {"title": "Mag."}}
+
+    response = client.post(form_url(chat), json=body, headers=anna)
+
+    fields = PdfReader(io.BytesIO(response.content)).get_fields()
+    assert (fields["Fam.Name"]["/V"], fields["Geburtsdatum"]["/V"], fields["Titel2"]["/V"]) == ("Berger", "12.03.1948", "Mag.")
+    assert kept(client, anna) == {
+        "self": {"title": "Mag."},
+        "mother": {"name": "Maria Berger", "birth_date": "12.03.1948", "sex": "weiblich"},
+    }
+    assert kept(client, bob) == {}
+    # The plain download and the card of every later form have them now.
+    fields = PdfReader(io.BytesIO(client.get(form_url(chat), headers=anna).content)).get_fields()
+    assert fields["Geburtsdatum"]["/V"] == "12.03.1948"
+    prefill = steps_of(client.get(f"/chats/{chat['id']}/state", headers=anna).json()["plan"])["care_allowance.submit"]["form"]["prefill"]
+    assert "Geburtsdatum Ihrer Mutter" in prefill["filled"]
+    assert "Geburtsdatum Ihrer Mutter" not in [a["label"] for a in prefill["ask"]]
+
+
+def test_details_not_to_remember_only_fill_this_pdf(client, anna, llm):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+
+    response = client.post(form_url(chat), json={"subject": {"birth_date": "1948-03-12"}, "remember": False}, headers=anna)
+
+    assert PdfReader(io.BytesIO(response.content)).get_fields()["Geburtsdatum"]["/V"] == "12.03.1948"
+    assert kept(client, anna) == {}
+
+
+def test_the_users_own_contact_details_from_a_form_card_go_to_the_profile(client, anna, llm):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+
+    client.post(form_url(chat), json={"user": {"full_name": "Anna Berger", "phone": "0660 1234567"}}, headers=anna)
+
+    profile = client.get("/me/profile", headers=anna).json()
+    assert (profile["full_name"], profile["phone"]) == ("Anna Berger", "0660 1234567")
+    assert kept(client, anna) == {}
+
+
+@pytest.mark.parametrize(
+    "subject", [{"birth_date": "2999-01-01"}, {"sex": "unknown"}, {"svnr": "1234567890"}]
+)
+def test_form_card_details_are_validated(client, anna, llm, subject):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+
+    assert_error(client.post(form_url(chat), json={"subject": subject}, headers=anna), 422)
+
+
+def test_kept_details_can_be_deleted(client, anna, llm):
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+    client.post(form_url(chat), json={"subject": {"birth_date": "1948-03-12"}}, headers=anna)
+
+    assert client.delete("/me/people/mother", headers=anna).status_code == 204
+    assert kept(client, anna) == {}
+    assert_error(client.delete("/me/people/mother", headers=anna), 404)
+
+
+def test_details_entered_in_the_settings_fill_the_first_form(client, anna, llm):
+    response = client.put("/me/people/mother", json={"full_name": "Maria Berger", "sex": "female"}, headers=anna)
+    chat = create_chat(client, anna)
+    to_plan(client, anna, llm, chat["id"])
+
+    assert response.json()["kept"] is True
+    fields = PdfReader(io.BytesIO(client.get(form_url(chat), headers=anna).content)).get_fields()
+    assert (fields["Fam.Name"]["/V"], fields["Geschlecht"]["/V"]) == ("Berger", "weiblich")
+
+
+def test_settings_replace_a_persons_details_and_an_empty_person_is_removed(client, anna):
+    client.put("/me/people/mother", json={"full_name": "Maria Berger", "sex": "female"}, headers=anna)
+    client.put("/me/people/mother", json={"full_name": "Maria Berger"}, headers=anna)
+    assert kept(client, anna) == {"mother": {"name": "Maria Berger"}}
+
+    client.put("/me/people/mother", json={}, headers=anna)
+    assert kept(client, anna) == {}
+
+
+def test_the_users_own_row_keeps_only_details_beyond_the_profile(client, anna):
+    client.put("/me/people/self", json={"full_name": "Anna Berger", "title": "Mag."}, headers=anna)
+
+    assert kept(client, anna) == {"self": {"title": "Mag."}}
+    own = next(p for p in client.get("/me/people", headers=anna).json() if p["relation"] == "self")
+    assert "name" not in [e["entry"] for e in own["entries"]]
+
+
+def test_unknown_relations_are_not_kept(client, anna):
+    assert_error(client.put("/me/people/neighbour", json={"full_name": "X"}, headers=anna), 404)

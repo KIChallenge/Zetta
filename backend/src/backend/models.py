@@ -21,6 +21,7 @@ class User(Base):
 
     # Deleted by the ORM with the user: SQLite does not enforce foreign keys by default.
     profile: Mapped["Profile | None"] = relationship(cascade="all, delete-orphan")
+    people: Mapped[list["Person"]] = relationship(cascade="all, delete-orphan")
     chats: Mapped[list["Chat"]] = relationship(cascade="all, delete-orphan")
     token_version: Mapped["TokenVersion | None"] = relationship(cascade="all, delete-orphan")
 
@@ -59,6 +60,18 @@ class Profile(Base):
     contact_email: Mapped[str] = mapped_column(String(320))
     answer_language: Mapped[str] = mapped_column(String(3))
     answer_length: Mapped[str] = mapped_column(String(10))
+
+
+class Person(Base):
+    """Details for forms, kept from a form card: of a relative (by relation), or the user's own ones beyond the profile
+    ("self"). Own table, so existing databases need no migration."""
+
+    __tablename__ = "people"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    relation: Mapped[str] = mapped_column(String(20), primary_key=True)  # a value of the `subject` fact
+    details: Mapped[dict] = mapped_column(JSON)  # schemas.PersonData without the empty ones
+    updated_at: Mapped[datetime] = mapped_column(DateTime)
 
 
 class Chat(Base):

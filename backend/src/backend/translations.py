@@ -8,9 +8,10 @@ cannot put new contact data in front of a user.
 import re
 from pathlib import Path
 
-from backend import scripts
+from backend import forms, scripts
 from backend.corpus import get_corpus
 from backend.facts import DISTRICTS, FACTS, SENTINELS, SUBJECT_WORDS
+from backend.schemas import CHOICES
 
 LANGUAGES = {"en": "English", "fr": "French", "cs": "Czech", "sk": "Slovak", "sl": "Slovenian"}
 FRONTEND_SRC = Path(__file__).resolve().parents[3] / "frontend" / "src"
@@ -63,6 +64,10 @@ def corpus_sources() -> set[str]:
     found |= {words[1] for words in SUBJECT_WORDS.values()}  # {subject.relation}
     found |= {label for label in scripts.SLOTS.values() if label and "{gen}" not in label}
     found |= {label.format(gen=words[2]) for label in scripts.SLOTS.values() if "{gen}" in label for words in others}
+    # Form cards and the kept details in the settings. Health insurers are names and stay German.
+    found |= {"Sie selbst"} | {label for own, noun, _ in forms.ENTRIES.values() for label in (own, noun)}
+    found |= {f"{noun} {words[2]}" for _, noun, _ in forms.ENTRIES.values() for words in others}
+    found |= {label for key, values in CHOICES.items() if key != "health_insurer" for label in values.values()}
     for question in corpus.questions:
         found.add(question.text["self"])
         found |= {question.text["other"].replace("{subject.ihr}", words[0]) for words in others}

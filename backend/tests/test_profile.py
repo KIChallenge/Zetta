@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import func, select
 
 from backend.database import SessionLocal
-from backend.models import Chat, Message, Profile, User
+from backend.models import Chat, Message, Person, Profile, User, utcnow
 from test_chats import assert_error, create_chat, register, send
 
 PASSWORD = "secret-password-123"
@@ -173,19 +173,23 @@ def test_change_password_rejects_short_new_password(client, anna):
 
 def counts():
     with SessionLocal() as db:
-        return [db.scalar(select(func.count()).select_from(t)) for t in (User, Profile, Chat, Message)]
+        return [db.scalar(select(func.count()).select_from(t)) for t in (User, Profile, Chat, Message, Person)]
 
 
 def test_delete_account_removes_all_its_data(client, anna, bob):
     for headers in (anna, bob):
         put(client, headers, ANNA)
         send(client, headers, create_chat(client, headers)["id"])
-    assert counts() == [2, 2, 2, 4]
+        with SessionLocal() as db:
+            user_id = client.get("/me", headers=headers).json()["id"]
+            db.add(Person(user_id=user_id, relation="mother", details={"birth_date": "1948-03-12"}, updated_at=utcnow()))
+            db.commit()
+    assert counts() == [2, 2, 2, 4, 2]
 
     response = client.request("DELETE", "/me", json={"password": PASSWORD}, headers=anna)
 
     assert response.status_code == 204
-    assert counts() == [1, 1, 1, 2]
+    assert counts() == [1, 1, 1, 2, 1]
     assert_error(client.get("/me", headers=anna), 401)
     assert client.get("/me/profile", headers=bob).json() == ANNA
 

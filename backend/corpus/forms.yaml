@@ -1,6 +1,7 @@
 # Application forms. `file` is the blank PDF in corpus/forms. `fields` say which PDF field gets which of the user's
-# details (src/backend/forms.py): {subject.*} only has values when the user asks for themselves, {user.*} always
-# comes from the profile. Never medical details, signatures, dates, consents or choices the user has to make.
+# details (src/backend/forms.py): {user.*} are the user's, {subject.*} the ones of the person the chat is about, from
+# the profile and the details kept from form cards. `map` gives a checkbox or radio button its state for a choice.
+# Never medical details, signatures, application dates, consents or choices the user has to make.
 
 - id: care_allowance_form
   title: Antrag auf Pflegegeld (PAL 080)
@@ -11,6 +12,13 @@
     - {field: VSNR_1, value: "{subject.svnr}"}
     - {field: Fam.Name, value: "{subject.last_name}"}
     - {field: Vorname, value: "{subject.first_name}"}
+    - {field: Titel, value: "{subject.title}"}
+    - {field: Geburtsdatum, value: "{subject.birth_date}"}
+    - {field: Geschlecht, value: "{subject.sex}"}
+    - {field: Stabü, value: "{subject.citizenship}", map: {austria: /01, other: /02}}
+    - field: Personenstand
+      value: "{subject.marital_status}"
+      map: {single: /01, married: /02, widowed: /03, divorced: /04, partnership: /05, former_partnership: /08}
     - {field: Adresse Straße, value: "{subject.street}"}
     - {field: "Hausnummer, Stiege, Tür", value: "{subject.house}"}
     - {field: PLZ, value: "{subject.postal_code}"}
@@ -20,6 +28,7 @@
     # Section 2: the person filling in the form for someone else. Whether they are a representative stays open.
     - {field: Familienname andere, value: "{user.last_name}", when: {subject: {not: [self]}}}
     - {field: Vorname andere Person, value: "{user.first_name}", when: {subject: {not: [self]}}}
+    - {field: Titel2, value: "{user.title}", when: {subject: {not: [self]}}}
     - {field: Adresse Straße 1, value: "{user.street}", when: {subject: {not: [self]}}}
     - {field: "Hausnummer, Stiege, Tür2", value: "{user.house}", when: {subject: {not: [self]}}}
     - {field: PLZ 1, value: "{user.postal_code}", when: {subject: {not: [self]}}}
@@ -41,6 +50,9 @@
     - {field: Pflege und Betreuung zu Hause, value: /Ja}
     - {field: Familienname Titel KundIn, value: "{subject.last_name}"}
     - {field: Vorname KundIn, value: "{subject.first_name}"}
+    - {field: Geburtsdatum KundIn, value: "{subject.birth_date}"}
+    - {field: Geschlecht KundIn, value: "{subject.sex}", map: {female: /weiblich, male: /maennlich, diverse: /divers/inter/offen}}
+    - {field: "Familienstand ", value: "{subject.marital_status}"}
     - {field: Telefonnummer KundIn, value: "{subject.phone}"}
     - {field: E-Mail Adresse KundIn, value: "{subject.email}"}
     - {field: Strassennamen Lebensmittelpunkt, value: "{subject.street}"}
@@ -60,8 +72,13 @@
     - {field: Patient(in), value: "{subject.last_name} {subject.first_name}"}
     - {field: VSNR_1, value: "{subject.svnr}"}
     - {field: Anschrift Patient(in), value: "{subject.address}"}
+    - {field: Telefonnummer, value: "{subject.phone}"}
+    - {field: Personenstand, value: "{subject.marital_status}"}
+    - {field: zuständiger SV-träger, value: "{subject.health_insurer}"}
     - {field: Familienname, value: "{subject.last_name}"}
     - {field: Vorname, value: "{subject.first_name}"}
+    - {field: Geburtsjahr, value: "{subject.birth_year}"}
+    - {field: Geschlecht, value: "{subject.sex}", map: {female: /w, male: /m}}
   submit_to: pva_vienna
   source_url: https://www.pv.at/web/reha-und-praevention/vom-antrag-zu-reha-und-kur
   verified_at: 2026-11-05

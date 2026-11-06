@@ -16,8 +16,8 @@ from backend.facts import FACTS, SENTINELS, VIENNA_POSTAL_CODE, merge, subject_w
 from backend.hours import now as vienna_now
 from backend.hours import reachable, summary
 from backend.llm import Llm, redact
-from backend.models import Chat, ChatFact, Message, Plan, Profile, StepState, utcnow
-from backend.schemas import MessageResponse, ProfileData
+from backend.models import Chat, ChatFact, Message, Person, Plan, Profile, StepState, utcnow
+from backend.schemas import Contact, FormDetails, FormRequest, MessageResponse, PersonData, ProfileData
 
 logger = logging.getLogger(__name__)
 TO_PLAN = "Ihr Plan steht weiter oben. Unter „Mehr dazu“ steht bei jedem Thema, worum es geht."
@@ -55,6 +55,56 @@ def shown(plan: Plan, states: dict[str, StepState]) -> list[dict]:
 def profile_of(db: Session, user_id: str) -> ProfileData:
     row = db.get(Profile, user_id)
     return ProfileData.model_validate(row) if row else ProfileData()
+
+
+def kept_of(db: Session, user_id: str) -> dict[str, dict]:
+    """Relation -> the details kept from form cards ("self": the user's own ones beyond the profile)."""
+    return {p.relation: p.details for p in db.scalars(select(Person).where(Person.user_id == user_id))}
+
+
+def people_of(db: Session, user_id: str, facts: dict) -> tuple[PersonData, PersonData | None]:
+    return forms.people(profile_of(db, user_id), kept_of(db, user_id), facts)
+
+
+def entered(body: FormRequest, facts: dict) -> dict[str, dict]:
+    """Relation -> the details typed into a form card, without the empty ones. The subject's details go to the
+    user's when they ask for themselves, and nowhere while it is not known who the chat is about."""
+    out = {"self": body.user.model_dump(exclude_defaults=True)}
+    subject = body.subject.model_dump(exclude_defaults=True)
+    if facts.get("subject") == "self":
+        out["self"] |= subject
+    elif facts.get("subject") in FACTS["subject"].values:
+        out[facts["subject"]] = subject
+    return {k: v for k, v in out.items() if v}
+
+
+def with_entered(user: PersonData, subject: PersonData | None, new: dict[str, dict], facts: dict):
+    """The people with the details just typed in, for one PDF."""
+    user = user.model_copy(update=new.get("self", {}))
+    if facts.get("subject") == "self":
+        return user, user
+    if subject is None:
+        return user, None
+    return user, subject.model_copy(update=new.get(facts["subject"], {}))
+
+
+def remember(db: Session, user_id: str, new: dict[str, dict]) -> None:
+    """Keeps details typed into a form card for the next forms. The user's name and contact details go to the
+    profile, everything else to their row in `people`."""
+    now = utcnow()
+    for relation, details in new.items():
+        if relation == "self" and (contact := {k: v for k, v in details.items() if k in Contact.model_fields}):
+            profile = profile_of(db, user_id).model_copy(update=contact)
+            db.merge(Profile(user_id=user_id, **profile.model_dump()))
+            details = {k: v for k, v in details.items() if k in FormDetails.model_fields}
+        if not details:
+            continue
+        row = db.get(Person, (user_id, relation))
+        if row is None:
+            db.add(Person(user_id=user_id, relation=relation, details=details, updated_at=now))
+        else:
+            row.details, row.updated_at = {**row.details, **details}, now
+    db.commit()
 
 
 def fact_rows(db: Session, chat_id: str) -> dict[str, ChatFact]:
@@ -184,7 +234,9 @@ def chat_status(db: Session, chat_id: str) -> str | None:
     return "Frage offen" if pending_question(db, chat_id) else None
 
 
-def render_plan(plan: Plan, states: dict[str, StepState], profile: ProfileData, facts: dict, now: datetime) -> dict:
+def render_plan(
+    plan: Plan, states: dict[str, StepState], profile: ProfileData, kept: dict[str, dict], facts: dict, now: datetime
+) -> dict:
     steps = shown(plan, states)
     status = statuses(steps, {k: s.status for k, s in states.items()})
     out = []
@@ -204,7 +256,8 @@ def render_plan(plan: Plan, states: dict[str, StepState], profile: ProfileData, 
             view["outcomes"][0]["label"] = step["done_label"]
         if (form := get_corpus().forms.get(step.get("form", {}).get("id"))) and form.file and form.fields:
             # The PDF itself is filled in on download (GET /chats/{id}/steps/{step_id}/form).
-            view["form"] = {**step["form"], "prefill": forms.summary(form, profile, facts)}
+            user, subject = forms.people(profile, kept, facts)
+            view["form"] = {**step["form"], "prefill": forms.summary(form, user, subject, facts)}
         if "contact" in step:
             view["contact"] = contact_view(step["contact"], now)
         if "doctors" in step:
@@ -230,7 +283,9 @@ def current_plan(db: Session, chat: Chat) -> dict | None:
     if plan is None:
         return None
     facts = {k: r.value for k, r in fact_rows(db, chat.id).items()}
-    return render_plan(plan, step_states(db, chat.id), profile_of(db, chat.user_id), facts, vienna_now())
+    return render_plan(
+        plan, step_states(db, chat.id), profile_of(db, chat.user_id), kept_of(db, chat.user_id), facts, vienna_now()
+    )
 
 
 def question_message(chat_id: str, key: str, facts: dict, corpus: Corpus) -> Message:
@@ -396,7 +451,7 @@ async def respond(
         for step in todo:
             states[step["id"]].script = {**written[step["id"]], "hash": scripts.inputs_hash(step, detail)}
         db.commit()
-        yield ServerSentEvent(event="plan", data=render_plan(plan, states, profile, facts, vienna_now()))
+        yield ServerSentEvent(event="plan", data=render_plan(plan, states, profile, kept_of(db, chat.user_id), facts, vienna_now()))
 
     if reply not in db:
         db.add(reply)
