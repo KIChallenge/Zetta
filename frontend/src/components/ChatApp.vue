@@ -78,6 +78,8 @@ function fail(e: unknown, invalid?: string) {
 }
 
 const focus = (id: string) => nextTick(() => document.getElementById(id)?.focus())
+// A pressed chip or button that is gone after the update would leave the keyboard on the page: it goes to `id` instead.
+const keepFocus = (id: string) => nextTick(() => document.activeElement === document.body && document.getElementById(id)?.focus())
 const scrollDown = () => nextTick(() => scroller.value?.scrollTo({ top: scroller.value.scrollHeight }))
 // Measured before an update: a new reply only scrolls along if the user has not scrolled up to read.
 const nearBottom = (el = scroller.value) => !!el && el.scrollHeight - el.scrollTop - el.clientHeight < 80
@@ -224,6 +226,7 @@ function deliver(id: string, text: string, answer?: AnswerPayload) {
   })
   messages.value.push(m)
   scrollDown()
+  keepFocus('q') // a picked chip is gone: the keyboard goes on in the composer, right below the reply
   retry(id, m)
 }
 
@@ -367,6 +370,7 @@ async function patchStep(step: string, body: StepUpdate) {
     if (activeId.value !== id) return
     plan.value = next
     setStatus(id, next.status)
+    keepFocus(`t-${step}`) // e.g. an outcome button, gone once the step is done
   } catch (e) {
     planErr.value = fail(e)
   }
